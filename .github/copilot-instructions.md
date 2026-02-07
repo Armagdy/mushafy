@@ -1,153 +1,174 @@
 # Quran Explorer - AI Coding Guide
 
 ## Project Overview
-A modern, multilingual Quranic reading web application built with Vite, React, TypeScript, and Tailwind CSS. The app features Arabic/English language switching, Surah browsing, search functionality, and offline-capable PWA support.
+A modern, multilingual Quranic reading web application built with Vite, React, TypeScript, and Tailwind CSS. Features include Arabic/English language switching, multiple Mushaf types (Mwdoa/Tashel/Madinah), audio playback, bookmarks, and offline-capable PWA support.
 
-**Key Tech Stack:**
-- **Frontend:** React 18, TypeScript, Vite (SWC transpiler)
-- **Styling:** Tailwind CSS + shadcn/ui component library
-- **Routing:** React Router v6
-- **State Management:** React Context (Language), TanStack React Query
-- **Testing:** Vitest with React Testing Library
-- **Build:** Vite with PWA plugin for offline support
+**Tech Stack:**
+- React 18 + TypeScript + Vite (SWC transpiler)
+- Tailwind CSS + shadcn/ui (Radix primitives)
+- React Router v6 + React Context state
+- Framer Motion + Lucide icons
+- Vitest + React Testing Library
 
-## Architecture Patterns
+## Architecture: Two-Context System
 
-### 1. **Context-Based Language System** (`src/contexts/LanguageContext.tsx`)
-- Single source of truth for all i18n: `useLanguage()` hook provides `t()` translation function, `isRTL` flag, and language state
-- Persists to `localStorage` and synchronizes `document.dir` and `document.lang`
-- **Pattern:** Always use `useLanguage()` in components; never hardcode text strings
-- **Example:** `const { t, isRTL } = useLanguage(); <h2>{t('surahs')}</h2>`
-- Add new translations to [src/i18n/translations.ts](src/i18n/translations.ts) (both `ar` and `en` objects required)
-- **Numbers:** Display numbers in language-appropriate format:
-  - Arabic (ar): Use Eastern Arabic numerals (٠١٢٣٤٥٦٧٨٩) via `.toLocaleString('ar-SA')`
-  - English (en): Use Western Arabic numerals (0123456789) via `.toLocaleString('en-US')`
-  - Create utility function or use language state to format all displayed numbers consistently
+### 1. Language Context (`src/contexts/LanguageContext.tsx`)
+**CRITICAL:** All text must use `t()` translation function—never hardcode strings.
+```tsx
+const { t, isRTL, language } = useLanguage();
+<h2>{t('surahs')}</h2>  // ✅ Correct
+<h2>Surahs</h2>         // ❌ Wrong
+```
+- Add new keys to **both** `ar` and `en` in [src/i18n/translations.ts](src/i18n/translations.ts)
+- Persists to `localStorage`, syncs `document.dir` and `document.lang`
+- **Number formatting:** Use helper function (see [src/pages/Surah.tsx](src/pages/Surah.tsx) `formatNumber`):
+  - Arabic: Eastern numerals (٠١٢٣...) via custom digit replacement
+  - English: Western numerals (0123...) unchanged
 
-### 2. **Component Layer Architecture**
-- **Page Components:** [src/pages/](src/pages/) handle routing (Index, NotFound)
-- **Feature Components:** [src/components/](src/components/) (SurahList, SurahCard, SurahReader, Hero, Header, Footer)
-- **UI Components:** [src/components/ui/](src/components/ui/) are shadcn/ui primitives—treat as read-only (auto-generated via CLI)
-- **Data Layer:** [src/data/surahs.ts](src/data/surahs.ts) exports static Surah array; immutable reference data
+### 2. Mushaf Context (`src/contexts/MushafContext.tsx`)
+Three Mushaf types: `'mwdoa' | 'tashel' | 'madinah'` map to image directories:
+- `mwdoa` → `/assets/mushuf_mwdoa_images`
+- `tashel` → `/assets/mushaf_tashel_pages`
+- `madinah` → `/assets/mushaf_madinah_images`
 
-### 3. **Styling & Responsive Design**
-- Tailwind CSS with HSL CSS variables for theming (defined in generated CSS)
-- Dark mode support via `darkMode: ["class"]` in [tailwind.config.ts](tailwind.config.ts)
-- RTL-aware layouts: use `cn()` utility from [src/lib/utils.ts](src/lib/utils.ts) to conditionally apply RTL-specific classes
-- Example: `cn("text-left", isRTL && "text-right")`
+Use `getMushafPath()` to build image URLs. Persists to `localStorage`.
 
-### 4. **Animation & Motion**
-- Framer Motion for entrance/viewport animations (see [src/components/SurahList.tsx](src/components/SurahList.tsx) for `motion.div` + `whileInView` pattern)
-- Use `once: true` in viewport to prevent re-animation on scroll
+## Quran Data Layer
 
-### 5. **Shadcn/UI Integration**
-- Components are generated from shadcn registry—do NOT edit directly
-- All components in [src/components/ui/](src/components/ui/) use Radix UI primitives
-- Add new UI components via shadcn CLI: `npx shadcn-ui@latest add <component-name>`
+### Static Metadata ([src/data/surahs.ts](src/data/surahs.ts))
+114 Surahs with `id`, `name`, `englishName`, `numberOfAyahs`, `revelationType`, `startingAyah`, `revelationOrder`, `quarter`.
+**DO NOT EDIT** this data—it's canonical Quranic metadata.
 
-## Developer Workflows
+### Dynamic JSON Files (loaded via `fetch`)
+- `/assets/quran-meta-data.json` — Page→Surah/Ayah mappings (see [src/lib/quran-mapping.ts](src/lib/quran-mapping.ts))
+- `/assets/ayah-meta-data.json` — Ayah text, Juz/Hizb boundaries
+- `/assets/audio.json` — Reciter metadata for audio player
 
-### Local Development
-```bash
-npm install          # Install dependencies (or `bun install`)
-npm run dev          # Start Vite dev server on :8080 with HMR
-npm run build        # Production build to dist/
-npm run build:dev    # Development build with source maps
-npm run lint         # Run ESLint across entire project
-npm run test         # Run Vitest once
-npm run test:watch   # Watch mode for development
-npm run preview      # Preview production build locally
+**Pattern:** Fetch JSON in `useEffect`, cache in component state. See [src/pages/Surah.tsx](src/pages/Surah.tsx) lines 157-626 for examples.
+
+## Routing Pattern ([src/App.tsx](src/App.tsx))
+```tsx
+<Route path="/" element={<Surah />} />
+<Route path="/page/:page" element={<Surah />} />
+<Route path="/surah/:id" element={<Surah />} />
+<Route path="/surah/:id/:page" element={<Surah />} />
+{/* ADD ALL CUSTOM ROUTES ABOVE THIS LINE */}
+<Route path="*" element={<NotFound />} />
+```
+**CRITICAL:** New routes go **before** catch-all `*` or they'll be swallowed.
+
+## Component Architecture
+
+### Pages ([src/pages/](src/pages/))
+- `Surah.tsx` — Main reader (3200+ lines, handles page navigation, audio, bookmarks, search)
+- `Index.tsx` — Landing page (if used)
+- `NotFound.tsx` — 404 page
+
+### Feature Components ([src/components/](src/components/))
+- `SurahList`, `SurahCard`, `SurahReader` — Quran browsing
+- `Header`, `Footer`, `Hero` — Layout
+- **NavLink** — Custom nav link component
+
+### UI Components ([src/components/ui/](src/components/ui/))
+**READ-ONLY:** Generated by shadcn CLI—never edit manually.
+Add new components: `npx shadcn-ui@latest add <component-name>`
+
+## Styling Patterns
+
+### RTL-Aware Layouts
+Use `cn()` utility from [src/lib/utils.ts](src/lib/utils.ts):
+```tsx
+const { isRTL } = useLanguage();
+<div className={cn("text-left", isRTL && "text-right")} />
 ```
 
-### Build System
-- **Vite dev server:** Configured on `[::]:8080` with componentTagger plugin in development (Lovable integration)
-- **Path alias:** `@` resolves to `src/` directory
-- **Lazy loading:** React Router supports automatic code-splitting with lazy routes
+### Dialog Styling (Project Standard)
+```tsx
+<DialogContent className={cn(
+  "sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto",
+  "rounded-xl border border-emerald-500",
+  isRTL ? "rtl" : "ltr"
+)}>
+  <DialogTitle className="text-base sm:text-lg font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+    {t('title')}
+  </DialogTitle>
+</DialogContent>
+```
 
-## Project-Specific Conventions
+### Bottom Bar Pattern
+```tsx
+// Icons: w-7 h-7 md:w-8 md:h-8 (no strokeWidth)
+<Icon className="w-7 h-7 md:w-8 md:h-8" />
+// Text: text-base md:text-xl font-medium
+<span className="text-base md:text-xl font-medium">{t('label')}</span>
+// Container: py-2 md:py-3 (or py-0.5 md:py-1 with text)
+```
 
-### 1. **Naming Conventions**
-- Components: PascalCase (e.g., `SurahCard.tsx`)
-- Utility functions: camelCase (e.g., `useLanguage.ts`)
-- Hooks: `use` prefix required (e.g., [src/hooks/use-toast.ts](src/hooks/use-toast.ts))
-- Translation keys: camelCase in both `ar` and `en` objects
+### Tabs Pattern
+```tsx
+<Tabs defaultValue="tab1">
+  <TabsList className="grid w-full grid-cols-2">
+    <TabsTrigger value="tab1">{t('tab1')}</TabsTrigger>
+    <TabsTrigger value="tab2">{t('tab2')}</TabsTrigger>
+  </TabsList>
+  <TabsContent value="tab1">...</TabsContent>
+</Tabs>
+```
 
-### 2. **File Structure by Feature**
-- Keep related files co-located: component + its CSS/hooks in [src/components/](src/components/)
-- Custom hooks in [src/hooks/](src/hooks/)
-- Global utilities in [src/lib/utils.ts](src/lib/utils.ts)
-- Static data in [src/data/](src/data/)
+## State Persistence Pattern
+Used throughout [src/pages/Surah.tsx](src/pages/Surah.tsx):
+```tsx
+const [tab, setTab] = useState<'surah' | 'juz'>(() => {
+  const saved = localStorage.getItem('quran-search-tab');
+  return (saved as 'surah' | 'juz') || 'surah';
+});
 
-### 3. **Type Safety**
-- All components must be typed (no `any` unless unavoidable)
-- Export interfaces for component props in same file (e.g., `interface SurahCardProps`)
-- Use TypeScript's `type` keyword for unions; `interface` for object shapes
+useEffect(() => {
+  localStorage.setItem('quran-search-tab', tab);
+}, [tab]);
+```
 
-### 4. **Search & Filtering Pattern**
-- Use `useMemo` to avoid re-filtering on every render (see [src/components/SurahList.tsx](src/components/SurahList.tsx))
-- Support searching by Arabic name, English name, translation, and ID
+## Development Workflows
 
-### 5. **Widget/Dialog Styling Pattern**
-- **Dialog Container:** Use `DialogContent` with `sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto rounded-xl border border-emerald-500` for responsive modal dialogs
-- **Dialog Title:** Use `text-base sm:text-lg font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent` for gradient-styled headers
-- **Settings Container:** Use `space-y-2 sm:space-y-3` for vertical spacing between setting items
-- **Setting Items:** Use `flex flex-col gap-2 p-2 sm:p-3 rounded-lg bg-gray-50 dark:bg-gray-800` for individual setting containers
-- **RTL Support:** Always include `${isRTL ? 'rtl' : 'ltr'}` in dialog className for proper text direction
-- **Tabs Container:** Use `Tabs` with `TabsList className="grid w-full grid-cols-2"` for two-tab layouts, and `TabsContent` for tab content areas
+### Commands
+```bash
+npm run dev          # Vite dev server on [::]:8080 with HMR
+npm run build        # Production build → dist/
+npm run build:dev    # Dev build with source maps
+npm run lint         # ESLint all files
+npm run test         # Vitest once
+npm run test:watch   # Vitest watch mode
+npm run preview      # Preview production build
+```
 
-### 6. **Bottom Bar Styling Pattern**
-- **Bottom Bar Icons:** Use `w-7 h-7 md:w-8 md:h-8` for icon size without `strokeWidth` (use default stroke width, not bold)
-- **Bottom Bar Text:** Use `text-base md:text-xl font-medium` for bottom bar button labels
-- **Bottom Bar Container:** Use `py-2 md:py-3` for normal padding, or `py-0.5 md:py-1` when text is shown
+### Vite Configuration
+- **Path alias:** `@` → `src/`
+- **Dev mode:** Lovable componentTagger plugin active
+- **Server:** IPv6 `[::]` on port 8080
 
-## Integration Points
+## Type Safety Rules
+- ❌ Avoid `any` unless absolutely unavoidable
+- Export interfaces in same file: `interface SurahCardProps { ... }`
+- Use `type` for unions, `interface` for object shapes
 
-### External Dependencies
-- **@radix-ui/react-\*:** Low-level accessible component primitives
-- **shadcn/ui:** High-level composable components built on Radix
-- **framer-motion:** Smooth animations with Tailwind integration
-- **lucide-react:** Icon library (SVG-based, tree-shakable)
-- **react-hook-form + zod:** Form validation (available but not currently used—follow this pattern for forms)
-
-### Router Configuration
-- Single route tree in [src/App.tsx](src/App.tsx)
-- Always add custom routes **before** the catch-all `Route path="*"` (NotFound)
-- Lazy load page components for code-splitting
-
-### Data Flow
-1. Static data → [src/data/surahs.ts](src/data/surahs.ts)
-2. Fetch/Query logic → TanStack React Query (not currently active; ready for API integration)
-3. Global state → Context API ([src/contexts/LanguageContext.tsx](src/contexts/LanguageContext.tsx))
-4. Component state → `useState` for local UI state
-
-## Testing
-
-- **Framework:** Vitest with React Testing Library
-- **Setup:** [src/test/setup.ts](src/test/setup.ts) configures testing environment
-- **Patterns:** Render components, query by role/text, assert on DOM
-- Run tests: `npm run test` or `npm run test:watch`
-
-## Performance Considerations
-
-- Surah list (~114 items) is memoized via `useMemo` with search filter
-- Framer Motion animations use `once: true` viewport to prevent layout thrashing
-- Dynamic imports for routes reduce initial bundle size
-- PWA support (Vite PWA plugin) enables offline-first caching
+## Performance Best Practices
+- **Memoize filters:** `useMemo` for search/filter logic (see [src/components/SurahList.tsx](src/components/SurahList.tsx))
+- **Animations:** Framer `once: true` in `whileInView` to prevent scroll thrashing
+- **Images:** Quran page images are large—ensure lazy loading
 
 ## Common Tasks
 
-| Task | How |
-|------|-----|
-| Add new Surah metadata | Edit [src/data/surahs.ts](src/data/surahs.ts) array |
-| Add translation strings | Add keys to both `ar` and `en` in [src/i18n/translations.ts](src/i18n/translations.ts), use `useLanguage()` to access |
-| Add new page/route | Create component in [src/pages/](src/pages/), add `<Route>` in [src/App.tsx](src/App.tsx) **before** catch-all |
-| Style RTL-aware component | Use `const { isRTL } = useLanguage()` and conditionally apply Tailwind classes |
-| Add UI component | Run `npx shadcn-ui@latest add <name>` to scaffold from registry |
-| Update theme colors | Modify CSS variables in generated theme file (Tailwind extends from `hsl(var(...))`) |
+| Task | Action |
+|------|--------|
+| Add translation | Add key to both `ar`/`en` in [src/i18n/translations.ts](src/i18n/translations.ts) |
+| New route | Create page in [src/pages/](src/pages/), add `<Route>` **before** `*` in [src/App.tsx](src/App.tsx) |
+| New UI component | `npx shadcn-ui@latest add <name>` |
+| Modify Surah metadata | ⚠️ DO NOT EDIT [src/data/surahs.ts](src/data/surahs.ts)—canonical data |
+| Change theme colors | Edit HSL variables in Tailwind config/CSS |
+| Access Quran page data | Use functions from [src/lib/quran-mapping.ts](src/lib/quran-mapping.ts) |
+| **Document new feature** | **Update [README.md](README.md) with feature description, usage, and any configuration** |
 
-## Lovable-Specific Notes
-
-- Project uses **Lovable** for AI-assisted development ([Lovable.dev](https://lovable.dev/))
-- Component Tagger plugin active in dev mode (auto-tags UI components)
-- GitHub integration: changes push automatically; manual edits sync back
-- Always test locally with `npm run dev` before committing
+## Lovable Integration
+- Changes via Lovable commit automatically
+- `lovable-tagger` plugin injects dev markers
+- Test locally first: `npm run dev`
