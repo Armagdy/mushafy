@@ -29,3 +29,4 @@ poppler
 TODO.txt
 pdf_to_jpg.py
 split_pdf.py
+REFACTORING_*.md
