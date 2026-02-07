@@ -1,0 +1,238 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 160 30% 15%;
+
+    --card: 45 40% 95%;
+    --card-foreground: 160 30% 15%;
+
+    --popover: 45 40% 95%;
+    --popover-foreground: 160 30% 15%;
+
+    --primary: 160 45% 25%;
+    --primary-foreground: 45 30% 97%;
+
+    --secondary: 45 35% 90%;
+    --secondary-foreground: 160 30% 20%;
+
+    --muted: 45 20% 92%;
+    --muted-foreground: 160 15% 45%;
+
+    --accent: 38 70% 50%;
+    --accent-foreground: 45 30% 97%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 160 20% 85%;
+    --input: 160 20% 85%;
+    --ring: 160 45% 25%;
+
+    --radius: 0.75rem;
+
+    /* Custom colors */
+    --emerald-deep: 160 45% 20%;
+    --emerald-light: 160 35% 40%;
+    --gold: 38 70% 50%;
+    --gold-light: 38 60% 65%;
+    --cream: 45 40% 95%;
+    --cream-dark: 45 30% 88%;
+
+    /* Gradients */
+    --gradient-emerald: linear-gradient(135deg, hsl(160 45% 25%), hsl(160 35% 35%));
+    --gradient-gold: linear-gradient(135deg, hsl(38 70% 50%), hsl(38 60% 60%));
+    --gradient-hero: hsl(0 0% 100%);
+
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -5px hsl(160 30% 15% / 0.08);
+    --shadow-card: 0 8px 30px -10px hsl(160 30% 15% / 0.12);
+    --shadow-elevated: 0 20px 50px -15px hsl(160 30% 15% / 0.15);
+
+    /* Typography */
+    --font-arabic: 'Amiri', 'Noto Naskh Arabic', serif;
+    --font-display: 'Playfair Display', serif;
+    --font-body: 'Inter', sans-serif;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 160 30% 8%;
+    --foreground: 45 30% 95%;
+
+    --card: 160 25% 12%;
+    --card-foreground: 45 30% 95%;
+
+    --popover: 160 25% 12%;
+    --popover-foreground: 45 30% 95%;
+
+    --primary: 160 40% 45%;
+    --primary-foreground: 160 30% 8%;
+
+    --secondary: 160 20% 18%;
+    --secondary-foreground: 45 30% 90%;
+
+    --muted: 160 15% 20%;
+    --muted-foreground: 45 15% 60%;
+
+    --accent: 38 65% 55%;
+    --accent-foreground: 160 30% 8%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 160 20% 20%;
+    --input: 160 20% 20%;
+    --ring: 160 40% 45%;
+
+    --emerald-deep: 160 40% 35%;
+    --emerald-light: 160 35% 50%;
+    --gold: 38 65% 55%;
+    --gold-light: 38 55% 65%;
+    --cream: 160 15% 15%;
+    --cream-dark: 160 20% 12%;
+
+    --gradient-emerald: linear-gradient(135deg, hsl(160 35% 30%), hsl(160 30% 40%));
+    --gradient-gold: linear-gradient(135deg, hsl(38 65% 55%), hsl(38 55% 65%));
+    --gradient-hero: hsl(0 0% 100%);
+
+    --shadow-soft: 0 4px 20px -5px hsl(0 0% 0% / 0.3);
+    --shadow-card: 0 8px 30px -10px hsl(0 0% 0% / 0.4);
+    --shadow-elevated: 0 20px 50px -15px hsl(0 0% 0% / 0.5);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    /* Responsive base font size */
+    font-size: 14px;
+  }
+
+  @media (min-width: 640px) {
+    html {
+      font-size: 15px;
+    }
+  }
+
+  @media (min-width: 768px) {
+    html {
+      font-size: 16px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    html {
+      font-size: 17px;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    html {
+      font-size: 18px;
+    }
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  /* RTL Support */
+  [dir="rtl"] {
+    font-family: var(--font-arabic);
+  }
+
+  .font-arabic {
+    font-family: var(--font-arabic);
+  }
+
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-body {
+    font-family: var(--font-body);
+  }
+}
+
+@layer components {
+  .gradient-emerald {
+    background: var(--gradient-emerald);
+  }
+
+  .gradient-gold {
+    background: var(--gradient-gold);
+  }
+
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+
+  /* Islamic geometric pattern overlay */
+  .islamic-pattern {
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23166534' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  /* Verse number ornament */
+  .verse-number {
+    @apply inline-flex items-center justify-center w-10 h-10 rounded-full;
+    background: var(--gradient-emerald);
+    font-family: var(--font-arabic);
+  }
+
+  /* Quran text styling */
+  .quran-text {
+    font-family: var(--font-arabic);
+    font-size: 1.75rem;
+    line-height: 2.5;
+    letter-spacing: 0.02em;
+  }
+
+  /* Surah header decoration */
+  .surah-decoration {
+    @apply relative;
+  }
+
+  .surah-decoration::before,
+  .surah-decoration::after {
+    content: '❁';
+    @apply text-accent opacity-60 mx-4;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
