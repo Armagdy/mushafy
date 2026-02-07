@@ -39,8 +39,10 @@ export function AyahSelectorDialog({
   const ayahListRef = useRef<HTMLDivElement>(null);
 
   const handleAyahClick = (surahNum: number, ayahNum: number, versePage: number) => {
+    console.log('Ayah clicked:', surahNum, ayahNum, 'page:', versePage);
     // Set flag to prevent auto-switch to first ayah
     isAyahNavigationRef.current = true;
+    console.log('Set isAyahNavigation flag to true');
     // Set current playing ayah BEFORE navigation to ensure it persists
     onSetCurrentPlayingAyah({ surah: surahNum, ayah: ayahNum });
     // Play the selected ayah
@@ -48,10 +50,6 @@ export function AyahSelectorDialog({
     // Navigate to the page containing this ayah (use verse.page directly)
     navigate(`/page/${versePage}#${surahNum}-${ayahNum}`);
     onOpenChange(false);
-    // Reset flag after navigation completes (handles case where ayah is on same page)
-    setTimeout(() => {
-      isAyahNavigationRef.current = false;
-    }, 500);
   };
 
   return (

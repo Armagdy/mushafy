@@ -263,6 +263,7 @@ const Surah = () => {
   // Load page info (surah and juz)
   useEffect(() => {
     const loadPageInfo = async () => {
+      console.log('loadPageInfo called - isAyahNavigation:', isAyahNavigation.current);
       const surahInfo = await getPageSurahInfo(currentPageNum);
       const juzNum = await getPageJuzNumber(currentPageNum);
       
@@ -271,12 +272,17 @@ const Surah = () => {
         setCurrentPageAyah(surahInfo.ayah);
         // Only update play bar to first ayah if NOT navigating from ayah selection
         if (!isAyahNavigation.current) {
+          console.log('Resetting ayah to first on page:', surahInfo.surahId, surahInfo.ayah);
           setCurrentPlayingAyah({ surah: surahInfo.surahId, ayah: surahInfo.ayah });
+        } else {
+          console.log('Skipping ayah reset - preserving user selection');
+          // Reset the flag after a delay to allow all navigation effects to complete
+          setTimeout(() => {
+            console.log('Resetting isAyahNavigation flag');
+            isAyahNavigation.current = false;
+          }, 100);
         }
       }
-      
-      // Always reset the flag after handling, so next manual navigation works
-      isAyahNavigation.current = false;
       
       setCurrentJuz(juzNum);
       
@@ -631,6 +637,16 @@ const Surah = () => {
         ayahData={ayahData}
         onNavigate={(page) => navigate(`/page/${page}`)}
         formatNumber={formatNumber}
+        currentSurahId={currentSurahId}
+        currentAyah={currentPageAyah}
+        currentJuz={currentJuz}
+        currentHezb={currentHezb}
+        currentQuarter={currentQuarter}
+        currentPage={currentPageNum}
+        onSetPlayingAyah={(ayah) => {
+          setCurrentPlayingAyah(ayah);
+          isAyahNavigation.current = true;
+        }}
       />
 
       {/* Settings Dialog */}
@@ -738,8 +754,11 @@ const Surah = () => {
         readingBookmarks={readingBookmarks}
         bookmarkPageSurahs={bookmarkPageSurahs}
         bookmarkPageAyahs={bookmarkPageAyahs}
+        currentSurahId={currentSurahId}
+        currentAyahNum={currentPageAyah ?? 1}
+        currentPage={currentPageNum}
         onNavigate={(page) => navigate(`/page/${page}`)}
-        onToggleBookmark={toggleBookmark}
+        onToggleBookmark={(page) => toggleBookmark(page, currentSurahId, currentPageAyah ?? undefined)}
         onRemoveMemorizationBookmark={removeMemorizationBookmark}
         onRemoveReadingBookmark={removeReadingBookmark}
         onAddBookmarkByType={addBookmarkByType}

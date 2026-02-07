@@ -8,7 +8,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { surahs } from "@/data/surahs";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useLayoutEffect } from "react";
 
 interface BookmarksDialogProps {
   open: boolean;
@@ -18,6 +18,9 @@ interface BookmarksDialogProps {
   readingBookmarks: number[];
   bookmarkPageSurahs: Record<number, string>;
   bookmarkPageAyahs: Record<number, number>;
+  currentSurahId: number;
+  currentAyahNum: number;
+  currentPage: number;
   onNavigate: (page: number) => void;
   onToggleBookmark: (page: number) => void;
   onRemoveMemorizationBookmark: (page: number) => void;
@@ -33,6 +36,9 @@ export function BookmarksDialog({
   readingBookmarks,
   bookmarkPageSurahs,
   bookmarkPageAyahs,
+  currentSurahId,
+  currentAyahNum,
+  currentPage,
   onNavigate,
   onToggleBookmark,
   onRemoveMemorizationBookmark,
@@ -43,8 +49,24 @@ export function BookmarksDialog({
   const { toast } = useToast();
 
   const [selectedBookmarkType, setSelectedBookmarkType] = useState<string>('bookmark');
-  const [bookmarkSurahId, setBookmarkSurahId] = useState(1);
-  const [bookmarkAyahNum, setBookmarkAyahNum] = useState(1);
+  const [bookmarkSurahId, setBookmarkSurahId] = useState(currentSurahId);
+  const [bookmarkAyahNum, setBookmarkAyahNum] = useState(currentAyahNum);
+
+  // Update dropdowns synchronously when dialog opens to avoid flash of old values
+  useLayoutEffect(() => {
+    if (open) {
+      setBookmarkSurahId(currentSurahId);
+      setBookmarkAyahNum(currentAyahNum);
+      console.log('📖 Bookmark Dialog Opened:', {
+        currentPage,
+        currentSurahId,
+        currentAyahNum,
+        bookmarkSurahId: currentSurahId,
+        bookmarkAyahNum: currentAyahNum,
+        selectedBookmarkType
+      });
+    }
+  }, [open, currentPage, currentSurahId, currentAyahNum, selectedBookmarkType]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

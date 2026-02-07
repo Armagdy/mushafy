@@ -14,6 +14,13 @@ interface NavigationDialogProps {
   ayahData: any[];
   onNavigate: (page: number) => void;
   formatNumber: (num: number | string) => string;
+  currentSurahId?: number;
+  currentAyah?: number | null;
+  currentJuz?: number;
+  currentHezb?: number;
+  currentQuarter?: number;
+  currentPage?: number;
+  onSetPlayingAyah?: (ayah: { surah: number; ayah: number }) => void;
 }
 
 export function NavigationDialog({
@@ -22,7 +29,14 @@ export function NavigationDialog({
   mode,
   ayahData,
   onNavigate,
-  formatNumber
+  formatNumber,
+  currentSurahId,
+  currentAyah,
+  currentJuz,
+  currentHezb,
+  currentQuarter,
+  currentPage,
+  onSetPlayingAyah
 }: NavigationDialogProps) {
   const { t, isRTL } = useLanguage();
   
@@ -106,7 +120,7 @@ export function NavigationDialog({
         setSearchJuz(juzNum.toString());
       }
     }
-  }, [searchJuzQuarter]);
+  }, [searchJuzQuarter, searchJuz, searchJuzHezb]);
 
   // Synchronize Juz when Hezb changes
   useEffect(() => {
@@ -118,15 +132,57 @@ export function NavigationDialog({
         setSearchJuz(juzNum.toString());
       }
     }
-  }, [searchJuzHezb]);
+  }, [searchJuzHezb, searchJuz]);
 
-  // Clear search results when dialog closes
+  // Prefill with current values when dialog opens
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      console.log('=== Navigation Dialog Opened ===');
+      console.log('Current Surah ID:', currentSurahId);
+      console.log('Current Ayah:', currentAyah);
+      console.log('Current Juz:', currentJuz);
+      console.log('Current Hezb:', currentHezb);
+      console.log('Current Quarter:', currentQuarter);
+      console.log('Current Page:', currentPage);
+      console.log('================================');
+      
+      // Prefill Surah tab with current surah and ayah
+      if (currentSurahId) {
+        setSearchSurah(currentSurahId.toString());
+      }
+      if (currentAyah) {
+        setSearchAyah(currentAyah.toString());
+      }
+      
+      // Prefill Surah tab filters (Juz and Hezb dropdowns in Surah tab)
+      if (currentJuz) {
+        setFilterJuz(currentJuz.toString());
+      }
+      if (currentHezb) {
+        setFilterHezb(currentHezb.toString());
+      }
+      
+      // Prefill Juz tab with current juz, hezb, and quarter
+      if (currentJuz) {
+        setSearchJuz(currentJuz.toString());
+      }
+      if (currentHezb) {
+        setSearchJuzHezb(currentHezb.toString());
+      }
+      if (currentQuarter) {
+        setSearchJuzQuarter(currentQuarter.toString());
+      }
+      
+      // Prefill Page tab with current page
+      if (currentPage) {
+        setSearchPage(currentPage.toString());
+      }
+    } else {
+      // Clear search results when dialog closes
       setSearchWord('');
       setWordSearchResults([]);
     }
-  }, [open]);
+  }, [open, currentSurahId, currentAyah, currentJuz, currentHezb, currentQuarter, currentPage]);
 
   // Normalize Arabic text by removing diacritics and normalizing character variations
   const normalizeArabic = (text: string) => {
@@ -247,13 +303,27 @@ export function NavigationDialog({
         const ayahNumber = parseInt(searchAyah);
         const ayahInfo = selectedSurahAyahs.find(v => v.number === ayahNumber);
         if (ayahInfo && ayahInfo.page) {
-          onNavigate(ayahInfo.page);
+          // Set the playing ayah BEFORE navigating to ensure it's correct
+          if (onSetPlayingAyah) {
+            onSetPlayingAyah({ surah: surahId, ayah: ayahNumber });
+          }
+          // Use setTimeout to ensure the ayah is set before navigation triggers page load
+          setTimeout(() => {
+            onNavigate(ayahInfo.page);
+          }, 0);
         }
       } else {
         // Otherwise, navigate to the first page of the surah
         const { getSurahFirstPage } = await import('@/lib/quran-mapping');
         const firstPage = await getSurahFirstPage(surahId);
-        onNavigate(firstPage);
+        // Set the playing ayah to first ayah of the surah
+        if (onSetPlayingAyah) {
+          onSetPlayingAyah({ surah: surahId, ayah: 1 });
+        }
+        // Use setTimeout to ensure the ayah is set before navigation triggers page load
+        setTimeout(() => {
+          onNavigate(firstPage);
+        }, 0);
       }
       
       setSearchSurah('');
@@ -423,8 +493,31 @@ export function NavigationDialog({
                           const juzNum = parseInt(juzValue);
                           const firstHezb = (juzNum - 1) * 2 + 1;
                           setFilterHezb(firstHezb.toString());
+                          
+                          // Auto-select first surah based on the Hezb (since Hezb filter takes precedence)
+                          const hezbRanges: Record<number, number[]> = {
+                            1: [1, 2], 2: [2], 3: [2], 4: [2, 3], 5: [3], 6: [3],
+                            7: [3], 8: [3, 4], 9: [4], 10: [4], 11: [4, 5], 12: [5],
+                            13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [7, 8],
+                            19: [8, 9], 20: [9], 21: [9, 10], 22: [10, 11], 23: [11], 24: [11, 12],
+                            25: [12, 13], 26: [13, 14, 15], 27: [15, 16], 28: [16, 17], 29: [17, 18], 30: [18, 19, 20],
+                            31: [20, 21], 32: [21, 22], 33: [22, 23], 34: [23, 24], 35: [24, 25], 36: [25, 26],
+                            37: [26, 27], 38: [27, 28], 39: [28, 29], 40: [29, 30, 31], 41: [31, 32, 33], 42: [33],
+                            43: [33, 34], 44: [34, 35, 36], 45: [36, 37], 46: [37, 38, 39], 47: [39, 40], 48: [40, 41],
+                            49: [41, 42, 43], 50: [43, 44, 45, 46], 51: [46, 47, 48], 52: [48, 49, 50, 51], 53: [51, 52, 53, 54, 55], 54: [55, 56, 57, 58],
+                            55: [58, 59, 60, 61, 62], 56: [62, 63, 64, 65, 66, 67], 57: [67, 68, 69, 70, 71, 72], 58: [72, 73, 74, 75, 76, 77, 78],
+                            59: [78, 79, 80, 81, 82, 83, 84, 85, 86, 87], 60: [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114],
+                          };
+                          
+                          const firstSurahId = hezbRanges[firstHezb]?.[0];
+                          if (firstSurahId) {
+                            setSearchSurah(firstSurahId.toString());
+                            setSearchAyah('1');
+                          }
                         } else {
                           setFilterHezb('');
+                          setSearchSurah('');
+                          setSearchAyah('');
                         }
                       }}
                       className="w-full px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -515,7 +608,44 @@ export function NavigationDialog({
                     </label>
                     <select
                       value={filterHezb}
-                      onChange={(e) => setFilterHezb(e.target.value)}
+                      onChange={(e) => {
+                        const hezbValue = e.target.value;
+                        setFilterHezb(hezbValue);
+                        
+                        if (hezbValue) {
+                          const hezbNum = parseInt(hezbValue);
+                          
+                          // Auto-select first surah in this Hezb
+                          const hezbRanges: Record<number, number[]> = {
+                            1: [1, 2], 2: [2], 3: [2], 4: [2, 3], 5: [3], 6: [3],
+                            7: [3], 8: [3, 4], 9: [4], 10: [4], 11: [4, 5], 12: [5],
+                            13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [7, 8],
+                            19: [8, 9], 20: [9], 21: [9, 10], 22: [10, 11], 23: [11], 24: [11, 12],
+                            25: [12, 13], 26: [13, 14, 15], 27: [15, 16], 28: [16, 17], 29: [17, 18], 30: [18, 19, 20],
+                            31: [20, 21], 32: [21, 22], 33: [22, 23], 34: [23, 24], 35: [24, 25], 36: [25, 26],
+                            37: [26, 27], 38: [27, 28], 39: [28, 29], 40: [29, 30, 31], 41: [31, 32, 33], 42: [33],
+                            43: [33, 34], 44: [34, 35, 36], 45: [36, 37], 46: [37, 38, 39], 47: [39, 40], 48: [40, 41],
+                            49: [41, 42, 43], 50: [43, 44, 45, 46], 51: [46, 47, 48], 52: [48, 49, 50, 51], 53: [51, 52, 53, 54, 55], 54: [55, 56, 57, 58],
+                            55: [58, 59, 60, 61, 62], 56: [62, 63, 64, 65, 66, 67], 57: [67, 68, 69, 70, 71, 72], 58: [72, 73, 74, 75, 76, 77, 78],
+                            59: [78, 79, 80, 81, 82, 83, 84, 85, 86, 87], 60: [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114],
+                          };
+                          
+                          let allowedSurahs = hezbRanges[hezbNum] || [];
+                          
+                          if (hezbNum % 2 === 0 && hezbNum !== 60 && allowedSurahs.length > 1) {
+                            allowedSurahs = allowedSurahs.slice(0, -1);
+                          }
+                          
+                          const firstSurahId = allowedSurahs[0];
+                          if (firstSurahId) {
+                            setSearchSurah(firstSurahId.toString());
+                            setSearchAyah('1');
+                          }
+                        } else {
+                          setSearchSurah('');
+                          setSearchAyah('');
+                        }
+                      }}
                       className="w-full px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     >
                       <option value="">{t('all')}</option>
@@ -526,10 +656,10 @@ export function NavigationDialog({
                           const secondHezb = firstHezb + 1;
                           return [
                             <option key={firstHezb} value={firstHezb}>
-                              {formatNumber(1)}
+                              {formatNumber(firstHezb)}
                             </option>,
                             <option key={secondHezb} value={secondHezb}>
-                              {formatNumber(2)}
+                              {formatNumber(secondHezb)}
                             </option>
                           ];
                         } else {
