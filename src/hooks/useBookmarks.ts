@@ -160,8 +160,32 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
 
   // Add bookmark by type (for bookmark dialog)
   const addBookmarkByType = async (type: string, surahId: number, ayahNum: number) => {
+    console.log('📚 addBookmarkByType called with:', {
+      type,
+      surahId,
+      ayahNum
+    });
+    
     const targetPage = await getAyahPage(surahId, ayahNum);
+    
+    console.log('📍 Calculated targetPage:', {
+      type,
+      surahId,
+      ayahNum,
+      targetPage
+    });
+    
     if (!targetPage) return;
+    
+    // Get surah name for the selected ayah (not the first ayah on the page)
+    const surah = surahs.find(s => s.id === surahId);
+    if (surah) {
+      const name = language === 'ar' ? surah.name : surah.englishName;
+      // Save custom metadata for this bookmark with the user-selected ayah
+      setBookmarkPageSurahs(prev => ({ ...prev, [targetPage]: name }));
+      setBookmarkPageAyahs(prev => ({ ...prev, [targetPage]: ayahNum }));
+      console.log('💾 Saved custom metadata:', { page: targetPage, surahName: name, ayah: ayahNum });
+    }
     
     if (type === 'bookmark') {
       toggleBookmark(targetPage);
@@ -174,7 +198,7 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
 
   // Get total bookmark count (all types)
   const getTotalBookmarks = (): number => {
-    return new Set([...bookmarks, ...memorizationBookmarks, ...readingBookmarks]).size;
+    return bookmarks.length + memorizationBookmarks.length + readingBookmarks.length;
   };
 
   // Check if a page is bookmarked (optionally filter by type)

@@ -46,7 +46,7 @@ export function SettingsDialog({
         isRTL ? "rtl" : "ltr"
       )}>
         <DialogHeader>
-          <DialogTitle className="font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+          <DialogTitle className="text-center text-base md:text-xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
             {t('settings')}
           </DialogTitle>
         </DialogHeader>
@@ -56,7 +56,7 @@ export function SettingsDialog({
           <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
             <div className="flex items-center gap-2 sm:gap-3">
               <BookOpen className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-              <span className="font-medium">{t('mushafType')}</span>
+              <span className="text-base md:text-xl font-medium">{t('mushafType')}</span>
             </div>
             <Select value={mushafType} onValueChange={(value) => setMushafType(value as MushafType)}>
               <SelectTrigger className="w-full h-8 sm:h-9">
@@ -75,13 +75,13 @@ export function SettingsDialog({
             <div className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
               <div className="flex items-center gap-2 sm:gap-3">
                 <Book className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                <span className="font-medium">{isRTL ? 'وضع العرض' : 'View Mode'}</span>
+                <span className="text-base md:text-xl font-medium">{isRTL ? 'وضع العرض' : 'View Mode'}</span>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => onViewModeChange(viewMode === 'single' ? 'double' : 'single')}
-                className="flex items-center gap-2 h-7 sm:h-8 px-2 sm:px-3"
+                className="flex items-center gap-2 h-7 sm:h-8 px-2 sm:px-3 text-base md:text-xl"
               >
                 <span>
                   {viewMode === 'single' ? (isRTL ? 'صفحتين' : '2 Pages') : (isRTL ? 'صفحة' : '1 Page')}
@@ -95,7 +95,7 @@ export function SettingsDialog({
             <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
               <div className="flex items-center gap-2 sm:gap-3">
                 <Navigation className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                <span className="font-medium">
+                <span className="text-base md:text-xl font-medium">
                   {isRTL ? 'الصفحات المحملة' : 'Swipe Sensitivity'}
                 </span>
               </div>
@@ -106,13 +106,13 @@ export function SettingsDialog({
                     size="sm"
                     onClick={() => pagesToLoad > 1 && updatePagesToLoad(pagesToLoad - 1)}
                     disabled={pagesToLoad <= 1}
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 text-base md:text-xl"
                   >
                     -
                   </Button>
                   <div className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-900 rounded-md border border-gray-300 dark:border-gray-600">
-                    <span className="font-medium">{pagesToLoad}</span>
-                    <span className="text-gray-500">
+                    <span className="text-base md:text-xl font-medium">{pagesToLoad}</span>
+                    <span className="text-base md:text-xl text-gray-500">
                       {pagesToLoad === 1 ? (isRTL ? 'صفحة' : 'page') : (isRTL ? 'صفحات' : 'pages')}
                     </span>
                   </div>
@@ -121,12 +121,12 @@ export function SettingsDialog({
                     size="sm"
                     onClick={() => pagesToLoad < 5 && updatePagesToLoad(pagesToLoad + 1)}
                     disabled={pagesToLoad >= 5}
-                    className="h-8 w-8 p-0"
+                    className="h-8 w-8 p-0 text-base md:text-xl"
                   >
                     +
                   </Button>
                 </div>
-                <p className="text-gray-500 dark:text-gray-400">
+                <p className="text-base md:text-xl text-gray-500 dark:text-gray-400">
                   {isRTL 
                     ? 'يحدد عدد الصفحات التي يمكنك التمرير إليها بحركة واحدة' 
                     : 'Controls how many pages you can swipe at once'}
@@ -139,7 +139,7 @@ export function SettingsDialog({
           <div className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
             <div className="flex items-center gap-2 sm:gap-3">
               <Menu className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-              <span className="font-medium">
+              <span className="text-base md:text-xl font-medium">
                 {isRTL ? 'إظهار نص الشريط السفلي' : 'Show Bottom Bar Text'}
               </span>
             </div>

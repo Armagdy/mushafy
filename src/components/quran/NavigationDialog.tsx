@@ -21,6 +21,7 @@ interface NavigationDialogProps {
   currentQuarter?: number;
   currentPage?: number;
   onSetPlayingAyah?: (ayah: { surah: number; ayah: number }) => void;
+  initialTab?: 'surah' | 'juz' | 'page';
 }
 
 export function NavigationDialog({
@@ -36,7 +37,8 @@ export function NavigationDialog({
   currentHezb,
   currentQuarter,
   currentPage,
-  onSetPlayingAyah
+  onSetPlayingAyah,
+  initialTab
 }: NavigationDialogProps) {
   const { t, isRTL } = useLanguage();
   
@@ -45,6 +47,20 @@ export function NavigationDialog({
     const saved = localStorage.getItem('quran-search-tab');
     return (saved as 'surah' | 'juz' | 'page' | 'word') || 'surah';
   });
+  
+  // Update tab when dialog opens with initialTab
+  useEffect(() => {
+    if (open && initialTab) {
+      setSearchTab(initialTab);
+    }
+  }, [open, initialTab]);
+  
+  // Update tab when dialog opens with initialTab
+  useEffect(() => {
+    if (open && initialTab) {
+      setSearchTab(initialTab);
+    }
+  }, [open, initialTab]);
   
   // Surah tab state
   const [searchSurah, setSearchSurah] = useState(() => localStorage.getItem('quran-search-surah') || '');
@@ -380,7 +396,7 @@ export function NavigationDialog({
         )}
       >
         <DialogHeader>
-          <DialogTitle className="text-base sm:text-lg font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+          <DialogTitle className="text-center text-base md:text-xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
             {mode === 'word' ? (isRTL ? 'بحث فى نصوص الايات' : 'Search') : (isRTL ? 'انتقل' : 'Go To')}
           </DialogTitle>
         </DialogHeader>
@@ -464,9 +480,9 @@ export function NavigationDialog({
           /* Navigation Search - With tabs */
           <Tabs value={searchTab} onValueChange={setSearchTab as any} className="w-full">
             <TabsList className="grid w-full grid-cols-3 h-11 md:h-12">
-              <TabsTrigger value="surah" className="text-base md:text-xl">{isRTL ? 'سورة' : 'Surah'}</TabsTrigger>
               <TabsTrigger value="juz" className="text-base md:text-xl">{isRTL ? 'جزء' : 'Juz'}</TabsTrigger>
               <TabsTrigger value="page" className="text-base md:text-xl">{isRTL ? 'صفحة' : 'Page'}</TabsTrigger>
+              <TabsTrigger value="surah" className="text-base md:text-xl">{isRTL ? 'سورة' : 'Surah'}</TabsTrigger>
             </TabsList>
 
             {/* Surah Tab */}

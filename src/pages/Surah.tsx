@@ -91,6 +91,7 @@ const Surah = () => {
 
   // Bookmark dialog
   const [showBookmarkDialog, setShowBookmarkDialog] = useState(false);
+  const [initialNavTab, setInitialNavTab] = useState<'surah' | 'juz' | 'page'>('surah');
   
   const [currentSurahId, setCurrentSurahId] = useState(1);
   const [currentJuz, setCurrentJuz] = useState(1);
@@ -548,14 +549,17 @@ const Surah = () => {
         formatNumber={formatNumber}
         onSurahClick={() => {
           setSearchMode('navigation');
+          setInitialNavTab('surah');
           setSearchOpen(true);
         }}
         onPageClick={() => {
           setSearchMode('navigation');
+          setInitialNavTab('page');
           setSearchOpen(true);
         }}
         onJuzClick={() => {
           setSearchMode('navigation');
+          setInitialNavTab('juz');
           setSearchOpen(true);
         }}
       />
@@ -643,6 +647,7 @@ const Surah = () => {
         currentHezb={currentHezb}
         currentQuarter={currentQuarter}
         currentPage={currentPageNum}
+        initialTab={initialNavTab}
         onSetPlayingAyah={(ayah) => {
           setCurrentPlayingAyah(ayah);
           isAyahNavigation.current = true;
@@ -757,6 +762,7 @@ const Surah = () => {
         currentSurahId={currentSurahId}
         currentAyahNum={currentPageAyah ?? 1}
         currentPage={currentPageNum}
+        currentPlayingAyah={currentPlayingAyah}
         onNavigate={(page) => navigate(`/page/${page}`)}
         onToggleBookmark={(page) => toggleBookmark(page, currentSurahId, currentPageAyah ?? undefined)}
         onRemoveMemorizationBookmark={removeMemorizationBookmark}

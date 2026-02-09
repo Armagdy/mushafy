@@ -54,7 +54,7 @@ export function ReciterDialog({
         isRTL ? "rtl" : "ltr"
       )}>
         <DialogHeader>
-          <DialogTitle className="text-base sm:text-lg font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+          <DialogTitle className="text-center text-base md:text-xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
             {t('selectReciter')}
           </DialogTitle>
         </DialogHeader>

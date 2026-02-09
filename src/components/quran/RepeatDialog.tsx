@@ -84,7 +84,7 @@ export function RepeatDialog({
         isRTL && "rtl"
       )}>
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+          <DialogTitle className="text-center text-base md:text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
             {t('repeatSettings')}
           </DialogTitle>
         </DialogHeader>

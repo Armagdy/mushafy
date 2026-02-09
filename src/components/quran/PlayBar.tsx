@@ -34,7 +34,7 @@ export function PlayBar({
       <motion.div 
         initial={{ y: 100 }}
         animate={{ y: 0 }}
-        className="w-[98%] md:max-w-3xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-gray-900 dark:to-emerald-950 backdrop-blur-lg border border-emerald-200 dark:border-emerald-700 rounded-full"
+        className="w-[98%] md:max-w-4xl lg:max-w-5xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-gray-900 dark:to-emerald-950 backdrop-blur-lg border border-emerald-200 dark:border-emerald-700 rounded-full"
       >
         <div className="flex items-center py-2 px-2 md:py-3 md:px-7 gap-1 md:gap-0 md:justify-between w-full">
           {/* Ayah Selection - Left */}
@@ -65,7 +65,7 @@ export function PlayBar({
           {/* Reciter Selection - Center */}
           <button
             onClick={onReciterClick}
-            className="flex items-center gap-1 md:gap-2 px-1 md:px-4 py-1 md:py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex-[2] md:flex-1 justify-center min-w-0 md:max-w-xs"
+            className="flex items-center gap-1 md:gap-2 px-1 md:px-4 py-1 md:py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex-[2] md:flex-1 justify-center min-w-0 md:max-w-md lg:max-w-lg"
           >
             <Volume2 className="w-3.5 h-3.5 md:w-5 md:h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
             <span className="text-base md:text-xl font-medium text-gray-900 dark:text-gray-100 truncate">

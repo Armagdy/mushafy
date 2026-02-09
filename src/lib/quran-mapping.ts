@@ -208,8 +208,14 @@ export const getSurahJuzs = async (surahId: number): Promise<Array<{number: numb
 // Get page number for a specific ayah
 export const getAyahPage = async (surahId: number, ayahNumber: number): Promise<number> => {
   try {
+    console.log('🔍 getAyahPage called with:', { surahId, ayahNumber });
     const response = await fetch('/assets/quran-meta-data.json');
     const quranData = await response.json();
+    
+    console.log('📋 Total pages in data:', quranData.pages.length);
+    
+    let firstPageOfSurah: number | null = null;
+    let firstAyahOnFirstPage: number | null = null;
     
     // Find the page that contains this specific ayah
     for (let i = 0; i < quranData.pages.length; i++) {
@@ -218,6 +224,19 @@ export const getAyahPage = async (surahId: number, ayahNumber: number): Promise<
       
       // If this is the surah we're looking for
       if (pageSurahId === surahId) {
+        // Track the first page where this surah appears
+        if (firstPageOfSurah === null) {
+          firstPageOfSurah = i + 1;
+          firstAyahOnFirstPage = pageStartAyah;
+          
+          // If the requested ayah is BEFORE the first ayah on this page,
+          // it means the surah started on the PREVIOUS page
+          if (ayahNumber < pageStartAyah) {
+            console.log(`✅ Ayah ${ayahNumber} is before first recorded ayah (${pageStartAyah}) on page ${i + 1}, so it's on previous page ${i}`);
+            return i; // Previous page (i + 1 - 1 = i)
+          }
+        }
+        
         // If there's a next page
         if (nextPage) {
           const [nextSurahId, nextStartAyah] = nextPage;
@@ -225,23 +244,27 @@ export const getAyahPage = async (surahId: number, ayahNumber: number): Promise<
           // If next page is same surah, check if ayah is before next page's start
           if (nextSurahId === surahId) {
             if (ayahNumber >= pageStartAyah && ayahNumber < nextStartAyah) {
+              console.log(`✅ Found! Surah ${surahId} Ayah ${ayahNumber} is on page ${i + 1} (range: ${pageStartAyah}-${nextStartAyah - 1})`);
               return i + 1;
             }
           } else {
             // Next page is different surah, so this ayah is on current page if >= pageStartAyah
             if (ayahNumber >= pageStartAyah) {
+              console.log(`✅ Found! Surah ${surahId} Ayah ${ayahNumber} is on page ${i + 1} (starts at ayah ${pageStartAyah}, last page of surah)`);
               return i + 1;
             }
           }
         } else {
           // This is the last page
           if (ayahNumber >= pageStartAyah) {
+            console.log(`✅ Found! Surah ${surahId} Ayah ${ayahNumber} is on page ${i + 1} (last page in Quran)`);
             return i + 1;
           }
         }
       }
     }
     
+    console.error('❌ No page found for surah', surahId, 'ayah', ayahNumber);
     return 1;
   } catch (error) {
     console.error('Failed to get ayah page:', error);

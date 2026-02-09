@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { surahs } from "@/data/surahs";
 import { cn } from "@/lib/utils";
 import { useState, useLayoutEffect } from "react";
+import { getAyahPage } from "@/lib/quran-mapping";
 
 interface BookmarksDialogProps {
   open: boolean;
@@ -21,6 +22,7 @@ interface BookmarksDialogProps {
   currentSurahId: number;
   currentAyahNum: number;
   currentPage: number;
+  currentPlayingAyah: { surah: number; ayah: number } | null;
   onNavigate: (page: number) => void;
   onToggleBookmark: (page: number) => void;
   onRemoveMemorizationBookmark: (page: number) => void;
@@ -39,6 +41,7 @@ export function BookmarksDialog({
   currentSurahId,
   currentAyahNum,
   currentPage,
+  currentPlayingAyah,
   onNavigate,
   onToggleBookmark,
   onRemoveMemorizationBookmark,
@@ -51,22 +54,31 @@ export function BookmarksDialog({
   const [selectedBookmarkType, setSelectedBookmarkType] = useState<string>('bookmark');
   const [bookmarkSurahId, setBookmarkSurahId] = useState(currentSurahId);
   const [bookmarkAyahNum, setBookmarkAyahNum] = useState(currentAyahNum);
+  const [activeTab, setActiveTab] = useState('add');
 
   // Update dropdowns synchronously when dialog opens to avoid flash of old values
   useLayoutEffect(() => {
     if (open) {
-      setBookmarkSurahId(currentSurahId);
-      setBookmarkAyahNum(currentAyahNum);
+      // Reset to add tab when dialog opens
+      setActiveTab('add');
+      
+      // Use currentPlayingAyah if available (user selected specific ayah), otherwise use first ayah on page
+      const selectedSurahId = currentPlayingAyah?.surah || currentSurahId;
+      const selectedAyahNum = currentPlayingAyah?.ayah || currentAyahNum;
+      
+      setBookmarkSurahId(selectedSurahId);
+      setBookmarkAyahNum(selectedAyahNum);
       console.log('📖 Bookmark Dialog Opened:', {
         currentPage,
         currentSurahId,
         currentAyahNum,
-        bookmarkSurahId: currentSurahId,
-        bookmarkAyahNum: currentAyahNum,
+        currentPlayingAyah,
+        selectedSurahId,
+        selectedAyahNum,
         selectedBookmarkType
       });
     }
-  }, [open, currentPage, currentSurahId, currentAyahNum, selectedBookmarkType]);
+  }, [open, currentPage, currentSurahId, currentAyahNum, currentPlayingAyah, selectedBookmarkType]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,12 +88,12 @@ export function BookmarksDialog({
         isRTL ? "rtl" : "ltr"
       )}>
         <DialogHeader>
-          <DialogTitle className="font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+          <DialogTitle className="text-center text-base md:text-xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
             {t('bookmarks')}
           </DialogTitle>
         </DialogHeader>
         
-        <Tabs defaultValue="add" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 h-11 md:h-12">
             <TabsTrigger value="add" className="text-base md:text-xl">
               {isRTL ? 'اضف علامة جديدة' : 'Add New Bookmark'}
@@ -174,14 +186,63 @@ export function BookmarksDialog({
               {/* Save Button */}
               <Button
                 onClick={async () => {
+                  console.log('🔖 Save Button Clicked:', {
+                    bookmarkSurahId,
+                    bookmarkAyahNum,
+                    selectedBookmarkType
+                  });
+                  
+                  const selectedSurah = surahs.find(s => s.id === bookmarkSurahId);
+                  const surahName = language === 'ar' ? selectedSurah?.name : selectedSurah?.englishName;
+                  const page = await getAyahPage(bookmarkSurahId, bookmarkAyahNum);
+                  
+                  console.log('📄 Calculated Page for notification:', {
+                    surahName,
+                    bookmarkSurahId,
+                    bookmarkAyahNum,
+                    calculatedPage: page
+                  });
+                  
+                  // Check if bookmark already exists for this page and type
+                  const isDuplicate = 
+                    (selectedBookmarkType === 'bookmark' && bookmarks.includes(page)) ||
+                    (selectedBookmarkType === 'memorization' && memorizationBookmarks.includes(page)) ||
+                    (selectedBookmarkType === 'reading' && readingBookmarks.includes(page));
+                  
+                  if (isDuplicate) {
+                    const typeLabel = selectedBookmarkType === 'bookmark' 
+                      ? (isRTL ? 'علامة' : 'Bookmark')
+                      : selectedBookmarkType === 'memorization'
+                      ? (isRTL ? 'حفظ' : 'Memorization')
+                      : (isRTL ? 'قراءة' : 'Reading');
+                    
+                    toast({
+                      title: isRTL ? 'خطأ' : 'Error',
+                      description: isRTL 
+                        ? `${typeLabel} موجودة بالفعل لـ ${surahName} - آية ${bookmarkAyahNum}`
+                        : `${typeLabel} already exists for ${surahName} - Ayah ${bookmarkAyahNum}`,
+                      duration: 2000,
+                      className: 'bg-red-500 text-white border-red-600',
+                    });
+                    return;
+                  }
+                  
                   await onAddBookmarkByType(selectedBookmarkType, bookmarkSurahId, bookmarkAyahNum);
+                  
+                  // Show detailed notification
+                  const description = isRTL 
+                    ? `تم حفظ العلامة إلى ${surahName} - آية ${bookmarkAyahNum} - صفحة ${page}`
+                    : `Saved bookmark to ${surahName} - Ayah ${bookmarkAyahNum} - Page ${page}`;
+                  
                   toast({
                     title: isRTL ? 'تم الحفظ' : 'Saved',
-                    description: isRTL ? 'تمت إضافة علامة جديدة بنجاح' : 'New bookmark saved successfully',
-                    duration: 1000,
+                    description,
+                    duration: 2000,
                     className: 'bg-emerald-500 text-white border-emerald-600',
                   });
-                  onOpenChange(false);
+                  
+                  // Switch to view tab to show the saved bookmark
+                  setActiveTab('view');
                 }}
                 className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 py-2 text-base md:text-xl"
               >
