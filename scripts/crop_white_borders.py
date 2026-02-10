@@ -137,43 +137,79 @@ def process_directory(input_dir, output_dir=None, threshold=230, variance_thresh
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python crop_white_borders.py <input_directory> [output_directory] [threshold] [variance_threshold]")
+        print("Usage: python crop_white_borders.py <input_path> [output_path] [threshold] [variance_threshold]")
         print("\nArguments:")
-        print("  input_directory     - Path to directory containing images")
-        print("  output_directory    - (Optional) Path to save cropped images. If not specified, overwrites original.")
+        print("  input_path          - Path to image file or directory containing images")
+        print("  output_path         - (Optional) Path to save cropped image(s). If not specified, overwrites original.")
         print("  threshold           - (Optional) Pixel brightness threshold (0-255). Default: 230")
         print("  variance_threshold  - (Optional) Variance threshold for border detection. Default: 300")
         print("\nExample:")
+        print('  python crop_white_borders.py "D:\\images\\quran\\page.jpg"')
         print('  python crop_white_borders.py "D:\\images\\quran"')
         print('  python crop_white_borders.py "D:\\images\\quran" "D:\\images\\quran_cropped"')
         print('  python crop_white_borders.py "D:\\images\\quran" "D:\\images\\quran_cropped" 230 300')
         sys.exit(1)
     
-    input_dir = sys.argv[1]
-    output_dir = sys.argv[2] if len(sys.argv) > 2 else None
+    input_path = sys.argv[1]
+    output_path = sys.argv[2] if len(sys.argv) > 2 else None
     threshold = int(sys.argv[3]) if len(sys.argv) > 3 else 230
     variance_threshold = int(sys.argv[4]) if len(sys.argv) > 4 else 300
     
-    if not os.path.exists(input_dir):
-        print(f"Error: Input directory does not exist: {input_dir}")
+    if not os.path.exists(input_path):
+        print(f"Error: Input path does not exist: {input_path}")
         sys.exit(1)
     
-    if output_dir and output_dir != input_dir:
-        print(f"Input directory: {input_dir}")
-        print(f"Output directory: {output_dir}")
-    else:
-        print(f"Processing directory: {input_dir}")
-        print("WARNING: Original images will be overwritten!")
-        response = input("Continue? (y/n): ")
-        if response.lower() != 'y':
-            print("Operation cancelled.")
-            sys.exit(0)
+    # Check if input is a file or directory
+    if os.path.isfile(input_path):
+        # Process single file
+        if output_path is None:
+            output_path = input_path
+        
+        print(f"Input file: {input_path}")
+        print(f"Output file: {output_path}")
+        print(f"Threshold: {threshold}")
+        print(f"Variance threshold: {variance_threshold}")
+        print()
+        
+        try:
+            img = Image.open(input_path)
+            original_size = img.size
+            
+            cropped_img = trim_white_borders(img, threshold, variance_threshold=variance_threshold)
+            new_size = cropped_img.size
+            
+            cropped_img.save(output_path, quality=95)
+            
+            width_diff = original_size[0] - new_size[0]
+            height_diff = original_size[1] - new_size[1]
+            
+            print(f"{os.path.basename(input_path)}: "
+                  f"{original_size[0]}x{original_size[1]} → {new_size[0]}x{new_size[1]} "
+                  f"(removed {width_diff}px width, {height_diff}px height)")
+            print(f"\nImage saved to: {output_path}")
+            
+        except Exception as e:
+            print(f"Error processing {input_path}: {str(e)}")
+            sys.exit(1)
     
-    print(f"Threshold: {threshold}")
-    print(f"Variance threshold: {variance_threshold}")
-    print()
-    
-    process_directory(input_dir, output_dir, threshold, variance_threshold)
+    elif os.path.isdir(input_path):
+        # Process directory
+        if output_path and output_path != input_path:
+            print(f"Input directory: {input_path}")
+            print(f"Output directory: {output_path}")
+        else:
+            print(f"Processing directory: {input_path}")
+            print("WARNING: Original images will be overwritten!")
+            response = input("Continue? (y/n): ")
+            if response.lower() != 'y':
+                print("Operation cancelled.")
+                sys.exit(0)
+        
+        print(f"Threshold: {threshold}")
+        print(f"Variance threshold: {variance_threshold}")
+        print()
+        
+        process_directory(input_path, output_path, threshold, variance_threshold)
 
 if __name__ == "__main__":
     main()
