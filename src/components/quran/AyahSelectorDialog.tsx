@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
+import { BookText } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +19,7 @@ interface AyahSelectorDialogProps {
   isAyahNavigationRef: React.MutableRefObject<boolean>;
   onPlayAyah: (surahNum: number, ayahNum: number) => void;
   onSetCurrentPlayingAyah: (ayah: { surah: number; ayah: number }) => void;
+  onViewTafseer?: (surahNum: number, ayahNum: number, surahName: string) => void;
 }
 
 export function AyahSelectorDialog({
@@ -33,6 +35,7 @@ export function AyahSelectorDialog({
   isAyahNavigationRef,
   onPlayAyah,
   onSetCurrentPlayingAyah,
+  onViewTafseer,
 }: AyahSelectorDialogProps) {
   const { t, isRTL, language } = useLanguage();
   const navigate = useNavigate();
@@ -50,6 +53,14 @@ export function AyahSelectorDialog({
     // Navigate to the page containing this ayah (use verse.page directly)
     navigate(`/page/${versePage}#${surahNum}-${ayahNum}`);
     onOpenChange(false);
+  };
+
+  const handleTafseerClick = (e: React.MouseEvent, surahNum: number, ayahNum: number, surahName: string) => {
+    e.stopPropagation();
+    if (onViewTafseer) {
+      onViewTafseer(surahNum, ayahNum, surahName);
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -89,25 +100,53 @@ export function AyahSelectorDialog({
             
             return surahsToShow.map((surah: any) => (
               <div key={surah.number} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <div className="bg-gray-100 dark:bg-gray-800 px-3 py-2 font-semibold text-sm">
-                  {language === 'ar' ? surah.name?.ar : surah.name?.en}
+                <div className="bg-gray-100 dark:bg-gray-800 px-3 py-2 flex items-center justify-between">
+                  <span className="font-semibold text-sm">
+                    {language === 'ar' ? surah.name?.ar : surah.name?.en}
+                  </span>
+                  {onViewTafseer && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const firstVerse = surah.verses?.[0];
+                        if (firstVerse) {
+                          handleTafseerClick(e, surah.number, firstVerse.number, language === 'ar' ? surah.name?.ar : surah.name?.en);
+                        }
+                      }}
+                      className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
+                      title={t('tafseer')}
+                    >
+                      <BookText className="w-4 h-4" />
+                      <span>{t('tafseer')}</span>
+                    </button>
+                  )}
                 </div>
                 <div className="max-h-[25vh] overflow-y-auto p-2 grid grid-cols-5 gap-1">
                   {surah.verses?.map((verse: any) => (
-                    <motion.button
-                      key={`${surah.number}-${verse.number}`}
-                      data-ayah={`${surah.number}-${verse.number}`}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleAyahClick(surah.number, verse.number, verse.page)}
-                      className={`w-full aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all ${
-                        currentPlayingAyah?.surah === surah.number && currentPlayingAyah?.ayah === verse.number
-                          ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md'
-                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-gray-700 dark:text-gray-200'
-                      }`}
-                    >
-                      {verse.number}
-                    </motion.button>
+                    <div key={`${surah.number}-${verse.number}`} className="relative group">
+                      <motion.button
+                        data-ayah={`${surah.number}-${verse.number}`}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleAyahClick(surah.number, verse.number, verse.page)}
+                        className={`w-full aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all ${
+                          currentPlayingAyah?.surah === surah.number && currentPlayingAyah?.ayah === verse.number
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md'
+                            : 'bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-gray-700 dark:text-gray-200'
+                        }`}
+                      >
+                        {verse.number}
+                      </motion.button>
+                      {onViewTafseer && (
+                        <button
+                          onClick={(e) => handleTafseerClick(e, surah.number, verse.number, language === 'ar' ? surah.name?.ar : surah.name?.en)}
+                          className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-teal-500 hover:bg-teal-600 text-white rounded-full p-0.5 shadow-lg"
+                          title={t('tafseer')}
+                        >
+                          <BookText className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>

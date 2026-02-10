@@ -14,6 +14,7 @@ import { RepeatDialog } from '@/components/quran/RepeatDialog';
 import { BookmarksDialog } from '@/components/quran/BookmarksDialog';
 import { SettingsDialog } from '@/components/quran/SettingsDialog';
 import { NavigationDialog } from '@/components/quran/NavigationDialog';
+import { TafseerDialog } from '@/components/quran/TafseerDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -97,6 +98,10 @@ const Surah = () => {
   const [currentJuz, setCurrentJuz] = useState(1);
   const [currentPageAyah, setCurrentPageAyah] = useState<number | null>(null);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showTafseerDialog, setShowTafseerDialog] = useState(false);
+  const [tafseerSurahNumber, setTafseerSurahNumber] = useState(1);
+  const [tafseerAyahNumber, setTafseerAyahNumber] = useState(1);
+  const [tafseerSurahName, setTafseerSurahName] = useState('');
   const [currentHezb, setCurrentHezb] = useState(1);
   const [currentQuarter, setCurrentQuarter] = useState(1);
   const [viewMode, setViewMode] = useState<'single' | 'double'>(
@@ -630,6 +635,33 @@ const Surah = () => {
           setShowBookmarkDialog(true);
         }}
         onSettingsClick={() => setShowSettingsDialog(true)}
+        onTafseerClick={async () => {
+          // Use currently playing/selected ayah if available, otherwise use first ayah of page
+          if (currentPlayingAyah) {
+            const surah = surahs.find(s => s.id === currentPlayingAyah.surah);
+            setTafseerSurahNumber(currentPlayingAyah.surah);
+            setTafseerAyahNumber(currentPlayingAyah.ayah);
+            setTafseerSurahName(surah ? (language === 'ar' ? surah.name : surah.englishName) : '');
+            setShowTafseerDialog(true);
+          } else {
+            // Fallback: Get first ayah of current page
+            const pageInfo = await getPageSurahInfo(currentPageNum);
+            if (pageInfo && pageInfo.surahId) {
+              const surah = surahs.find(s => s.id === pageInfo.surahId);
+              setTafseerSurahNumber(pageInfo.surahId);
+              setTafseerAyahNumber(pageInfo.ayah || 1);
+              setTafseerSurahName(surah ? (language === 'ar' ? surah.name : surah.englishName) : '');
+              setShowTafseerDialog(true);
+            } else {
+              // Final fallback to current surah
+              const surah = surahs.find(s => s.id === currentSurahId);
+              setTafseerSurahNumber(currentSurahId);
+              setTafseerAyahNumber(currentPageAyah || 1);
+              setTafseerSurahName(surah ? (language === 'ar' ? surah.name : surah.englishName) : '');
+              setShowTafseerDialog(true);
+            }
+          }
+        }}
         onViewModeToggle={() => setViewMode(viewMode === 'single' ? 'double' : 'single')}
       />
 
@@ -665,6 +697,15 @@ const Surah = () => {
         onPagesToLoadChange={setPagesToLoad}
         showBottomBarText={showBottomBarText}
         onShowBottomBarTextChange={setShowBottomBarText}
+      />
+
+      {/* Tafseer Dialog */}
+      <TafseerDialog
+        open={showTafseerDialog}
+        onOpenChange={setShowTafseerDialog}
+        surahNumber={tafseerSurahNumber}
+        ayahNumber={tafseerAyahNumber}
+        surahName={tafseerSurahName}
       />
 
       {/* Reciter Selection Dialog */}
@@ -728,6 +769,12 @@ const Surah = () => {
         isAyahNavigationRef={isAyahNavigation}
         onPlayAyah={playAyah}
         onSetCurrentPlayingAyah={setCurrentPlayingAyah}
+        onViewTafseer={(surahNum, ayahNum, surahName) => {
+          setTafseerSurahNumber(surahNum);
+          setTafseerAyahNumber(ayahNum);
+          setTafseerSurahName(surahName);
+          setShowTafseerDialog(true);
+        }}
       />
 
       {/* Repeat Settings Dialog */}

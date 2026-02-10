@@ -1,5 +1,5 @@
  import { motion } from 'framer-motion';
-import { Navigation, Search, Bookmark, Settings } from 'lucide-react';
+import { Navigation, Search, Bookmark, Settings, BookText } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
@@ -12,6 +12,7 @@ interface BottomBarProps {
   onSearchClick: () => void;
   onBookmarkClick: () => void;
   onSettingsClick: () => void;
+  onTafseerClick: () => void;
   onViewModeToggle: () => void;
 }
 
@@ -24,6 +25,7 @@ export function BottomBar({
   onSearchClick,
   onBookmarkClick,
   onSettingsClick,
+  onTafseerClick,
   onViewModeToggle,
 }: BottomBarProps) {
   const { isRTL, t } = useLanguage();
@@ -65,6 +67,20 @@ export function BottomBar({
         </motion.button>
       </div>
 
+      {/* Tafseer Button */}
+      <div className="flex-1 flex justify-center">
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={onTafseerClick}
+          className="flex flex-col items-center gap-0.5 md:gap-1 text-gray-600 dark:text-gray-300 hover:text-teal-500 dark:hover:text-teal-400 transition-colors group"
+          title={t('tafseer')}
+        >
+          <BookText className="w-7 h-7 md:w-8 md:h-8 group-hover:fill-teal-500/20" />
+          {showBottomBarText && <span className="text-base md:text-xl font-medium">{t('tafseer')}</span>}
+        </motion.button>
+      </div>
+
       {/* Bookmark Button */}
       <div className="flex-1 flex justify-center">
         <motion.button
@@ -86,6 +102,7 @@ export function BottomBar({
         </motion.button>
       </div>
 
+      {/* 
       {/* Settings */}
       <div className="flex-1 flex justify-center">
         <motion.button
