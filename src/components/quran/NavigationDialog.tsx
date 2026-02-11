@@ -500,6 +500,13 @@ export function NavigationDialog({
                     key={`${result.surahNumber}-${result.ayahNumber}-${index}`}
                     whileHover={{ scale: 1.02 }}
                     onClick={() => {
+                      // Set the specific ayah to navigate to before changing the page
+                      if (onSetPlayingAyah) {
+                        onSetPlayingAyah({
+                          surah: result.surahNumber,
+                          ayah: result.ayahNumber
+                        });
+                      }
                       onNavigate(result.page);
                       onOpenChange(false);
                       setSearchWord('');
