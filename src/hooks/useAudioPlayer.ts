@@ -314,7 +314,7 @@ export const useAudioPlayer = ({
   
   // Load reciters from audio.json
   useEffect(() => {
-    fetch("`${ASSETS_BASE_URL}/audio.json`")
+    fetch(`${ASSETS_BASE_URL}/audio.json`)
       .then(res => res.json())
       .then(data => {
         setReciters(data);
@@ -518,3 +518,4 @@ export const useAudioPlayer = ({
     preloadNextAyah
   };
 };
+

@@ -67,7 +67,7 @@ export function useQuranData(): UseQuranDataReturn {
     setIsAyahDataLoading(true);
     setAyahDataError(null);
     
-    fetch("`${ASSETS_BASE_URL}/ayah-meta-data.json`")
+    fetch(`${ASSETS_BASE_URL}/ayah-meta-data.json`)
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
@@ -90,7 +90,7 @@ export function useQuranData(): UseQuranDataReturn {
     setIsMetaDataLoading(true);
     setMetaDataError(null);
     
-    fetch("`${ASSETS_BASE_URL}/quran-meta-data.json`")
+    fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`)
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
@@ -132,3 +132,4 @@ export function useQuranData(): UseQuranDataReturn {
     reloadMetaData: loadQuranMetaData,
   };
 }
+
