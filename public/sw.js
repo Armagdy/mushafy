@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mushafy-v1';
+const CACHE_NAME = 'mushafy-v2';
 const AUDIO_CACHE_NAME = 'mushafy-audio-v1';
 
 // Core assets to cache on install (relative to service worker scope)
@@ -6,6 +6,8 @@ const CORE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
   './mushafy.jpeg',
   './assets/quran-meta-data.json',
   './assets/ayah-meta-data.json',

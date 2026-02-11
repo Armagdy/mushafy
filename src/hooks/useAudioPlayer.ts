@@ -154,7 +154,8 @@ export const useAudioPlayer = ({
       artist: reciterName,
       album: surahEnglishName,
       artwork: [
-        { src: '/mushafy.jpeg', sizes: '512x512', type: 'image/jpeg' },
+        { src: `${import.meta.env.BASE_URL}icon-192.png`, sizes: '192x192', type: 'image/png' },
+        { src: `${import.meta.env.BASE_URL}icon-512.png`, sizes: '512x512', type: 'image/png' },
       ]
     });
     

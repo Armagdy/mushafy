@@ -11,22 +11,38 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "./mushafy.jpeg",
+      "src": "./icon-192.png",
       "sizes": "192x192",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./mushafy.jpeg",
+      "src": "./icon-512.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./mushafy.jpeg",
+      "src": "./icon-512.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "./screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "مصحفي - Mushafy Desktop View"
+    },
+    {
+      "src": "./screenshot-narrow.png",
+      "sizes": "720x1280",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "مصحفي - Mushafy Mobile View"
     }
   ],
   "categories": ["education", "lifestyle"],
