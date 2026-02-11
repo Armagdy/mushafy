@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ASSETS_BASE_URL } from '@/config/assets';
+import { getQuranMetaData, getAyahMetaData } from '@/lib/quran-data-service';
 
 interface AyahVerse {
   number: number;
@@ -67,13 +67,7 @@ export function useQuranData(): UseQuranDataReturn {
     setIsAyahDataLoading(true);
     setAyahDataError(null);
     
-    fetch(`${ASSETS_BASE_URL}/ayah-meta-data.json`)
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        return res.json();
-      })
+    getAyahMetaData()
       .then(data => {
         setAyahData(data);
         setIsAyahDataLoading(false);
@@ -90,13 +84,7 @@ export function useQuranData(): UseQuranDataReturn {
     setIsMetaDataLoading(true);
     setMetaDataError(null);
     
-    fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`)
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        return res.json();
-      })
+    getQuranMetaData()
       .then(data => {
         setQuranMetaData(data);
         setIsMetaDataLoading(false);

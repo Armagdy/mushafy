@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ASSETS_BASE_URL } from '@/config/assets';
+import { getAudioData } from '@/lib/quran-data-service';
 
 interface CurrentAyah {
   surah: number;
@@ -332,8 +333,7 @@ export const useAudioPlayer = ({
   
   // Load reciters from audio.json
   useEffect(() => {
-    fetch(`${ASSETS_BASE_URL}/audio.json`)
-      .then(res => res.json())
+    getAudioData()
       .then(data => {
         setReciters(data);
         

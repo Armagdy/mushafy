@@ -11,12 +11,24 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    headers: {
+      // Cache static assets for better performance
+      'Cache-Control': 'public, max-age=31536000',
+    },
   },
   base: mode === "production" ? "/mushafy/" : "/",
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Cache busting for assets
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      },
     },
   },
 }));

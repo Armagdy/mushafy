@@ -1,10 +1,10 @@
 import { ASSETS_BASE_URL } from '@/config/assets';
+import { getQuranMetaData } from './quran-data-service';
 
 // Generate surah to image filename mapping from quran-meta-data.json
 export const generateSurahImageMap = async (): Promise<Record<number, string>> => {
   try {
-    const response = await fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`);
-    const quranData = await response.json();
+    const quranData = await getQuranMetaData();
     
     const imageMap: Record<number, string> = {};
     const seenSurahs = new Set<number>();
@@ -34,8 +34,7 @@ export const generateSurahImageMap = async (): Promise<Record<number, string>> =
 // Get all pages for a specific surah
 export const getSurahPages = async (surahId: number): Promise<number[]> => {
   try {
-    const response = await fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`);
-    const quranData = await response.json();
+    const quranData = await getQuranMetaData();
     
     const pages: number[] = [];
     quranData.pages.forEach((page: number[], index: number) => {
@@ -63,8 +62,7 @@ export const getPageImageFilename = (pageNumber: number): string => {
 // Get surah info for a specific page
 export const getPageSurahInfo = async (pageNumber: number): Promise<{ surahId: number; ayah: number } | null> => {
   try {
-    const response = await fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`);
-    const quranData = await response.json();
+    const quranData = await getQuranMetaData();
     
     if (pageNumber < 1 || pageNumber > quranData.pages.length) {
       return null;
@@ -84,8 +82,7 @@ export const getPageSurahInfo = async (pageNumber: number): Promise<{ surahId: n
 // Get juz number for a specific page
 export const getPageJuzNumber = async (pageNumber: number): Promise<number> => {
   try {
-    const response = await fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`);
-    const quranData = await response.json();
+    const quranData = await getQuranMetaData();
     
     // Get the surah and ayah for this page
     if (pageNumber < 1 || pageNumber > quranData.pages.length) {
@@ -117,8 +114,7 @@ export const getPageJuzNumber = async (pageNumber: number): Promise<number> => {
 // Get first page of a juz
 export const getJuzFirstPage = async (juzNumber: number): Promise<number> => {
   try {
-    const response = await fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`);
-    const quranData = await response.json();
+    const quranData = await getQuranMetaData();
     
     if (juzNumber < 1 || juzNumber > 30) {
       return 1;
@@ -148,8 +144,7 @@ export const getJuzFirstPage = async (juzNumber: number): Promise<number> => {
 // Get first page of a surah
 export const getSurahFirstPage = async (surahId: number): Promise<number> => {
   try {
-    const response = await fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`);
-    const quranData = await response.json();
+    const quranData = await getQuranMetaData();
     
     for (let i = 0; i < quranData.pages.length; i++) {
       const [pageSurahId] = quranData.pages[i];
@@ -168,8 +163,7 @@ export const getSurahFirstPage = async (surahId: number): Promise<number> => {
 // Get all hizb quarters for a specific surah
 export const getSurahHizbQuarters = async (surahId: number): Promise<Array<{index: number; ayah: number}>> => {
   try {
-    const response = await fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`);
-    const quranData = await response.json();
+    const quranData = await getQuranMetaData();
     
     const hizbQuarters: Array<{index: number; ayah: number}> = [];
     quranData.hizb_quarters.forEach((hizb: number[], index: number) => {
@@ -189,8 +183,7 @@ export const getSurahHizbQuarters = async (surahId: number): Promise<Array<{inde
 // Get all juzs (guza) for a specific surah
 export const getSurahJuzs = async (surahId: number): Promise<Array<{number: number; ayah: number}>> => {
   try {
-    const response = await fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`);
-    const quranData = await response.json();
+    const quranData = await getQuranMetaData();
     
     const juzs: Array<{number: number; ayah: number}> = [];
     quranData.juzs.forEach((juz: number[], index: number) => {
@@ -211,8 +204,7 @@ export const getSurahJuzs = async (surahId: number): Promise<Array<{number: numb
 export const getAyahPage = async (surahId: number, ayahNumber: number): Promise<number> => {
   try {
     console.log('🔍 getAyahPage called with:', { surahId, ayahNumber });
-    const response = await fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`);
-    const quranData = await response.json();
+    const quranData = await getQuranMetaData();
     
     console.log('📋 Total pages in data:', quranData.pages.length);
     
@@ -277,8 +269,7 @@ export const getAyahPage = async (surahId: number, ayahNumber: number): Promise<
 // Get all surahs that appear on a specific page
 export const getPageSurahs = async (pageNumber: number): Promise<number[]> => {
   try {
-    const response = await fetch(`${ASSETS_BASE_URL}/quran-meta-data.json`);
-    const quranData = await response.json();
+    const quranData = await getQuranMetaData();
     
     if (pageNumber < 1 || pageNumber > quranData.pages.length) {
       return [];
