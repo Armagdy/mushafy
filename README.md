@@ -119,7 +119,53 @@ npm run lint         # Run ESLint
 npm run test         # Run Vitest once
 npm run test:watch   # Run Vitest in watch mode
 npm run preview      # Preview production build
+npm run deploy       # Deploy to GitHub Pages (requires gh-pages package)
 ```
+
+## 🚀 Deployment
+
+### GitHub Pages
+
+This project is configured for automatic deployment to GitHub Pages. The site is available at: **https://armagdy.github.io/mushafy/**
+
+#### Automatic Deployment
+
+Every push to the `main` branch automatically triggers a GitHub Actions workflow that:
+1. Builds the project
+2. Deploys it to GitHub Pages
+
+No manual intervention is needed!
+
+#### Manual Deployment
+
+If you prefer to deploy manually:
+
+1. Install gh-pages package:
+```sh
+npm install --save-dev gh-pages
+```
+
+2. Run the deploy command:
+```sh
+npm run deploy
+```
+
+#### Configuration
+
+The following files configure GitHub Pages deployment:
+
+- **vite.config.ts**: Sets `base: "/mushafy/"` for correct asset paths
+- **.github/workflows/deploy.yml**: GitHub Actions workflow for automatic deployment
+- **public/.nojekyll**: Prevents GitHub from processing the site with Jekyll
+
+#### Enabling GitHub Pages
+
+If this is a new repository, enable GitHub Pages:
+
+1. Go to your repository on GitHub
+2. Navigate to **Settings** → **Pages**
+3. Under **Source**, select **GitHub Actions**
+4. The site will be deployed automatically on the next push
 
 ## 📁 Project Structure
 
