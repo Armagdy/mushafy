@@ -33,6 +33,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Remove image folders from dist
+        run: |
+          rm -rf ./dist/assets/mushuf_mwdoa_images
+          rm -rf ./dist/assets/mushaf_tashel_pages
+          rm -rf ./dist/assets/mushaf_madinah_images
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 

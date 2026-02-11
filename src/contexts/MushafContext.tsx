@@ -21,11 +21,12 @@ export const MushafProvider = ({ children }: { children: ReactNode }) => {
   }, [mushafType]);
 
   const getMushafPath = (): string => {
+    const baseUrl = 'https://raw.githubusercontent.com/Armagdy/mushafy/main/public/assets';
     return mushafType === 'mwdoa' 
-      ? '/assets/mushuf_mwdoa_images' 
+      ? `${baseUrl}/mushuf_mwdoa_images` 
       : mushafType === 'tashel'
-      ? '/assets/mushaf_tashel_pages'
-      : '/assets/mushaf_madinah_images';
+      ? `${baseUrl}/mushaf_tashel_pages`
+      : `${baseUrl}/mushaf_madinah_images`;
   };
 
   return (
