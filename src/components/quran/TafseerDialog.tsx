@@ -37,6 +37,7 @@ export function TafseerDialog({
     getTafseersByLanguage,
   } = useTafseer();
 
+  const [currentSurahNumber, setCurrentSurahNumber] = useState(surahNumber);
   const [currentAyahNumber, setCurrentAyahNumber] = useState(ayahNumber);
   const [ayahText, setAyahText] = useState<string>("");
   const [isLoadingAyah, setIsLoadingAyah] = useState(false);
@@ -52,22 +53,36 @@ export function TafseerDialog({
   };
 
   // Get current surah info for ayah count
-  const currentSurah = surahs.find(s => s.id === surahNumber);
+  const currentSurah = surahs.find(s => s.id === currentSurahNumber);
   const maxAyahs = currentSurah?.numberOfAyahs || 1;
 
-  // Reset current ayah when prop changes
+  // Reset current surah and ayah when props change
   useEffect(() => {
+    setCurrentSurahNumber(surahNumber);
     setCurrentAyahNumber(ayahNumber);
-  }, [ayahNumber]);
+  }, [surahNumber, ayahNumber]);
+
+  // Handle surah change - reset to first ayah
+  const handleSurahChange = (value: string) => {
+    const newSurahNumber = parseInt(value);
+    setCurrentSurahNumber(newSurahNumber);
+    setCurrentAyahNumber(1); // Reset to first ayah when changing surah
+  };
+
+  // Handle ayah change
+  const handleAyahChange = (value: string) => {
+    const newAyahNumber = parseInt(value);
+    setCurrentAyahNumber(newAyahNumber);
+  };
 
   // Fetch ayah text from Quran.com API (same source as tafseer)
   useEffect(() => {
-    if (open && surahNumber && currentAyahNumber) {
+    if (open && currentSurahNumber && currentAyahNumber) {
       setIsLoadingAyah(true);
       setAyahText(""); // Reset ayah text
       
       // Use Quran.com API to get verse text
-      fetch(`https://api.quran.com/api/v4/verses/by_key/${surahNumber}:${currentAyahNumber}?fields=text_uthmani`)
+      fetch(`https://api.quran.com/api/v4/verses/by_key/${currentSurahNumber}:${currentAyahNumber}?fields=text_uthmani`)
         .then(res => {
           if (!res.ok) {
             throw new Error(`HTTP error! status: ${res.status}`);
@@ -88,14 +103,14 @@ export function TafseerDialog({
           setIsLoadingAyah(false);
         });
     }
-  }, [open, surahNumber, currentAyahNumber]);
+  }, [open, currentSurahNumber, currentAyahNumber]);
 
   // Fetch tafseer when dialog opens or ayah changes
   useEffect(() => {
-    if (open && surahNumber && currentAyahNumber && selectedTafseerId) {
-      fetchTafseerForAyah(surahNumber, currentAyahNumber);
+    if (open && currentSurahNumber && currentAyahNumber && selectedTafseerId) {
+      fetchTafseerForAyah(currentSurahNumber, currentAyahNumber);
     }
-  }, [open, surahNumber, currentAyahNumber, selectedTafseerId]);
+  }, [open, currentSurahNumber, currentAyahNumber, selectedTafseerId]);
 
   // Navigation handlers
   const handlePreviousAyah = () => {
@@ -118,14 +133,78 @@ export function TafseerDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         className={cn(
-          "sm:max-w-2xl max-w-[90vw] max-h-[85vh]",
+          "sm:max-w-2xl max-w-[90vw] max-h-[95vh]",
           "rounded-xl border border-emerald-500",
           isRTL ? "rtl" : "ltr"
         )}
       >
-        <DialogTitle className="text-base sm:text-lg font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
-          {t('tafseerFor')} {surahName} - {t('ayah')} {formatNumber(currentAyahNumber)}
+        <DialogTitle className="text-base sm:text-lg font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent text-center">
+          {t('tafseer')}
         </DialogTitle>
+
+        {/* Surah and Ayah Selectors */}
+        <div className={cn(
+          "grid grid-cols-2 gap-3",
+          isRTL && "rtl"
+        )}>
+          {/* Surah Selector */}
+          <div className="space-y-2">
+            <label className="font-medium text-emerald-800">
+              {t('selectSurah')}
+            </label>
+            <Select
+              value={currentSurahNumber.toString()}
+              onValueChange={handleSurahChange}
+            >
+              <SelectTrigger className={cn(
+                "w-full border-emerald-300 focus:ring-emerald-500 text-sm md:text-base",
+                isRTL && "text-right"
+              )}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className={isRTL ? "rtl" : "ltr"}>
+                {surahs.map((surah) => (
+                  <SelectItem 
+                    key={surah.id} 
+                    value={surah.id.toString()}
+                    className={cn(isRTL ? "text-right" : "text-left", "text-sm md:text-base")}
+                  >
+                    {formatNumber(surah.id)}. {language === 'ar' ? surah.name : surah.englishName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Ayah Selector */}
+          <div className="space-y-2">
+            <label className="font-medium text-emerald-800">
+              {t('selectAyah')}
+            </label>
+            <Select
+              value={currentAyahNumber.toString()}
+              onValueChange={handleAyahChange}
+            >
+              <SelectTrigger className={cn(
+                "w-full border-emerald-300 focus:ring-emerald-500 text-sm md:text-base",
+                isRTL && "text-right"
+              )}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className={isRTL ? "rtl" : "ltr"}>
+                {Array.from({ length: maxAyahs }, (_, i) => i + 1).map((ayahNum) => (
+                  <SelectItem 
+                    key={ayahNum} 
+                    value={ayahNum.toString()}
+                    className={cn(isRTL ? "text-right" : "text-left", "text-sm md:text-base")}
+                  >
+                    {t('ayah')} {formatNumber(ayahNum)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         {/* Ayah Navigation */}
         <div className={cn(
@@ -168,7 +247,7 @@ export function TafseerDialog({
               <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
             </div>
           ) : ayahText ? (
-            <ScrollArea className="h-[80px] sm:h-[100px] md:h-[120px] px-4 pb-3">
+            <ScrollArea className="max-h-[80px] sm:max-h-[100px] md:max-h-[120px] px-4 pb-3">
               <div className="text-lg md:text-xl lg:text-2xl leading-relaxed text-right font-arabic text-emerald-900">
                 {ayahText}
               </div>
@@ -182,7 +261,7 @@ export function TafseerDialog({
 
         {/* Tafseer Selector */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-emerald-800">
+          <label className="font-medium text-emerald-800">
             {t('selectTafseer')}
           </label>
           <Select
@@ -209,8 +288,13 @@ export function TafseerDialog({
           </Select>
         </div>
 
+        {/* Tafseer Header */}
+        <div className="font-medium text-emerald-800 text-center">
+          {t('tafseer')}
+        </div>
+
         {/* Tafseer Content */}
-        <ScrollArea className="h-[250px] sm:h-[350px] md:h-[400px] w-full rounded-md border border-emerald-200 p-4">
+        <ScrollArea className="h-[250px] sm:h-[350px] md:h-[450px] lg:h-[550px] w-full rounded-md border border-emerald-200 p-4">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
@@ -230,7 +314,7 @@ export function TafseerDialog({
                 </p>
               </div>
               <button
-                onClick={() => fetchTafseerForAyah(surahNumber, currentAyahNumber)}
+                onClick={() => fetchTafseerForAyah(currentSurahNumber, currentAyahNumber)}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
               >
                 {isRTL ? 'إعادة المحاولة' : 'Retry'}

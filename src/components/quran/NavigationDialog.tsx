@@ -170,13 +170,9 @@ export function NavigationDialog({
         setSearchAyah(currentAyah.toString());
       }
       
-      // Prefill Surah tab filters (Juz and Hezb dropdowns in Surah tab)
-      if (currentJuz) {
-        setFilterJuz(currentJuz.toString());
-      }
-      if (currentHezb) {
-        setFilterHezb(currentHezb.toString());
-      }
+      // Keep Juz and Hezb filters empty in Surah tab
+      setFilterJuz('');
+      setFilterHezb('');
       
       // Prefill Juz tab with current juz, hezb, and quarter
       if (currentJuz) {
@@ -202,7 +198,8 @@ export function NavigationDialog({
 
   // Normalize Arabic text by removing diacritics and normalizing character variations
   const normalizeArabic = (text: string) => {
-    return text
+    const normalized = text
+      .replace(/ٰ/g, 'ا') // IMPORTANT: Normalize superscript alif (U+0670) to regular alif FIRST, before removing diacritics
       .replace(/[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g, '') // Remove diacritics
       .replace(/[ٱأإآٲٳٵ]/g, 'ا') // Normalize alef variations
       .replace(/[ىي]/g, 'ي') // Normalize yaa
@@ -211,6 +208,13 @@ export function NavigationDialog({
       .replace(/ئ/g, 'ي') // Normalize yaa with hamza
       .replace(/\s+/g, '') // Remove spaces
       .toLowerCase();
+    
+    // Debug: Show before and after for first few characters
+    if (text.includes('و') && text.length < 50) {
+      console.log('Normalize:', text.substring(0, 20), '→', normalized.substring(0, 20));
+    }
+    
+    return normalized;
   };
 
   // Highlight exact phrase match in text
@@ -269,6 +273,11 @@ export function NavigationDialog({
     if (searchWord.trim().length >= 2 && ayahData.length > 0) {
       setIsSearchLoading(true);
       
+      console.log('=== WORD SEARCH DEBUG ===');
+      console.log('Search Word:', searchWord);
+      console.log('Ayah Data Length:', ayahData.length);
+      console.log('Normalized Search:', normalizeArabic(searchWord.trim()));
+      
       // Use setTimeout to allow UI to update with loading state
       setTimeout(() => {
         // Search for the full text phrase
@@ -287,6 +296,8 @@ export function NavigationDialog({
             const matchesEnglish = englishText.includes(searchFullLower);
             
             if (matchesArabic || matchesEnglish) {
+              console.log('Found match in Surah', surahData.number, 'Ayah', verse.number);
+              console.log('Arabic Text:', arabicText);
               results.push({
                 surahNumber: surahData.number,
                 surahName: surahData.name?.ar,
@@ -301,10 +312,14 @@ export function NavigationDialog({
           });
         });
         
+        console.log('Total Results:', results.length);
+        console.log('========================');
+        
         setWordSearchResults(results);
         setIsSearchLoading(false);
       }, 100);
     } else {
+      console.log('Search too short or no data. Length:', searchWord.trim().length, 'Data:', ayahData.length);
       setWordSearchResults([]);
       setIsSearchLoading(false);
     }
@@ -390,7 +405,7 @@ export function NavigationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         className={cn(
-          "sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto rounded-xl border border-emerald-500",
+          "sm:max-w-2xl max-w-[90vw] max-h-[85vh] overflow-y-auto rounded-xl border border-emerald-500",
           mode === 'word' ? '!top-[5vh] !translate-y-0' : '',
           isRTL ? 'rtl' : 'ltr'
         )}
@@ -465,7 +480,10 @@ export function NavigationDialog({
                         {isRTL ? 'صفحة' : 'Page'} {result.page}
                       </div>
                     </div>
-                    <div className={`text-base md:text-xl text-gray-700 dark:text-gray-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <div className={cn(
+                      "text-lg md:text-xl lg:text-2xl",
+                      isRTL ? "text-right font-arabic text-emerald-900 dark:text-emerald-100 leading-20" : "text-left text-gray-700 dark:text-gray-300 leading-relaxed"
+                    )}>
                       {isRTL 
                         ? highlightText(result.arabicText, searchWord, true)
                         : highlightText(result.englishText, searchWord, false)
@@ -610,7 +628,7 @@ export function NavigationDialog({
                         
                         return filteredSurahs.map(s => (
                           <option key={s.id} value={s.id}>
-                            {isRTL ? s.name : s.englishName}
+                            {isRTL ? `${formatNumber(s.id)}. ${s.name}` : `${s.id}. ${s.englishName}`}
                           </option>
                         ));
                       })()}
