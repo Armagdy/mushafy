@@ -3,12 +3,14 @@
   "name": "مصحفي - Mushafy",
   "short_name": "مصحفي",
   "description": "تصفح القرآن الكريم بتجربة روحانية مميزة - Browse the Holy Quran with a unique spiritual experience",
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
-  "display": "standalone",
-  "background_color": "#ffffff",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "background_color": "#1a4d3e",
   "theme_color": "#1a4d3e",
   "orientation": "any",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "./icon-192.png",
