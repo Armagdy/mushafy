@@ -134,6 +134,9 @@ export const useAudioPlayer = ({
     
     setCurrentPlayingAyah({ surah: surahNum, ayah: ayahNum });
     
+    // Keep playing state true to prevent button flashing
+    setIsPlaying(true);
+    
     // Navigate to the page containing this ayah if not already on it
     const surahData = ayahData.find(s => s.number === surahNum);
     if (surahData && surahData.verses) {
@@ -145,7 +148,10 @@ export const useAudioPlayer = ({
         
         setTimeout(() => {
           if (audioElement && audioElement.src === audioUrl) {
-            audioElement.play().catch(err => console.error('Failed to play audio:', err));
+            audioElement.play().catch(err => {
+              console.error('Failed to play audio:', err);
+              setIsPlaying(false);
+            });
             preloadNextAyah(surahNum, ayahNum);
           }
           isAyahNavigation.current = false;
@@ -157,7 +163,10 @@ export const useAudioPlayer = ({
     
     // Same page - play immediately
     audioElement.src = audioUrl;
-    audioElement.play().catch(err => console.error('Failed to play audio:', err));
+    audioElement.play().catch(err => {
+      console.error('Failed to play audio:', err);
+      setIsPlaying(false);
+    });
     preloadNextAyah(surahNum, ayahNum);
   }, [audioElement, selectedReciter, ayahData, currentPageNum, navigate, preloadNextAyah, isAyahNavigation]);
   
@@ -167,14 +176,20 @@ export const useAudioPlayer = ({
     
     if (isPlaying) {
       audioElement.pause();
+      setIsPlaying(false);
     } else {
       if (currentPlayingAyah) {
         if (audioElement.src && audioElement.currentTime > 0) {
-          audioElement.play().catch(err => {
-            console.error('Failed to resume audio:', err);
-            playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
-          });
-          preloadNextAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+          setIsPlaying(true);
+          audioElement.play()
+            .then(() => {
+              preloadNextAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+            })
+            .catch(err => {
+              console.error('Failed to resume audio:', err);
+              setIsPlaying(false);
+              playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+            });
         } else {
           playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
         }
@@ -214,8 +229,6 @@ export const useAudioPlayer = ({
   
   // Handle audio ended (for continuous playback and repeat)
   const handleAudioEnded = useCallback(() => {
-    setIsPlaying(false);
-    
     if (isRepeatActive && currentPlayingAyah) {
       // Handle repeat logic
       if (currentRepeatAyahCount < repeatAyahCount) {
@@ -250,7 +263,8 @@ export const useAudioPlayer = ({
           setCurrentRepeatAyahCount(1);
           playAyah(repeatStartSurah, repeatStartAyah);
         } else {
-          // Repeat finished
+          // Repeat finished - stop playback
+          setIsPlaying(false);
           setIsRepeatActive(false);
           setCurrentRepeatPassage(0);
           setCurrentRepeatAyah(0);
@@ -267,11 +281,17 @@ export const useAudioPlayer = ({
       return;
     }
     
-    if (!currentPlayingAyah || !ayahData.length) return;
+    if (!currentPlayingAyah || !ayahData.length) {
+      setIsPlaying(false);
+      return;
+    }
     
     // Find current surah data
     const currentSurahData = ayahData.find(s => s.number === currentPlayingAyah.surah);
-    if (!currentSurahData || !currentSurahData.verses) return;
+    if (!currentSurahData || !currentSurahData.verses) {
+      setIsPlaying(false);
+      return;
+    }
     
     const totalAyahs = currentSurahData.verses.length;
     const currentAyahNum = currentPlayingAyah.ayah;
@@ -287,24 +307,22 @@ export const useAudioPlayer = ({
         // Play first ayah of next surah
         const nextSurahNum = currentPlayingAyah.surah + 1;
         playAyah(nextSurahNum, 1);
+      } else {
+        // Last ayah of last surah - stop playback
+        setIsPlaying(false);
       }
-      // If it was the last ayah of the last surah (114), just stop
     }
   }, [isRepeatActive, currentPlayingAyah, currentRepeatAyahCount, repeatAyahCount, currentRepeatSurah, currentRepeatAyah, ayahData, currentRepeatPassage, repeatPassageCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, playAyah]);
   
   // Initialize audio elements
   useEffect(() => {
     const audio = new Audio();
-    audio.addEventListener('play', () => setIsPlaying(true));
-    audio.addEventListener('pause', () => setIsPlaying(false));
     setAudioElement(audio);
     
     const preloadAudio = new Audio();
     setPreloadAudioElement(preloadAudio);
     
     return () => {
-      audio.removeEventListener('play', () => setIsPlaying(true));
-      audio.removeEventListener('pause', () => setIsPlaying(false));
       audio.pause();
       audio.remove();
       preloadAudio.pause();

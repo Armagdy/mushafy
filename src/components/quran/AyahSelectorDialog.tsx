@@ -48,9 +48,8 @@ export function AyahSelectorDialog({
     console.log('Set isAyahNavigation flag to true');
     // Set current playing ayah BEFORE navigation to ensure it persists
     onSetCurrentPlayingAyah({ surah: surahNum, ayah: ayahNum });
-    // Play the selected ayah
-    onPlayAyah(surahNum, ayahNum);
     // Navigate to the page containing this ayah (use verse.page directly)
+    // Note: Audio will NOT auto-play - user can manually press play if desired
     navigate(`/page/${versePage}#${surahNum}-${ayahNum}`);
     onOpenChange(false);
   };
