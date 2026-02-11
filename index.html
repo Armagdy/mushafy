@@ -26,6 +26,21 @@
     <!-- Icon URLs -->
     <link rel="apple-touch-icon" href="icon-192.png" />
     <link rel="icon" type="image/png" href="icon-192.png" />
+    
+    <!-- SPA redirect handler for GitHub Pages -->
+    <script type="text/javascript">
+      (function() {
+        var redirect = sessionStorage.getItem('spa-redirect');
+        if (redirect) {
+          sessionStorage.removeItem('spa-redirect');
+          var data = JSON.parse(redirect);
+          var targetUrl = data.path + data.search + data.hash;
+          if (targetUrl !== '/' && targetUrl !== window.location.pathname) {
+            history.replaceState(null, '', targetUrl);
+          }
+        }
+      })();
+    </script>
   </head>
 
   <body>
