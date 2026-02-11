@@ -1,7 +1,8 @@
  import { motion } from 'framer-motion';
-import { Navigation, Search, Bookmark, Settings, BookText } from 'lucide-react';
+import { Navigation, Search, Bookmark, Settings, BookText, GraduationCap } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
 
 interface BottomBarProps {
   showBottomBarText: boolean;

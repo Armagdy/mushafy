@@ -2,10 +2,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Book, Navigation, Menu } from "lucide-react";
+import { BookOpen, Book, Navigation, Menu, GraduationCap } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMushaf, MushafType } from "@/contexts/MushafContext";
 import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -153,6 +154,22 @@ export function SettingsDialog({
               />
             </div>
           </div>
+
+          {/* Test Feature Button */}
+          <Link to="/test" className="block">
+            <Button
+              variant="outline"
+              className="w-full p-2 sm:p-3 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 dark:from-emerald-900/20 dark:to-teal-900/20 dark:hover:from-emerald-900/30 dark:hover:to-teal-900/30 border-emerald-300 dark:border-emerald-700"
+              onClick={() => onOpenChange(false)}
+            >
+              <div className="flex items-center gap-2 sm:gap-3 w-full">
+                <GraduationCap className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-base md:text-xl font-medium text-emerald-700 dark:text-emerald-300">
+                  {t('testFeature')}
+                </span>
+              </div>
+            </Button>
+          </Link>
         </div>
       </DialogContent>
     </Dialog>

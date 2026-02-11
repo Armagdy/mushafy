@@ -94,11 +94,13 @@ Add new components: `npx shadcn-ui@latest add <component-name>`
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className={cn(
-          "sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto",
+          "sm:max-w-md md:max-w-lg lg:max-w-xl max-w-[90vw] max-h-[85vh] overflow-y-auto",
           "rounded-xl border border-emerald-500",
           isRTL ? "rtl" : "ltr"
         )}>
-          <DialogTitle>{t('bookmarks')}</DialogTitle>
+          <DialogTitle className="text-base md:text-xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+            {t('bookmarks')}
+          </DialogTitle>
           {/* Dialog content */}
         </DialogContent>
       </Dialog>
@@ -117,15 +119,20 @@ const { isRTL } = useLanguage();
 ```
 
 ### Dialog Styling (Project Standard)
+**Responsive widths:** Dialogs scale up on larger screens (`md:max-w-lg lg:max-w-xl`).
+**Responsive text:** All dialog text uses `text-base md:text-xl` for readability on larger screens.
 ```tsx
 <DialogContent className={cn(
-  "sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto",
+  "sm:max-w-md md:max-w-lg lg:max-w-xl max-w-[90vw] max-h-[85vh] overflow-y-auto",
   "rounded-xl border border-emerald-500",
   isRTL ? "rtl" : "ltr"
 )}>
-  <DialogTitle className="text-base sm:text-lg font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+  <DialogTitle className="text-base md:text-xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
     {t('title')}
   </DialogTitle>
+  {/* Labels, SelectItems, descriptions, buttons all use text-base md:text-xl */}
+  <Label className="text-base md:text-xl font-medium">{t('label')}</Label>
+  <Button className="text-base md:text-xl">{t('action')}</Button>
 </DialogContent>
 ```
 

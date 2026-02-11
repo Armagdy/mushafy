@@ -42,7 +42,7 @@ export function TopBar({
         >
           <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-white/20 to-transparent pointer-events-none" />
           <span className="relative">
-            {formatNumber(currentSurah.id)}. {language === 'ar' ? currentSurah.name : currentSurah.englishName}
+            {formatNumber(currentSurah.id)} {language === 'ar' ? currentSurah.name : currentSurah.englishName}
           </span>
         </button>
 
