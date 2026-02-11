@@ -1,9 +1,9 @@
 {
   "id": "mushafy-quran-app",
-  "name": "مصحفي - Mushafy",
-  "short_name": "مصحفي",
-  "description": "تصفح القرآن الكريم بتجربة روحانية مميزة - Browse the Holy Quran with a unique spiritual experience",
-  "start_url": "./index.html",
+  "name": "Mushafy - مصحفى",
+  "short_name": "Mushafy",
+  "description": "Browse the Holy Quran with a unique spiritual experience",
+  "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone"],
@@ -37,14 +37,14 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "مصحفي - Mushafy Desktop View"
+      "label": "Mushafy Desktop View"
     },
     {
       "src": "./screenshot-narrow.png",
       "sizes": "720x1280",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "مصحفي - Mushafy Mobile View"
+      "label": "Mushafy Mobile View"
     }
   ],
   "categories": ["education", "lifestyle"],
