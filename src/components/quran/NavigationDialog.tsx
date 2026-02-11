@@ -197,7 +197,7 @@ export function NavigationDialog({
   }, [open, currentSurahId, currentAyah, currentJuz, currentHezb, currentQuarter, currentPage]);
 
   // Normalize Arabic text by removing diacritics and normalizing character variations
-  const normalizeArabic = (text: string) => {
+  const normalizeArabic = (text: string, keepSpaces: boolean = false) => {
     const normalized = text
       .replace(/ٰ/g, 'ا') // IMPORTANT: Normalize superscript alif (U+0670) to regular alif FIRST, before removing diacritics
       .replace(/[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g, '') // Remove diacritics
@@ -206,7 +206,7 @@ export function NavigationDialog({
       .replace(/ة/g, 'ه') // Normalize taa marboota
       .replace(/ؤ/g, 'و') // Normalize waw with hamza
       .replace(/ئ/g, 'ي') // Normalize yaa with hamza
-      .replace(/\s+/g, '') // Remove spaces
+      .replace(/\s+/g, keepSpaces ? ' ' : '') // Keep or remove spaces
       .toLowerCase();
     
     // Debug: Show before and after for first few characters
@@ -221,8 +221,8 @@ export function NavigationDialog({
   const highlightText = (text: string, searchWord: string, isArabic: boolean) => {
     if (!searchWord || !text) return text;
     
-    const normalizedSearch = isArabic ? normalizeArabic(searchWord.trim()) : searchWord.trim().toLowerCase();
-    const normalizedText = isArabic ? normalizeArabic(text) : text.toLowerCase();
+    const normalizedSearch = isArabic ? normalizeArabic(searchWord.trim(), true) : searchWord.trim().toLowerCase();
+    const normalizedText = isArabic ? normalizeArabic(text, true) : text.toLowerCase();
     
     // Find the position of the exact match in normalized text
     const matchIndex = normalizedText.indexOf(normalizedSearch);
@@ -268,7 +268,7 @@ export function NavigationDialog({
     );
   };
 
-  // Word search functionality
+  // Word search functionality with word boundary support
   const performWordSearch = () => {
     if (searchWord.trim().length >= 2 && ayahData.length > 0) {
       setIsSearchLoading(true);
@@ -276,24 +276,41 @@ export function NavigationDialog({
       console.log('=== WORD SEARCH DEBUG ===');
       console.log('Search Word:', searchWord);
       console.log('Ayah Data Length:', ayahData.length);
-      console.log('Normalized Search:', normalizeArabic(searchWord.trim()));
+      console.log('Normalized Search:', normalizeArabic(searchWord.trim(), true));
       
       // Use setTimeout to allow UI to update with loading state
       setTimeout(() => {
-        // Search for the full text phrase
-        const normalizedSearchFull = normalizeArabic(searchWord.trim());
+        // Normalize search term with spaces preserved
+        const normalizedSearchFull = normalizeArabic(searchWord.trim(), true);
         const searchFullLower = searchWord.trim().toLowerCase();
         const results: any[] = [];
         
         ayahData.forEach(surahData => {
           surahData.verses?.forEach((verse: any) => {
             const arabicText = verse.text?.ar || '';
-            const normalizedArabic = normalizeArabic(arabicText);
+            const normalizedArabic = normalizeArabic(arabicText, true); // Keep spaces
             const englishText = (verse.text?.en || '').toLowerCase();
             
-            // Check if the full phrase matches
-            const matchesArabic = normalizedArabic.includes(normalizedSearchFull);
-            const matchesEnglish = englishText.includes(searchFullLower);
+            // Check if the full phrase matches with word boundaries
+            // For Arabic: ensure the match is surrounded by spaces or start/end
+            const arabicWords = normalizedArabic.split(' ');
+            const searchWords = normalizedSearchFull.split(' ');
+            
+            // Try to find the search phrase as complete words
+            let matchesArabic = false;
+            if (searchWords.length === 1) {
+              // Single word search - must match complete word
+              matchesArabic = arabicWords.includes(normalizedSearchFull);
+            } else {
+              // Multi-word search - match consecutive words
+              const searchPhrase = normalizedSearchFull;
+              matchesArabic = normalizedArabic.includes(searchPhrase);
+            }
+            
+            // For English, use word boundary check
+            const matchesEnglish = englishText.split(/\s+/).some(word => 
+              word === searchFullLower || word.includes(searchFullLower)
+            );
             
             if (matchesArabic || matchesEnglish) {
               console.log('Found match in Surah', surahData.number, 'Ayah', verse.number);
