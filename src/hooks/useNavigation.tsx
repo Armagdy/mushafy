@@ -74,6 +74,26 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
     );
   }, [normalizeArabic]);
 
+  // Helper function to check if search term matches as a complete word
+  const matchesWholeWord = useCallback((text: string, searchTerm: string): boolean => {
+    // If search term is empty, no match
+    if (!searchTerm) return false;
+    
+    // Create a regex pattern that matches the search term as a whole word
+    // Using word boundaries for word matching
+    // For Arabic, we handle space-separated words
+    const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // Match if the search term:
+    // 1. Is at the start of text followed by space or end
+    // 2. Is after a space and followed by space or end
+    // 3. Is the entire text
+    const pattern = `(^|\\s)${escaped}(\\s|$)`;
+    const regex = new RegExp(pattern);
+    
+    return regex.test(text);
+  }, []);
+
   // Word search functionality - manual search only, supports multiple words
   const performWordSearch = useCallback((
     searchWord: string,
@@ -83,6 +103,9 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
   ) => {
     if (searchWord.trim().length >= 2 && ayahData.length > 0) {
       setIsSearchLoading(true);
+      
+      // Detect if user wants exact word matching (search ends with space)
+      const exactWordMatch = searchWord.endsWith(' ') && searchWord.trim().length > 0;
       
       // Use setTimeout to allow UI to update with loading state
       setTimeout(() => {
@@ -98,8 +121,18 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
             const englishText = (verse.text?.en || '').toLowerCase();
             
             // Check if the full phrase matches
-            const matchesArabic = normalizedArabic.includes(normalizedSearchFull);
-            const matchesEnglish = englishText.includes(searchFullLower);
+            let matchesArabic: boolean;
+            let matchesEnglish: boolean;
+            
+            if (exactWordMatch) {
+              // Use whole word matching when search ends with space
+              matchesArabic = matchesWholeWord(normalizedArabic, normalizedSearchFull);
+              matchesEnglish = matchesWholeWord(englishText, searchFullLower);
+            } else {
+              // Use substring matching for partial searches
+              matchesArabic = normalizedArabic.includes(normalizedSearchFull);
+              matchesEnglish = englishText.includes(searchFullLower);
+            }
             
             if (matchesArabic || matchesEnglish) {
               results.push({
@@ -123,7 +156,7 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
       setWordSearchResults([]);
       setIsSearchLoading(false);
     }
-  }, [normalizeArabic]);
+  }, [normalizeArabic, matchesWholeWord]);
 
   // Navigate to surah and optionally to a specific ayah
   const handleGoToSurah = useCallback(async (
