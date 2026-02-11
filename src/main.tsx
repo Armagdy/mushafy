@@ -11,7 +11,9 @@ preloadQuranData().catch(err => {
 // Register service worker for PWA support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    // Use base URL for correct path in both dev and production
+    const swPath = `${import.meta.env.BASE_URL}sw.js`;
+    navigator.serviceWorker.register(swPath)
       .then((registration) => {
         console.log('Service Worker registered with scope:', registration.scope);
       })

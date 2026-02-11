@@ -1,15 +1,15 @@
 const CACHE_NAME = 'mushafy-v1';
 const AUDIO_CACHE_NAME = 'mushafy-audio-v1';
 
-// Core assets to cache on install
+// Core assets to cache on install (relative to service worker scope)
 const CORE_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/mushafy.jpeg',
-  '/assets/quran-meta-data.json',
-  '/assets/ayah-meta-data.json',
-  '/assets/audio.json'
+  './',
+  './index.html',
+  './manifest.json',
+  './mushafy.jpeg',
+  './assets/quran-meta-data.json',
+  './assets/ayah-meta-data.json',
+  './assets/audio.json'
 ];
 
 // Install event - cache core assets
@@ -103,7 +103,7 @@ self.addEventListener('fetch', (event) => {
           }
           // Return offline page for navigation requests
           if (event.request.mode === 'navigate') {
-            return caches.match('/');
+            return caches.match('./');
           }
           return new Response('Offline', { status: 503 });
         });
