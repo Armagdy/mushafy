@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ASSETS_BASE_URL } from '@/config/assets';
 import { getAudioData } from '@/lib/quran-data-service';
+import { surahs } from '@/data/surahs';
 
 interface CurrentAyah {
   surah: number;
@@ -40,6 +41,9 @@ export const useAudioPlayer = ({
   const [preloadAudioElement, setPreloadAudioElement] = useState<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayingAyah, setCurrentPlayingAyah] = useState<CurrentAyah | null>(null);
+  
+  // Wake Lock state to prevent screen sleep during playback
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   
   // Reciter state
   const [reciters, setReciters] = useState<Reciter[]>([]);
@@ -86,6 +90,77 @@ export const useAudioPlayer = ({
       .replace(/\s*-\s*(مجود|مرتل)\s*/g, '')
       .trim();
   };
+  
+  // Request wake lock to prevent screen sleep during playback
+  const requestWakeLock = useCallback(async () => {
+    if ('wakeLock' in navigator) {
+      try {
+        // Release any existing wake lock first
+        if (wakeLockRef.current) {
+          await wakeLockRef.current.release();
+        }
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        console.log('Wake lock acquired for audio playback');
+        
+        // Re-acquire wake lock if visibility changes (user comes back to tab)
+        wakeLockRef.current.addEventListener('release', () => {
+          console.log('Wake lock released');
+        });
+      } catch (err) {
+        console.log('Wake lock request failed:', err);
+      }
+    }
+  }, []);
+  
+  // Release wake lock when stopping audio
+  const releaseWakeLock = useCallback(async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+        console.log('Wake lock released');
+      } catch (err) {
+        console.log('Wake lock release failed:', err);
+      }
+    }
+  }, []);
+  
+  // Get previous ayah in sequence
+  const getPreviousAyah = useCallback((currentSurah: number, currentAyah: number): CurrentAyah | null => {
+    if (currentAyah > 1) {
+      return { surah: currentSurah, ayah: currentAyah - 1 };
+    } else if (currentSurah > 1) {
+      // Get last ayah of previous surah
+      const prevSurahData = ayahData.find(s => s.number === currentSurah - 1);
+      if (prevSurahData && prevSurahData.verses) {
+        return { surah: currentSurah - 1, ayah: prevSurahData.verses.length };
+      }
+    }
+    return null;
+  }, [ayahData]);
+  
+  // Update Media Session API for Android/mobile notification controls
+  const updateMediaSession = useCallback((surahNum: number, ayahNum: number, playing: boolean) => {
+    if (!('mediaSession' in navigator)) return;
+    
+    const surah = surahs.find(s => s.id === surahNum);
+    const surahName = surah?.name || `سورة ${surahNum}`;
+    const surahEnglishName = surah?.englishName || `Surah ${surahNum}`;
+    const reciterName = selectedReciter?.nameAr || selectedReciter?.name || 'Reciter';
+    
+    // Set metadata to keep notification visible
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: `${surahName} - آية ${ayahNum}`,
+      artist: reciterName,
+      album: surahEnglishName,
+      artwork: [
+        { src: '/mushafy.jpeg', sizes: '512x512', type: 'image/jpeg' },
+      ]
+    });
+    
+    // Set playback state
+    navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+  }, [selectedReciter]);
   
   // Get next ayah in sequence
   const getNextAyah = useCallback((currentSurah: number, currentAyah: number): CurrentAyah | null => {
@@ -138,6 +213,12 @@ export const useAudioPlayer = ({
     // Keep playing state true to prevent button flashing
     setIsPlaying(true);
     
+    // Update Media Session for Android notification
+    updateMediaSession(surahNum, ayahNum, true);
+    
+    // Request wake lock to prevent screen sleep
+    requestWakeLock();
+    
     // Navigate to the page containing this ayah if not already on it
     const surahData = ayahData.find(s => s.number === surahNum);
     if (surahData && surahData.verses) {
@@ -169,7 +250,7 @@ export const useAudioPlayer = ({
       setIsPlaying(false);
     });
     preloadNextAyah(surahNum, ayahNum);
-  }, [audioElement, selectedReciter, ayahData, currentPageNum, navigate, preloadNextAyah, isAyahNavigation]);
+  }, [audioElement, selectedReciter, ayahData, currentPageNum, navigate, preloadNextAyah, isAyahNavigation, updateMediaSession, requestWakeLock]);
   
   // Toggle play/pause
   const togglePlayPause = useCallback(() => {
@@ -178,10 +259,18 @@ export const useAudioPlayer = ({
     if (isPlaying) {
       audioElement.pause();
       setIsPlaying(false);
+      // Update media session to paused
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
     } else {
       if (currentPlayingAyah) {
         if (audioElement.src && audioElement.currentTime > 0) {
           setIsPlaying(true);
+          // Update media session to playing
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'playing';
+          }
           audioElement.play()
             .then(() => {
               preloadNextAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
@@ -211,7 +300,13 @@ export const useAudioPlayer = ({
     setCurrentRepeatAyah(0);
     setCurrentRepeatSurah(0);
     setCurrentRepeatAyahCount(0);
-  }, [audioElement]);
+    // Clear media session
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'none';
+    }
+    // Release wake lock
+    releaseWakeLock();
+  }, [audioElement, releaseWakeLock]);
   
   // Start repeat mode
   const startRepeat = useCallback(() => {
@@ -330,6 +425,79 @@ export const useAudioPlayer = ({
       preloadAudio.remove();
     };
   }, []);
+  
+  // Set up Media Session action handlers for Android notification controls
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+    
+    // Play action
+    navigator.mediaSession.setActionHandler('play', () => {
+      if (audioElement && currentPlayingAyah) {
+        audioElement.play().catch(console.error);
+        setIsPlaying(true);
+        navigator.mediaSession.playbackState = 'playing';
+      }
+    });
+    
+    // Pause action
+    navigator.mediaSession.setActionHandler('pause', () => {
+      if (audioElement) {
+        audioElement.pause();
+        setIsPlaying(false);
+        navigator.mediaSession.playbackState = 'paused';
+      }
+    });
+    
+    // Previous track action - go to previous ayah
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      if (currentPlayingAyah) {
+        const prevAyah = getPreviousAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+        if (prevAyah) {
+          playAyah(prevAyah.surah, prevAyah.ayah);
+        }
+      }
+    });
+    
+    // Next track action - go to next ayah
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      if (currentPlayingAyah) {
+        const nextAyah = getNextAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+        if (nextAyah) {
+          playAyah(nextAyah.surah, nextAyah.ayah);
+        }
+      }
+    });
+    
+    // Cleanup - remove action handlers
+    return () => {
+      try {
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('previoustrack', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+      } catch (e) {
+        // Some browsers might not support removing handlers
+      }
+    };
+  }, [audioElement, currentPlayingAyah, playAyah, getNextAyah, getPreviousAyah]);
+  
+  // Re-acquire wake lock when page becomes visible (after screen unlock or tab switch)
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && isPlaying) {
+        // Re-acquire wake lock when page becomes visible and audio is playing
+        await requestWakeLock();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // Release wake lock on cleanup
+      releaseWakeLock();
+    };
+  }, [isPlaying, requestWakeLock, releaseWakeLock]);
   
   // Load reciters from audio.json
   useEffect(() => {
