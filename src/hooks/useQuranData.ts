@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ASSETS_BASE_URL } from '@/config/assets';
 
 interface AyahVerse {
   number: number;
@@ -66,7 +67,7 @@ export function useQuranData(): UseQuranDataReturn {
     setIsAyahDataLoading(true);
     setAyahDataError(null);
     
-    fetch('/assets/ayah-meta-data.json')
+    fetch("`${ASSETS_BASE_URL}/ayah-meta-data.json`")
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
@@ -89,7 +90,7 @@ export function useQuranData(): UseQuranDataReturn {
     setIsMetaDataLoading(true);
     setMetaDataError(null);
     
-    fetch('/assets/quran-meta-data.json')
+    fetch("`${ASSETS_BASE_URL}/quran-meta-data.json`")
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);

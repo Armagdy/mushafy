@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { ASSETS_BASE_URL } from '@/config/assets';
 
 export type MushafType = 'mwdoa' | 'tashel' | 'madinah';
 
@@ -21,12 +22,12 @@ export const MushafProvider = ({ children }: { children: ReactNode }) => {
   }, [mushafType]);
 
   const getMushafPath = (): string => {
-    const baseUrl = 'https://raw.githubusercontent.com/Armagdy/mushafy/main/public/assets';
-    return mushafType === 'mwdoa' 
-      ? `${baseUrl}/mushuf_mwdoa_images` 
+    const folder = mushafType === 'mwdoa' 
+      ? 'mushuf_mwdoa_images' 
       : mushafType === 'tashel'
-      ? `${baseUrl}/mushaf_tashel_pages`
-      : `${baseUrl}/mushaf_madinah_images`;
+      ? 'mushaf_tashel_pages'
+      : 'mushaf_madinah_images';
+    return `${ASSETS_BASE_URL}/${folder}`;
   };
 
   return (

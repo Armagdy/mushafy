@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ASSETS_BASE_URL } from '@/config/assets';
 
 interface CurrentAyah {
   surah: number;
@@ -313,7 +314,7 @@ export const useAudioPlayer = ({
   
   // Load reciters from audio.json
   useEffect(() => {
-    fetch('/assets/audio.json')
+    fetch("`${ASSETS_BASE_URL}/audio.json`")
       .then(res => res.json())
       .then(data => {
         setReciters(data);
