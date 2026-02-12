@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mushafy-v2';
+const CACHE_NAME = 'mushafy-v3';
 const AUDIO_CACHE_NAME = 'mushafy-audio-v1';
 
 // Core assets to cache on install (relative to service worker scope)
@@ -42,6 +42,32 @@ self.addEventListener('activate', (event) => {
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  
+  // For navigation requests (HTML pages), always serve index.html for SPA routing
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // If the server returns the page successfully, cache and return it
+          if (response.ok) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put('./index.html', responseClone);
+            });
+            return response;
+          }
+          // For 404s (SPA routes), serve cached index.html
+          return caches.match('./index.html').then((cached) => cached || response);
+        })
+        .catch(() => {
+          // Offline: serve cached index.html
+          return caches.match('./index.html').then((cached) => {
+            return cached || caches.match('./');
+          });
+        })
+    );
+    return;
+  }
   
   // Handle audio files with special caching strategy
   if (url.pathname.endsWith('.mp3')) {
