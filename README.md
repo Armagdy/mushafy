@@ -167,6 +167,65 @@ If this is a new repository, enable GitHub Pages:
 3. Under **Source**, select **GitHub Actions**
 4. The site will be deployed automatically on the next push
 
+### Vercel Deployment (Recommended for Android TWA)
+
+For Android Trusted Web Activity (TWA) apps, **Vercel is recommended** over GitHub Pages because:
+- GitHub Pages serves projects at subdirectories (e.g., `username.github.io/repo/`)
+- Android Digital Asset Links verification requires `assetlinks.json` at the **domain root** (`/.well-known/assetlinks.json`)
+- Vercel serves your app at the root domain, making TWA verification work seamlessly
+
+#### Deploy to Vercel
+
+1. Push your code to GitHub
+2. Go to [vercel.com](https://vercel.com) and import your repository
+3. Deploy (Vercel auto-detects Vite configuration)
+4. Your app will be available at `https://your-project.vercel.app/`
+
+### Android TWA (Trusted Web Activity)
+
+To create an Android APK that runs your PWA without the browser URL bar:
+
+#### Step 1: Generate APK with PWABuilder
+
+1. Go to [PWABuilder.com](https://pwabuilder.com)
+2. Enter your Vercel URL (e.g., `https://mushafy-beryl.vercel.app/`)
+3. Click **"Package for Stores"** → **"Android"**
+4. Download the package (contains APK and `assetlinks.json`)
+5. **Save the `signing.keystore` file** - you need it for future builds to keep the same fingerprint
+
+#### Step 2: Configure Digital Asset Links
+
+1. Extract `assetlinks.json` from the downloaded package
+2. Copy it to your project: `public/.well-known/assetlinks.json`
+3. The file contains your app's package name and signing certificate fingerprint:
+
+```json
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "app.vercel.your_project.twa",
+    "sha256_cert_fingerprints": ["YOUR:FINGERPRINT:HERE"]
+  }
+}]
+```
+
+4. Deploy to Vercel
+5. Verify the file is accessible: `https://your-domain/.well-known/assetlinks.json`
+
+#### Step 3: Install and Test
+
+1. **Uninstall** any previous version of the app
+2. Install the new APK on your Android device
+3. Open the app and wait 10-15 seconds (Android verifies the Digital Asset Link)
+4. The URL bar should now be hidden!
+
+#### Troubleshooting TWA
+
+- **URL bar still visible?** Clear app data: Settings → Apps → Your App → Clear Data
+- **Fingerprint mismatch?** Regenerating the APK creates a new signing key. Always use the same `signing.keystore` for future builds
+- **Verify Digital Asset Links**: Use [Google's DAL Tool](https://developers.google.com/digital-asset-links/tools/generator) to test your configuration
+
 ## 📁 Project Structure
 
 ```

@@ -268,26 +268,6 @@ export function NavigationDialog({
     );
   };
 
-  // Helper function to check if search term matches as a complete word
-  const matchesWholeWord = (text: string, searchTerm: string): boolean => {
-    // If search term is empty, no match
-    if (!searchTerm) return false;
-    
-    // Create a regex pattern that matches the search term as a whole word
-    // Using word boundaries (\b) for word matching
-    // For Arabic, we need to handle space-separated words
-    const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    
-    // Match if the search term:
-    // 1. Is at the start of text followed by space or end
-    // 2. Is after a space and followed by space or end
-    // 3. Is the entire text
-    const pattern = `(^|\\s)${escaped}(\\s|$)`;
-    const regex = new RegExp(pattern);
-    
-    return regex.test(text);
-  };
-
   // Word search functionality
   const performWordSearch = () => {
     if (searchWord.trim().length >= 2 && ayahData.length > 0) {
@@ -297,10 +277,6 @@ export function NavigationDialog({
       console.log('Search Word:', searchWord);
       console.log('Ayah Data Length:', ayahData.length);
       console.log('Normalized Search:', normalizeArabic(searchWord.trim()));
-      
-      // Detect if user wants exact word matching (search ends with space)
-      const exactWordMatch = searchWord.endsWith(' ') && searchWord.trim().length > 0;
-      console.log('Exact Word Match Mode:', exactWordMatch);
       
       // Use setTimeout to allow UI to update with loading state
       setTimeout(() => {
@@ -316,18 +292,8 @@ export function NavigationDialog({
             const englishText = (verse.text?.en || '').toLowerCase();
             
             // Check if the full phrase matches
-            let matchesArabic: boolean;
-            let matchesEnglish: boolean;
-            
-            if (exactWordMatch) {
-              // Use whole word matching when search ends with space
-              matchesArabic = matchesWholeWord(normalizedArabic, normalizedSearchFull);
-              matchesEnglish = matchesWholeWord(englishText, searchFullLower);
-            } else {
-              // Use substring matching for partial searches
-              matchesArabic = normalizedArabic.includes(normalizedSearchFull);
-              matchesEnglish = englishText.includes(searchFullLower);
-            }
+            const matchesArabic = normalizedArabic.includes(normalizedSearchFull);
+            const matchesEnglish = englishText.includes(searchFullLower);
             
             if (matchesArabic || matchesEnglish) {
               console.log('Found match in Surah', surahData.number, 'Ayah', verse.number);
@@ -439,7 +405,11 @@ export function NavigationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent 
         className={cn(
-          "sm:max-w-2xl max-w-[90vw] max-h-[85vh] overflow-y-auto rounded-xl border border-emerald-500",
+          "sm:max-w-2xl max-w-[90vw] overflow-y-auto rounded-xl border border-emerald-500",
+          // Taller dialog when search results are available
+          wordSearchResults.length > 0 
+            ? "max-h-[90vh] md:max-h-[95vh]" 
+            : "max-h-[85vh]",
           mode === 'word' ? '!top-[5vh] !translate-y-0' : '',
           isRTL ? 'rtl' : 'ltr'
         )}
@@ -500,13 +470,6 @@ export function NavigationDialog({
                     key={`${result.surahNumber}-${result.ayahNumber}-${index}`}
                     whileHover={{ scale: 1.02 }}
                     onClick={() => {
-                      // Set the specific ayah to navigate to before changing the page
-                      if (onSetPlayingAyah) {
-                        onSetPlayingAyah({
-                          surah: result.surahNumber,
-                          ayah: result.ayahNumber
-                        });
-                      }
                       onNavigate(result.page);
                       onOpenChange(false);
                       setSearchWord('');
