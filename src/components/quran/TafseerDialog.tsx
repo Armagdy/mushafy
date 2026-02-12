@@ -288,11 +288,6 @@ export function TafseerDialog({
           </Select>
         </div>
 
-        {/* Tafseer Header */}
-        <div className="font-medium text-emerald-800 text-center">
-          {t('tafseer')}
-        </div>
-
         {/* Tafseer Content */}
         <ScrollArea className="h-[250px] sm:h-[350px] md:h-[450px] lg:h-[550px] w-full rounded-md border border-emerald-200 p-4">
           {isLoading ? (
