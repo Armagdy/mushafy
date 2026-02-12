@@ -3,8 +3,8 @@
   "name": "Mushafy - مصحفى",
   "short_name": "Mushafy",
   "description": "Browse the Holy Quran with a unique spiritual experience",
-  "start_url": "/mushafy/",
-  "scope": "/mushafy/",
+  "start_url": "./",
+  "scope": "./",
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone"],
   "background_color": "#1a4d3e",
@@ -13,19 +13,19 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/mushafy/icon-192.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/mushafy/icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/mushafy/icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -33,14 +33,14 @@
   ],
   "screenshots": [
     {
-      "src": "/mushafy/screenshot-wide.png",
+      "src": "./screenshot-wide.png",
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Mushafy Desktop View"
     },
     {
-      "src": "/mushafy/screenshot-narrow.png",
+      "src": "./screenshot-narrow.png",
       "sizes": "720x1280",
       "type": "image/png",
       "form_factor": "narrow",
