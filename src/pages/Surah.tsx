@@ -44,6 +44,7 @@ const Surah = () => {
     readingBookmarks,
     bookmarkPageSurahs,
     bookmarkPageAyahs,
+    bookmarkPageSurahIds,
     toggleBookmark,
     addMemorizationBookmark,
     removeMemorizationBookmark,
@@ -306,13 +307,12 @@ const Surah = () => {
       // Stop audio playback when page changes ONLY if it's a manual navigation
       // Don't stop if it's automatic navigation (following the recitation)
       if (audioElement && !isAyahNavigation.current) {
-        audioElement.pause();
-        audioElement.currentTime = 0;
+        stopAudio();
       }
     };
     
     loadPageInfo();
-  }, [currentPageNum, audioElement]);
+  }, [currentPageNum, audioElement, stopAudio]);
 
   // Scroll to currently playing ayah when ayah selector dialog opens
   useEffect(() => {
@@ -806,12 +806,19 @@ const Surah = () => {
         readingBookmarks={readingBookmarks}
         bookmarkPageSurahs={bookmarkPageSurahs}
         bookmarkPageAyahs={bookmarkPageAyahs}
+        bookmarkPageSurahIds={bookmarkPageSurahIds}
         currentSurahId={currentSurahId}
         currentAyahNum={currentPageAyah ?? 1}
         currentPage={currentPageNum}
         currentPlayingAyah={currentPlayingAyah}
-        onNavigate={(page) => navigate(`/page/${page}`)}
-        onToggleBookmark={(page) => toggleBookmark(page, currentSurahId, currentPageAyah ?? undefined)}
+        onNavigate={(page, surahId, ayahNum) => {
+          if (surahId !== undefined && ayahNum !== undefined) {
+            isAyahNavigation.current = true;
+            setCurrentPlayingAyah({ surah: surahId, ayah: ayahNum });
+          }
+          navigate(`/page/${page}`);
+        }}
+        onToggleBookmark={(page) => toggleBookmark(page)}
         onRemoveMemorizationBookmark={removeMemorizationBookmark}
         onRemoveReadingBookmark={removeReadingBookmark}
         onAddBookmarkByType={addBookmarkByType}

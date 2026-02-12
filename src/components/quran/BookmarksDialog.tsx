@@ -19,11 +19,12 @@ interface BookmarksDialogProps {
   readingBookmarks: number[];
   bookmarkPageSurahs: Record<number, string>;
   bookmarkPageAyahs: Record<number, number>;
+  bookmarkPageSurahIds: Record<number, number>;
   currentSurahId: number;
   currentAyahNum: number;
   currentPage: number;
   currentPlayingAyah: { surah: number; ayah: number } | null;
-  onNavigate: (page: number) => void;
+  onNavigate: (page: number, surahId?: number, ayahNum?: number) => void;
   onToggleBookmark: (page: number) => void;
   onRemoveMemorizationBookmark: (page: number) => void;
   onRemoveReadingBookmark: (page: number) => void;
@@ -38,6 +39,7 @@ export function BookmarksDialog({
   readingBookmarks,
   bookmarkPageSurahs,
   bookmarkPageAyahs,
+  bookmarkPageSurahIds,
   currentSurahId,
   currentAyahNum,
   currentPage,
@@ -266,7 +268,7 @@ export function BookmarksDialog({
                     >
                       <button
                         onClick={() => {
-                          onNavigate(page);
+                          onNavigate(page, bookmarkPageSurahIds[page], bookmarkPageAyahs[page]);
                           onOpenChange(false);
                         }}
                         className={`flex items-center gap-1.5 sm:gap-2 flex-1 ${isRTL ? 'text-right' : 'text-left'}`}
@@ -303,7 +305,7 @@ export function BookmarksDialog({
                     >
                       <button
                         onClick={() => {
-                          onNavigate(page);
+                          onNavigate(page, bookmarkPageSurahIds[page], bookmarkPageAyahs[page]);
                           onOpenChange(false);
                         }}
                         className={`flex items-center gap-1.5 sm:gap-2 flex-1 ${isRTL ? 'text-right' : 'text-left'}`}
@@ -340,7 +342,7 @@ export function BookmarksDialog({
                     >
                       <button
                         onClick={() => {
-                          onNavigate(page);
+                          onNavigate(page, bookmarkPageSurahIds[page], bookmarkPageAyahs[page]);
                           onOpenChange(false);
                         }}
                         className={`flex items-center gap-1.5 sm:gap-2 flex-1 ${isRTL ? 'text-right' : 'text-left'}`}

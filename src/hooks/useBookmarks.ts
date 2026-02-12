@@ -16,6 +16,7 @@ interface UseBookmarksReturn {
   // Metadata
   bookmarkPageSurahs: Record<number, string>;
   bookmarkPageAyahs: Record<number, number>;
+  bookmarkPageSurahIds: Record<number, number>;
   
   // Bookmark operations
   toggleBookmark: (page: number) => void;
@@ -66,6 +67,11 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
     return saved ? JSON.parse(saved) : {};
   });
 
+  const [bookmarkPageSurahIds, setBookmarkPageSurahIds] = useState<Record<number, number>>(() => {
+    const saved = localStorage.getItem('quran-bookmark-surah-ids');
+    return saved ? JSON.parse(saved) : {};
+  });
+
   // Persist bookmarks to localStorage
   useEffect(() => {
     localStorage.setItem('quran-bookmark-bookmarks', JSON.stringify(bookmarks));
@@ -87,6 +93,10 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
     localStorage.setItem('quran-bookmark-ayahs', JSON.stringify(bookmarkPageAyahs));
   }, [bookmarkPageAyahs]);
 
+  useEffect(() => {
+    localStorage.setItem('quran-bookmark-surah-ids', JSON.stringify(bookmarkPageSurahIds));
+  }, [bookmarkPageSurahIds]);
+
   // Get surah name and ayah for a page
   const getSurahNameForPage = async (page: number): Promise<string> => {
     if (bookmarkPageSurahs[page]) {
@@ -100,6 +110,7 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
         const name = language === 'ar' ? surah.name : surah.englishName;
         setBookmarkPageSurahs(prev => ({ ...prev, [page]: name }));
         setBookmarkPageAyahs(prev => ({ ...prev, [page]: surahInfo.ayah }));
+        setBookmarkPageSurahIds(prev => ({ ...prev, [page]: surahInfo.surahId }));
         return name;
       }
     }
@@ -184,7 +195,8 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
       // Save custom metadata for this bookmark with the user-selected ayah
       setBookmarkPageSurahs(prev => ({ ...prev, [targetPage]: name }));
       setBookmarkPageAyahs(prev => ({ ...prev, [targetPage]: ayahNum }));
-      console.log('💾 Saved custom metadata:', { page: targetPage, surahName: name, ayah: ayahNum });
+      setBookmarkPageSurahIds(prev => ({ ...prev, [targetPage]: surahId }));
+      console.log('💾 Saved custom metadata:', { page: targetPage, surahName: name, ayah: ayahNum, surahId });
     }
     
     if (type === 'bookmark') {
@@ -217,6 +229,7 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
     readingBookmarks,
     bookmarkPageSurahs,
     bookmarkPageAyahs,
+    bookmarkPageSurahIds,
     
     // Operations
     toggleBookmark,
