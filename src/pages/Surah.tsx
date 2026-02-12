@@ -543,7 +543,7 @@ const Surah = () => {
   const minSwipeDistance = 50;
 
   return (
-    <div className="w-full h-screen bg-white dark:bg-gray-900 flex flex-col overflow-hidden">
+    <div className="w-full min-h-screen bg-white dark:bg-gray-900 flex flex-col overflow-hidden" style={{ minHeight: '100dvh' }}>
       {/* Enhanced Islamic Top Header */}
       <TopBar
         currentSurah={currentSurah}
