@@ -46,7 +46,7 @@ export function BottomBar({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={onGoToClick}
-          className="flex flex-col items-center gap-0.5 md:gap-1 text-gray-600 dark:text-gray-300 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors group"
+          className="flex flex-col items-center gap-0.5 md:gap-1 text-black dark:text-gray-300 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors group"
           title={t('search')}
         >
           <Navigation className="w-7 h-7 md:w-8 md:h-8 group-hover:fill-emerald-500/20" />
@@ -60,7 +60,7 @@ export function BottomBar({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={onSearchClick}
-          className="flex flex-col items-center gap-0.5 md:gap-1 text-gray-600 dark:text-gray-300 hover:text-purple-500 dark:hover:text-purple-400 transition-colors group"
+          className="flex flex-col items-center gap-0.5 md:gap-1 text-black dark:text-gray-300 hover:text-purple-500 dark:hover:text-purple-400 transition-colors group"
           title={isRTL ? 'بحث عن كلمة' : 'Word Search'}
         >
           <Search className="w-7 h-7 md:w-8 md:h-8 group-hover:fill-purple-500/20" />
@@ -74,7 +74,7 @@ export function BottomBar({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={onTafseerClick}
-          className="flex flex-col items-center gap-0.5 md:gap-1 text-gray-600 dark:text-gray-300 hover:text-teal-500 dark:hover:text-teal-400 transition-colors group"
+          className="flex flex-col items-center gap-0.5 md:gap-1 text-black dark:text-gray-300 hover:text-teal-500 dark:hover:text-teal-400 transition-colors group"
           title={t('tafseer')}
         >
           <BookText className="w-7 h-7 md:w-8 md:h-8 group-hover:fill-teal-500/20" />
@@ -88,7 +88,7 @@ export function BottomBar({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={onBookmarkClick}
-          className="flex flex-col items-center gap-0.5 md:gap-1 text-gray-600 dark:text-gray-300 hover:text-amber-500 dark:hover:text-amber-400 transition-colors group"
+          className="flex flex-col items-center gap-0.5 md:gap-1 text-black dark:text-gray-300 hover:text-amber-500 dark:hover:text-amber-400 transition-colors group"
           title={t('bookmarks')}
         >
           <div className="relative">
@@ -110,7 +110,7 @@ export function BottomBar({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={onSettingsClick}
-          className="flex flex-col items-center gap-0.5 md:gap-1 text-gray-600 dark:text-gray-300 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors group"
+          className="flex flex-col items-center gap-0.5 md:gap-1 text-black dark:text-gray-300 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors group"
           title={t('settings')}
         >
           <Settings className="w-7 h-7 md:w-8 md:h-8 group-hover:fill-indigo-500/20" />
@@ -125,7 +125,7 @@ export function BottomBar({
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={onViewModeToggle}
-            className="flex flex-col items-center gap-1 text-gray-600 dark:text-gray-300 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors group"
+            className="flex flex-col items-center gap-1 text-black dark:text-gray-300 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors group"
             title={viewMode === 'single' ? (isRTL ? 'عرض صفحتين' : 'Two Pages') : (isRTL ? 'صفحة واحدة' : 'Single Page')}
           >
             <div className="relative w-8 h-8">
