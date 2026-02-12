@@ -3,6 +3,6 @@
   "target": {
     "namespace": "android_app",
     "package_name": "io.github.armagdy.twa",
-    "sha256_cert_fingerprints": ["A7:1B:C5:CA:7A:73:C7:5E:05:FF:81:7B:A6:6A:9F:A5:15:5F:E9:0C:B2:19:9E:90:06:84:CA:E4:B9:3C:62:7D"]
+    "sha256_cert_fingerprints": ["05:F7:74:7E:41:07:12:D1:C9:E0:04:36:DE:EE:5C:21:FE:2C:1B:55:F6:ED:4F:51:FD:C1:D4:17:89:3D:81:71"]
   }
 }]
