@@ -2,7 +2,7 @@
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target": {
     "namespace": "android_app",
-    "package_name": "io.github.armagdy.twa",
-    "sha256_cert_fingerprints": ["05:F7:74:7E:41:07:12:D1:C9:E0:04:36:DE:EE:5C:21:FE:2C:1B:55:F6:ED:4F:51:FD:C1:D4:17:89:3D:81:71"]
+    "package_name": "app.vercel.mushafy_beryl.twa",
+    "sha256_cert_fingerprints": ["2D:BC:BD:B2:06:11:B5:60:C7:B6:DD:23:F6:1D:70:6F:9F:6F:25:87:37:49:96:8A:B0:69:99:D7:FD:D5:26:CF"]
   }
 }]
