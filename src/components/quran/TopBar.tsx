@@ -32,7 +32,7 @@ export function TopBar({
     <motion.header 
       initial={{ y: -100 }}
       animate={{ y: 0 }}
-      className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg shadow-sm"
+      className="bg-white dark:bg-gray-900 backdrop-blur-lg shadow-sm"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <div className="px-4 md:px-8 py-3 md:py-4 flex items-center justify-between gap-3 md:gap-6 text-gray-800 dark:text-gray-200 relative">
