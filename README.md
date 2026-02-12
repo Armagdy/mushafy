@@ -220,11 +220,73 @@ To create an Android APK that runs your PWA without the browser URL bar:
 3. Open the app and wait 10-15 seconds (Android verifies the Digital Asset Link)
 4. The URL bar should now be hidden!
 
-#### Troubleshooting TWA
+#### Troubleshooting TWA (Removing Browser Address Bar)
 
-- **URL bar still visible?** Clear app data: Settings → Apps → Your App → Clear Data
-- **Fingerprint mismatch?** Regenerating the APK creates a new signing key. Always use the same `signing.keystore` for future builds
-- **Verify Digital Asset Links**: Use [Google's DAL Tool](https://developers.google.com/digital-asset-links/tools/generator) to test your configuration
+If you're seeing a browser address bar in your PWA Android app, follow these steps based on [PWABuilder's Asset Links FAQ](https://docs.pwabuilder.com/#/builder/asset-links-faq):
+
+> **Note:** A "Chrome is in use" banner on first run is expected and doesn't indicate broken asset links. The issue is only when the browser address bar persists.
+
+##### 1. Validate Location
+
+Your `assetlinks.json` must be at the **domain root**, not the app root:
+- ✅ Correct: `https://your-domain/.well-known/assetlinks.json`
+- ❌ Wrong: `https://your-domain/app-path/.well-known/assetlinks.json`
+
+##### 2. Add Google Play's Production Fingerprint
+
+When publishing to Google Play, add their signing fingerprint to your `assetlinks.json`:
+
+1. Login to [Google Play Console](https://developer.android.com/distribute/console)
+2. Select your app → **Setup** → **App integrity**
+3. Copy the **SHA-256 fingerprint**
+4. Add it to your `assetlinks.json`:
+
+```json
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "app.vercel.your_project.twa",
+    "sha256_cert_fingerprints": [
+      "YOUR:ORIGINAL:FINGERPRINT:HERE",
+      "GOOGLE:PLAY:FINGERPRINT:HERE"
+    ]
+  }
+}]
+```
+
+##### 3. Fix Incorrect Fingerprints with Asset Links Tool
+
+If the address bar persists, Android may have different fingerprints than your file:
+
+1. Install your app on an Android device/emulator
+2. Install the [Asset Links Tool](https://play.google.com/store/apps/details?id=dev.conn.assetlinkstool) from Google Play
+3. Run the tool and search for your package ID (e.g., `app.vercel.mushafy_beryl.twa`)
+4. Tap your app to view its asset links, then tap **Copy Signature**
+5. Paste the fingerprint into your `assetlinks.json`
+
+> **Important:** Ensure fingerprints are comma-separated. [Validate your JSON](https://jsonformatter.curiousconcept.com/) before deploying.
+
+##### 4. Check Redirects
+
+Redirects across origins break asset link verification:
+
+- If `https://myapp.com` redirects to `https://www.myapp.com`, generate your APK using the **final redirect URL** (`www.myapp.com`)
+- Use the canonical URL that users land on after all redirects
+
+##### 5. Clear Browser Cache
+
+If you previously installed the PWA, the old `assetlinks.json` may be cached:
+
+1. **Uninstall** the app completely
+2. Go to **Settings** → **Apps** → **Chrome** → **Clear Cache**
+3. Reinstall the app
+
+##### Additional Resources
+
+- **Verify Configuration**: [Google's Digital Asset Links Tool](https://developers.google.com/digital-asset-links/tools/generator)
+- **PWABuilder Docs**: [Asset Links FAQ](https://docs.pwabuilder.com/#/builder/asset-links-faq)
+- **Debug Issue**: [Bubblewrap GitHub Issue #310](https://github.com/GoogleChromeLabs/bubblewrap/issues/310#issuecomment-685505871)
 
 ## 📁 Project Structure
 
