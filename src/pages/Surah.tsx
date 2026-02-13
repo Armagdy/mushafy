@@ -192,7 +192,8 @@ const Surah = () => {
     startRepeat,
     preloadNextAyah,
     ayahTimestamps,
-    concatenatedSurah
+    concatenatedSurah,
+    currentSurahAudio
   } = useAudioPlayer({
     currentPageNum,
     currentSurahId,
@@ -297,19 +298,21 @@ const Surah = () => {
       
       // Stop audio playback when page changes ONLY if it's a manual navigation
       // Don't stop if it's automatic navigation (following the recitation)
+      // Also don't stop if MP3Quran is selected (plays entire surah continuously)
       console.log('=== PAGE CHANGE DETECTED ===');
       console.log('Current page:', currentPageNum);
       console.log('isAyahNavigation.current:', isAyahNavigation.current);
-      if (audioElement && !isAyahNavigation.current) {
+      console.log('audioSource:', audioSource);
+      if (audioElement && !isAyahNavigation.current && audioSource !== 'mp3quran') {
         console.log('Stopping audio due to page navigation');
         stopAudio();
       } else {
-        console.log('Skipping audio stop (ayah navigation or no audio element)');
+        console.log('Skipping audio stop (ayah navigation, mp3quran source, or no audio element)');
       }
     };
     
     loadPageInfo();
-  }, [currentPageNum]);
+  }, [currentPageNum, audioSource]);
 
   // Scroll to currently playing ayah when ayah selector dialog opens
   useEffect(() => {
@@ -645,11 +648,17 @@ const Surah = () => {
           preloadProgress={preloadProgress}
           audioSource={audioSource}
           currentSurahName={
-            currentPlayingAyah 
+            // For MP3Quran mode, prioritize currentSurahAudio to show the surah being played
+            // This ensures the surah name doesn't change when user navigates pages manually
+            audioSource === 'mp3quran' && currentSurahAudio
               ? (language === 'ar' 
-                  ? (surahs.find(s => s.id === currentPlayingAyah.surah)?.name || currentSurah.name)
-                  : (surahs.find(s => s.id === currentPlayingAyah.surah)?.englishName || currentSurah.englishName))
-              : (language === 'ar' ? currentSurah.name : currentSurah.englishName)
+                  ? (surahs.find(s => s.id === currentSurahAudio)?.name || currentSurah.name)
+                  : (surahs.find(s => s.id === currentSurahAudio)?.englishName || currentSurah.englishName))
+              : currentPlayingAyah 
+                ? (language === 'ar' 
+                    ? (surahs.find(s => s.id === currentPlayingAyah.surah)?.name || currentSurah.name)
+                    : (surahs.find(s => s.id === currentPlayingAyah.surah)?.englishName || currentSurah.englishName))
+                : (language === 'ar' ? currentSurah.name : currentSurah.englishName)
           }
           formatNumber={formatNumber}
           onAyahSelectorClick={() => setShowAyahSelector(true)}

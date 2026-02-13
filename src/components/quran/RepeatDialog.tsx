@@ -221,7 +221,7 @@ export function RepeatDialog({
             </div>
             {audioSource === 'mp3quran' && (
               <p className="text-xs md:text-sm text-emerald-600 dark:text-emerald-400 italic">
-                {isRTL ? "تكرار الآية غير متاح مع تلاوات mp3quran" : "Ayah repeat not available with mp3quran reciters"}
+                {isRTL ? "تكرار الآية غير متاح مع تلاوات السور الكاملة" : "Ayah repeat not available with mp3quran reciters"}
               </p>
             )}
           </div>
