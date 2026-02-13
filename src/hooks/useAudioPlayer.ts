@@ -392,8 +392,18 @@ export const useAudioPlayer = ({
     if (currentPlayingAyah?.surah !== surahNum || currentPlayingAyah?.ayah !== ayahNum) {
       setCurrentPlayingAyah({ surah: surahNum, ayah: ayahNum });
       updateMediaSession(surahNum, ayahNum, true);
+      
+      // Navigate to the page containing this ayah if not already on it
+      const surahData = ayahData.find(s => s.number === surahNum);
+      if (surahData && surahData.verses) {
+        const verse = surahData.verses.find((v: any) => v.number === ayahNum);
+        if (verse && verse.page && verse.page !== currentPageNum) {
+          isAyahNavigation.current = true;
+          navigate(`/page/${verse.page}#${surahNum}-${ayahNum}`);
+        }
+      }
     }
-  }, [audioElement, ayahTimestamps, currentPlayingAyah, updateMediaSession]);
+  }, [audioElement, ayahTimestamps, currentPlayingAyah, updateMediaSession, ayahData, currentPageNum, navigate, isAyahNavigation]);
   
   // Play specific ayah
   const playAyah = useCallback(async (surahNum: number, ayahNum: number) => {
