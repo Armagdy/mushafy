@@ -8,6 +8,7 @@ import { TopBar } from '@/components/quran/TopBar';
 import { BottomBar } from '@/components/quran/BottomBar';
 import { PlayBar } from '@/components/quran/PlayBar';
 import { PageDisplay } from '@/components/quran/PageDisplay';
+import { AudioProgressBar } from '@/components/quran/AudioProgressBar';
 import { ReciterDialog } from '@/components/quran/ReciterDialog';
 import { AyahSelectorDialog } from '@/components/quran/AyahSelectorDialog';
 import { RepeatDialog } from '@/components/quran/RepeatDialog';
@@ -127,6 +128,7 @@ const Surah = () => {
   const isScrollNavigation = useRef(false);
   const isAyahNavigation = useRef(false);
   const ayahListRef = useRef<HTMLDivElement>(null);
+  const wasPlayingBeforeDrag = useRef(false);
 
   // Current page number (default to 1 if not specified)
   const currentPageNum = parseInt(page || '1');
@@ -137,6 +139,8 @@ const Surah = () => {
     isPlaying,
     currentPlayingAyah,
     setCurrentPlayingAyah,
+    currentTime,
+    duration,
     isPreloadingAyahs,
     preloadProgress,
     audioSource,
@@ -184,8 +188,11 @@ const Surah = () => {
     playAyah,
     togglePlayPause,
     stopAudio,
+    seekToTime,
     startRepeat,
-    preloadNextAyah
+    preloadNextAyah,
+    ayahTimestamps,
+    concatenatedSurah
   } = useAudioPlayer({
     currentPageNum,
     currentSurahId,
@@ -576,6 +583,52 @@ const Surah = () => {
         onNextPage={handleNextPage}
         onScroll={handleScroll}
       />
+
+      {/* Audio Progress Bar - between page and controls */}
+      {currentPlayingAyah && (
+        <AudioProgressBar
+          currentTime={currentTime}
+          duration={duration}
+          isPlaying={isPlaying}
+          onSeek={seekToTime}
+          audioSource={audioSource}
+          ayahTimestamps={ayahTimestamps}
+          concatenatedSurah={concatenatedSurah}
+          formatNumber={formatNumber}
+          onDragStart={() => {
+            wasPlayingBeforeDrag.current = isPlaying;
+            if (isPlaying && audioElement) {
+              console.log('Pausing audio for drag');
+              audioElement.pause();
+            }
+          }}
+          onDragEnd={() => {
+            if (wasPlayingBeforeDrag.current && audioElement) {
+              console.log('Resuming audio after drag');
+              // Small delay to ensure seek completes before resuming
+              setTimeout(() => {
+                if (audioElement.readyState >= 2) { // HAVE_CURRENT_DATA or better
+                  audioElement.play().then(() => {
+                    console.log('Playback resumed successfully');
+                  }).catch(err => {
+                    console.error('Failed to resume playback:', err);
+                  });
+                } else {
+                  // If not ready, wait for canplay event
+                  const handleCanPlay = () => {
+                    audioElement.play().catch(err => {
+                      console.error('Failed to resume playback after canplay:', err);
+                    });
+                    audioElement.removeEventListener('canplay', handleCanPlay);
+                  };
+                  audioElement.addEventListener('canplay', handleCanPlay);
+                }
+              }, 50);
+            }
+            wasPlayingBeforeDrag.current = false;
+          }}
+        />
+      )}
 
       {/* Combined Audio & Navigation Bar */}
       <div className="w-full flex justify-center bg-gradient-to-t from-emerald-800 to-emerald-600">

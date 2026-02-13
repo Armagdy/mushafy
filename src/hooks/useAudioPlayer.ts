@@ -45,6 +45,8 @@ export const useAudioPlayer = ({
   const [preloadAudioElement, setPreloadAudioElement] = useState<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayingAyah, setCurrentPlayingAyah] = useState<CurrentAyah | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   
   // Web Audio API for concatenating ayahs
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -753,6 +755,86 @@ export const useAudioPlayer = ({
     console.log('=== STOP AUDIO COMPLETE ===');
   }, [audioElement, releaseWakeLock, concatenatedBlobUrl]);
   
+  // Seek to a specific time in the audio
+  const seekToTime = useCallback((time: number) => {
+    if (!audioElement || !duration) return;
+    
+    console.log('=== SEEKING TO TIME ===');
+    console.log('Seeking to:', time, 'seconds');
+    console.log('Audio source:', audioSource);
+    
+    // Prevent navigation during manual seek
+    isAyahNavigation.current = true;
+    
+    // Set the audio time
+    audioElement.currentTime = Math.max(0, Math.min(time, duration));
+    
+    // Update current ayah based on the seeked time
+    if (audioSource === 'everyayah' && concatenatedSurah && ayahTimestamps.length > 0) {
+      // EveryAyah mode: Find which ayah corresponds to this time
+      let ayahNum = 1;
+      for (let i = 0; i < ayahTimestamps.length; i++) {
+        if (time >= ayahTimestamps[i]) {
+          ayahNum = i + 1;
+        } else {
+          break;
+        }
+      }
+      
+      console.log('EveryAyah: Seeked to ayah', ayahNum, 'of surah', concatenatedSurah);
+      setCurrentPlayingAyah({ surah: concatenatedSurah, ayah: ayahNum });
+      updateMediaSession(concatenatedSurah, ayahNum, isPlaying);
+      
+      // Navigate to page if needed
+      const surahData = ayahData.find(s => s.number === concatenatedSurah);
+      if (surahData && surahData.verses) {
+        const verse = surahData.verses.find((v: any) => v.number === ayahNum);
+        if (verse && verse.page && verse.page !== currentPageNum) {
+          console.log('Navigating to page:', verse.page);
+          navigate(`/page/${verse.page}#${concatenatedSurah}-${ayahNum}`);
+        }
+      }
+    } else if (audioSource === 'mp3quran' && currentSurahAudio && ayahTimings.length > 0) {
+      // MP3Quran mode: Find which ayah corresponds to this time
+      const ayahNum = getCurrentAyahFromTime(ayahTimings, time);
+      
+      if (ayahNum !== null && ayahNum > 0) {
+        console.log('MP3Quran: Seeked to ayah', ayahNum, 'of surah', currentSurahAudio);
+        setCurrentPlayingAyah({ surah: currentSurahAudio, ayah: ayahNum });
+        updateMediaSession(currentSurahAudio, ayahNum, isPlaying);
+        
+        // Navigate to page if needed
+        const surahData = ayahData.find(s => s.number === currentSurahAudio);
+        if (surahData && surahData.verses) {
+          const verse = surahData.verses.find((v: any) => v.number === ayahNum);
+          if (verse && verse.page && verse.page !== currentPageNum) {
+            console.log('Navigating to page:', verse.page);
+            navigate(`/page/${verse.page}#${currentSurahAudio}-${ayahNum}`);
+          }
+        }
+      }
+    }
+    
+    // Reset flag after a short delay
+    setTimeout(() => {
+      isAyahNavigation.current = false;
+    }, 500);
+  }, [
+    audioElement, 
+    duration, 
+    audioSource, 
+    concatenatedSurah, 
+    ayahTimestamps, 
+    currentSurahAudio, 
+    ayahTimings, 
+    isPlaying, 
+    updateMediaSession, 
+    ayahData, 
+    currentPageNum, 
+    navigate, 
+    isAyahNavigation
+  ]);
+  
   // Start repeat mode
   const startRepeat = useCallback(() => {
     const passageCount = repeatPassageCount || 1;
@@ -936,6 +1018,33 @@ export const useAudioPlayer = ({
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  // Track current time and duration for progress bar
+  useEffect(() => {
+    if (!audioElement) return;
+    
+    const handleTimeUpdate = () => {
+      setCurrentTime(audioElement.currentTime);
+    };
+    
+    const handleLoadedMetadata = () => {
+      setDuration(audioElement.duration);
+    };
+    
+    const handleDurationChange = () => {
+      setDuration(audioElement.duration);
+    };
+    
+    audioElement.addEventListener('timeupdate', handleTimeUpdate);
+    audioElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audioElement.addEventListener('durationchange', handleDurationChange);
+    
+    return () => {
+      audioElement.removeEventListener('timeupdate', handleTimeUpdate);
+      audioElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audioElement.removeEventListener('durationchange', handleDurationChange);
+    };
+  }, [audioElement]);
   
   // Set up Media Session action handlers for Android notification controls
   useEffect(() => {
@@ -1219,6 +1328,8 @@ export const useAudioPlayer = ({
     isPlaying,
     currentPlayingAyah,
     setCurrentPlayingAyah,
+    currentTime,
+    duration,
     
     // Preloading state
     isPreloadingAyahs,
@@ -1276,10 +1387,15 @@ export const useAudioPlayer = ({
     currentRepeatSurah,
     currentRepeatAyahCount,
     
+    // Concatenated audio data (for progress bar ayah display)
+    ayahTimestamps,
+    concatenatedSurah,
+    
     // Audio control functions
     playAyah,
     togglePlayPause,
     stopAudio,
+    seekToTime,
     startRepeat,
     preloadNextAyah
   };
