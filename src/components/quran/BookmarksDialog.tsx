@@ -84,18 +84,22 @@ export function BookmarksDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(
-        "sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto",
-        "rounded-xl border border-emerald-500",
-        isRTL ? "rtl" : "ltr"
-      )}>
-        <DialogHeader>
-          <DialogTitle className="text-center text-base md:text-xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+      <DialogContent 
+        className={cn(
+          "sm:max-w-md md:max-w-lg lg:max-w-xl max-w-[90vw] max-h-[85vh] overflow-y-auto p-0",
+          "rounded-xl border-0 bg-[#FBF9F4]",
+          isRTL ? "rtl" : "ltr"
+        )}
+        style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
+      >
+        <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
+          <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
             {t('bookmarks')}
           </DialogTitle>
         </DialogHeader>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="p-4 space-y-2 sm:space-y-3">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 h-11 md:h-12">
             <TabsTrigger value="add" className="text-base md:text-xl">
               {isRTL ? 'اضف علامة جديدة' : 'Add New Bookmark'}
@@ -109,27 +113,27 @@ export function BookmarksDialog({
             <div className="space-y-2 sm:space-y-3">
               {/* Bookmark Type Selector */}
               <div className="space-y-2">
-                <Label htmlFor="bookmark-type" className={`text-base md:text-xl font-medium ${isRTL ? 'text-right' : 'text-left'}`}>
+                <Label htmlFor="bookmark-type" className={`text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
                   {t('bookmarkType')}
                 </Label>
                 <Select value={selectedBookmarkType} onValueChange={setSelectedBookmarkType}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bookmark">
+                  <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
+                    <SelectItem value="bookmark" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                       <div className="flex items-center gap-2">
                         <Bookmark className="w-3 h-3 sm:w-4 sm:h-4 text-amber-500" />
                         <span className="text-base md:text-xl">{isRTL ? 'علامة' : 'Bookmark'}</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="memorization">
+                    <SelectItem value="memorization" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                       <div className="flex items-center gap-2">
                         <BookMarked className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-600" />
                         <span className="text-base md:text-xl">{isRTL ? 'حفظ' : 'Memorization'}</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="reading">
+                    <SelectItem value="reading" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                       <div className="flex items-center gap-2">
                         <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600" />
                         <span className="text-base md:text-xl">{isRTL ? 'قراءة' : 'Reading'}</span>
@@ -141,7 +145,7 @@ export function BookmarksDialog({
 
               {/* Surah Selector */}
               <div className="space-y-2">
-                <Label htmlFor="bookmark-surah" className={`text-base md:text-xl font-medium ${isRTL ? 'text-right' : 'text-left'}`}>
+                <Label htmlFor="bookmark-surah" className={`text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
                   {isRTL ? 'السورة' : 'Surah'}
                 </Label>
                 <Select value={bookmarkSurahId.toString()} onValueChange={(val) => {
@@ -149,12 +153,12 @@ export function BookmarksDialog({
                   // Reset ayah to 1 when surah changes
                   setBookmarkAyahNum(1);
                 }}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="max-h-60">
+                  <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                     {surahs.map((surah) => (
-                      <SelectItem key={surah.id} value={surah.id.toString()}>
+                      <SelectItem key={surah.id} value={surah.id.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                         <span className="text-base md:text-xl">
                           {surah.id}. {language === 'ar' ? surah.name : surah.englishName}
                         </span>
@@ -166,16 +170,16 @@ export function BookmarksDialog({
 
               {/* Ayah Selector */}
               <div className="space-y-2">
-                <Label htmlFor="bookmark-ayah" className={`text-base md:text-xl font-medium ${isRTL ? 'text-right' : 'text-left'}`}>
+                <Label htmlFor="bookmark-ayah" className={`text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
                   {isRTL ? 'الآية' : 'Ayah'}
                 </Label>
                 <Select value={bookmarkAyahNum.toString()} onValueChange={(val) => setBookmarkAyahNum(parseInt(val))}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="max-h-60">
+                  <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                     {Array.from({ length: surahs.find(s => s.id === bookmarkSurahId)?.numberOfAyahs || 1 }, (_, i) => i + 1).map((ayahNum) => (
-                      <SelectItem key={ayahNum} value={ayahNum.toString()}>
+                      <SelectItem key={ayahNum} value={ayahNum.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                         <span className="text-base md:text-xl">
                           {isRTL ? 'آية' : 'Ayah'} {ayahNum}
                         </span>
@@ -246,7 +250,7 @@ export function BookmarksDialog({
                   // Switch to view tab to show the saved bookmark
                   setActiveTab('view');
                 }}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 py-2 text-base md:text-xl"
+                className="w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] text-base md:text-xl"
               >
                 {t('save')}
               </Button>
@@ -368,13 +372,14 @@ export function BookmarksDialog({
               
               {/* No Bookmarks Message */}
               {bookmarks.length === 0 && memorizationBookmarks.length === 0 && readingBookmarks.length === 0 && (
-                <div className="px-3 sm:px-4 py-4 sm:py-6 text-gray-500 dark:text-gray-400 text-center">
+                <div className="px-3 sm:px-4 py-4 sm:py-6 text-emerald-600 dark:text-emerald-400 text-center">
                   {t('noBookmarks')}
                 </div>
               )}
             </div>
           </TabsContent>
         </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );
