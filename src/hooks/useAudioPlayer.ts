@@ -4,6 +4,7 @@ import { ASSETS_BASE_URL } from '@/config/assets';
 import { getAudioData } from '@/lib/quran-data-service';
 import { getMp3QuranReciters, getAyahTiming, getSurahAudioUrl, getCurrentAyahFromTime, seekToAyah, type Mp3QuranReciter, type Mp3QuranMoshaf, type AyahTiming } from '@/lib/mp3quran-service';
 import { surahs } from '@/data/surahs';
+import { cacheAudio, getCachedAudio } from '@/lib/audio-cache';
 
 interface CurrentAyah {
   surah: number;
@@ -286,6 +287,27 @@ export const useAudioPlayer = ({
     if (!surahData || !surahData.verses) return null;
     
     const totalAyahs = surahData.verses.length;
+    
+    // Check cache first
+    const cachedData = await getCachedAudio(selectedReciter.folder, surahNum);
+    if (cachedData) {
+      console.log(`✅ Using cached audio for ${selectedReciter.folder} surah ${surahNum}`);
+      const blobUrl = URL.createObjectURL(cachedData.blobData);
+      
+      // Revoke old blob URL if exists
+      if (concatenatedBlobUrl) {
+        URL.revokeObjectURL(concatenatedBlobUrl);
+      }
+      
+      setConcatenatedBlobUrl(blobUrl);
+      setConcatenatedSurah(surahNum);
+      setAyahTimestamps(cachedData.timestamps);
+      
+      return { blobUrl, timestamps: cachedData.timestamps };
+    }
+    
+    // Not in cache - download and concatenate
+    console.log(`⬇️ Downloading and caching audio for ${selectedReciter.folder} surah ${surahNum}`);
     setIsPreloadingAyahs(true);
     setPreloadProgress({ current: 0, total: totalAyahs });
     
@@ -352,6 +374,10 @@ export const useAudioPlayer = ({
       // Convert buffer to WAV blob and create URL
       const wavBlob = audioBufferToWav(concatenated);
       const blobUrl = URL.createObjectURL(wavBlob);
+      
+      // Cache the blob for future use
+      await cacheAudio(selectedReciter.folder, surahNum, wavBlob, timestamps);
+      console.log(`💾 Cached audio for ${selectedReciter.folder} surah ${surahNum}`);
       
       // Revoke old blob URL if exists
       if (concatenatedBlobUrl) {
