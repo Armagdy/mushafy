@@ -543,7 +543,7 @@ const Surah = () => {
   const minSwipeDistance = 50;
 
   return (
-    <div className="w-full min-h-screen bg-white dark:bg-gray-900 flex flex-col overflow-hidden" style={{ minHeight: '100dvh' }}>
+    <div className="w-full h-screen max-h-screen bg-white dark:bg-gray-900 flex flex-col overflow-hidden" style={{ height: '100dvh', maxHeight: '100dvh' }}>
       {/* Enhanced Islamic Top Header */}
       <TopBar
         currentSurah={currentSurah}
@@ -587,38 +587,40 @@ const Surah = () => {
         onScroll={handleScroll}
       />
 
-      {/* Audio Player Bottom Bar */}
-      <PlayBar
-        currentPlayingAyah={currentPlayingAyah}
-        selectedReciter={selectedReciter}
-        isPlaying={isPlaying}
-        isRepeatActive={isRepeatActive}
-        formatNumber={formatNumber}
-        onAyahSelectorClick={() => setShowAyahSelector(true)}
-        onRepeatClick={() => {
-          // Set default values based on current playing ayah
-          if (currentPlayingAyah) {
-            setRepeatStartSurah(currentPlayingAyah.surah);
-            setRepeatStartAyah(currentPlayingAyah.ayah);
-            setRepeatEndSurah(currentPlayingAyah.surah);
-            // Find the last ayah of current surah
-            const currentSurahData = ayahData.find(s => s.number === currentPlayingAyah.surah);
-            if (currentSurahData && currentSurahData.verses) {
-              setRepeatEndAyah(currentSurahData.verses.length);
+      {/* Combined Audio & Navigation Bar */}
+      <div className="bg-gradient-to-t from-emerald-800 to-emerald-600 rounded-t-2xl">
+        {/* Audio Player Bottom Bar */}
+        <PlayBar
+          currentPlayingAyah={currentPlayingAyah}
+          selectedReciter={selectedReciter}
+          isPlaying={isPlaying}
+          isRepeatActive={isRepeatActive}
+          formatNumber={formatNumber}
+          onAyahSelectorClick={() => setShowAyahSelector(true)}
+          onRepeatClick={() => {
+            // Set default values based on current playing ayah
+            if (currentPlayingAyah) {
+              setRepeatStartSurah(currentPlayingAyah.surah);
+              setRepeatStartAyah(currentPlayingAyah.ayah);
+              setRepeatEndSurah(currentPlayingAyah.surah);
+              // Find the last ayah of current surah
+              const currentSurahData = ayahData.find(s => s.number === currentPlayingAyah.surah);
+              if (currentSurahData && currentSurahData.verses) {
+                setRepeatEndAyah(currentSurahData.verses.length);
+              }
             }
-          }
-          // Prefill repeat counts with 1 if they're empty/0
-          if (repeatPassageCount === 0) setRepeatPassageCount(1);
-          if (repeatAyahCount === 0) setRepeatAyahCount(1);
-          setShowRepeatDialog(true);
-        }}
-        onReciterClick={() => setShowReciterDialog(true)}
-        onStop={stopAudio}
-        onTogglePlayPause={togglePlayPause}
-      />
+            // Prefill repeat counts with 1 if they're empty/0
+            if (repeatPassageCount === 0) setRepeatPassageCount(1);
+            if (repeatAyahCount === 0) setRepeatAyahCount(1);
+            setShowRepeatDialog(true);
+          }}
+          onReciterClick={() => setShowReciterDialog(true)}
+          onStop={stopAudio}
+          onTogglePlayPause={togglePlayPause}
+        />
 
-      {/* Modern Bottom Toolbar */}
-      <BottomBar
+        {/* Modern Bottom Toolbar */}
+        <BottomBar
         showBottomBarText={showBottomBarText}
         totalBookmarks={getTotalBookmarks()}
         isMobile={isMobile}
@@ -664,6 +666,7 @@ const Surah = () => {
         }}
         onViewModeToggle={() => setViewMode(viewMode === 'single' ? 'double' : 'single')}
       />
+      </div>
 
       {/* Search/Navigation Dialog */}
       <NavigationDialog

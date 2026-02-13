@@ -5,14 +5,13 @@ import { useEffect } from 'react';
  * This makes the Android status bar seamlessly match the app's TopBar.
  * 
  * Colors:
- * - Light mode: #ffffff (white - matches TopBar bg-white)
- * - Dark mode: #111827 (gray-900 - matches TopBar dark:bg-gray-900)
+ * - Uses emerald-800 (#065f46) to match the TopBar gradient
  */
 export function useThemeColor() {
   useEffect(() => {
     const updateThemeColor = () => {
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const themeColor = isDark ? '#111827' : '#ffffff';
+      // Use emerald-800 color to match the app's gradient theme
+      const themeColor = '#065f46';
       
       // Update the default theme-color meta tag (fallback)
       const metaTheme = document.querySelector('meta[name="theme-color"]:not([media])');
@@ -23,14 +22,6 @@ export function useThemeColor() {
 
     // Initial update
     updateThemeColor();
-
-    // Listen for system theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    mediaQuery.addEventListener('change', updateThemeColor);
-
-    return () => {
-      mediaQuery.removeEventListener('change', updateThemeColor);
-    };
   }, []);
 }
 

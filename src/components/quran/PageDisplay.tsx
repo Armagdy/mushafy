@@ -43,7 +43,7 @@ export function PageDisplay({
   const isTashelOrMadinah = mushafType === 'tashel' || mushafType === 'madinah';
 
   return (
-    <main className="flex-1 flex items-center justify-center gap-6 overflow-hidden">
+    <main className="flex-1 flex items-center justify-center gap-6 overflow-hidden min-h-0">
       {/* Navigation Arrow Left - Hidden on mobile */}
       <motion.button
         whileHover={{ scale: 1.1, x: -5 }}
@@ -92,7 +92,7 @@ export function PageDisplay({
                         <img
                           src={`${getMushafPath()}/${getPageImageFilename(leftPageNum)}`}
                           alt={`${t('page')} ${leftPageNum}`}
-                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100vh-120px)]' : 'max-h-[calc(100vh-80px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
+                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100dvh-200px)]' : 'max-h-[calc(100dvh-180px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
                           loading="lazy"
                         />
                       </div>
@@ -118,7 +118,7 @@ export function PageDisplay({
                         <img
                           src={`${getMushafPath()}/${getPageImageFilename(rightPageNum)}`}
                           alt={`${t('page')} ${rightPageNum}`}
-                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100vh-120px)]' : 'max-h-[calc(100vh-80px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
+                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100dvh-200px)]' : 'max-h-[calc(100dvh-180px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
                           loading="lazy"
                         />
                       </div>
@@ -147,7 +147,7 @@ export function PageDisplay({
                         <img
                           src={`${getMushafPath()}/${getPageImageFilename(rightPageNum)}`}
                           alt={`${t('page')} ${rightPageNum}`}
-                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100vh-120px)]' : 'max-h-[calc(100vh-80px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
+                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100dvh-200px)]' : 'max-h-[calc(100dvh-180px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
                           loading="lazy"
                         />
                       </div>
@@ -173,7 +173,7 @@ export function PageDisplay({
                         <img
                           src={`${getMushafPath()}/${getPageImageFilename(leftPageNum)}`}
                           alt={`${t('page')} ${leftPageNum}`}
-                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100vh-120px)]' : 'max-h-[calc(100vh-80px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
+                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100dvh-200px)]' : 'max-h-[calc(100dvh-180px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
                           loading="lazy"
                         />
                       </div>
@@ -275,7 +275,7 @@ export function PageDisplay({
                   <img
                     src={`${getMushafPath()}/${imageFilename}`}
                     alt={`${t('page')} ${pageNum}`}
-                    className={`max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100vh-120px)]' : 'max-h-[calc(100vh-80px)]'} w-auto h-auto object-contain md:shadow-2xl md:rounded-xl md:border-4 md:border-white mx-auto`}
+                    className={`max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100dvh-200px)]' : 'max-h-[calc(100dvh-180px)]'} w-auto h-auto object-contain md:shadow-2xl md:rounded-xl md:border-4 md:border-white mx-auto`}
                     loading="eager"
                   />
                 </div>
