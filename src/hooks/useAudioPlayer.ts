@@ -419,13 +419,18 @@ export const useAudioPlayer = ({
       setCurrentPlayingAyah({ surah: surahNum, ayah: ayahNum });
       updateMediaSession(surahNum, ayahNum, true);
       
-      // Navigate to the page containing this ayah if not already on it
+      // Only navigate if the ayah is on a different page AND we're not in the middle of loading
+      // This prevents navigation during initial seeking to the correct timestamp
       const surahData = ayahData.find(s => s.number === surahNum);
       if (surahData && surahData.verses) {
         const verse = surahData.verses.find((v: any) => v.number === ayahNum);
-        if (verse && verse.page && verse.page !== currentPageNum) {
+        if (verse && verse.page && verse.page !== currentPageNum && !isAyahNavigation.current) {
           isAyahNavigation.current = true;
           navigate(`/page/${verse.page}#${surahNum}-${ayahNum}`);
+          // Reset the flag after navigation
+          setTimeout(() => {
+            isAyahNavigation.current = false;
+          }, 300);
         }
       }
     }
@@ -541,6 +546,9 @@ export const useAudioPlayer = ({
         // New source needed - set it and wait for load
         audioElement.src = blobUrl;
         
+        // Set flag to prevent automatic navigation during initial seek
+        isAyahNavigation.current = true;
+        
         // Wait for the audio to be ready before seeking
         const handleLoadedMetadata = () => {
           audioElement.currentTime = startTime;
@@ -549,10 +557,15 @@ export const useAudioPlayer = ({
             if ('mediaSession' in navigator) {
               navigator.mediaSession.playbackState = 'playing';
             }
+            // Reset flag after successful playback start
+            setTimeout(() => {
+              isAyahNavigation.current = false;
+            }, 500);
           }).catch(err => {
             console.error('Failed to play audio:', err);
             setIsPlaying(false);
             releaseWakeLock();
+            isAyahNavigation.current = false;
           });
         };
         
@@ -563,6 +576,9 @@ export const useAudioPlayer = ({
         // If already playing, this will seamlessly jump to the new ayah
         audioElement.currentTime = startTime;
         
+        // Set flag to prevent navigation during seek
+        isAyahNavigation.current = true;
+        
         if (wasPlaying) {
           // Continue playing from new position
           audioElement.play().then(() => {
@@ -570,10 +586,14 @@ export const useAudioPlayer = ({
             if ('mediaSession' in navigator) {
               navigator.mediaSession.playbackState = 'playing';
             }
+            setTimeout(() => {
+              isAyahNavigation.current = false;
+            }, 300);
           }).catch(err => {
             console.error('Failed to play audio:', err);
             setIsPlaying(false);
             releaseWakeLock();
+            isAyahNavigation.current = false;
           });
         } else {
           // Start playing from this position
@@ -582,21 +602,16 @@ export const useAudioPlayer = ({
             if ('mediaSession' in navigator) {
               navigator.mediaSession.playbackState = 'playing';
             }
+            setTimeout(() => {
+              isAyahNavigation.current = false;
+            }, 300);
           }).catch(err => {
             console.error('Failed to play audio:', err);
             setIsPlaying(false);
             releaseWakeLock();
+            isAyahNavigation.current = false;
           });
         }
-      }
-    }
-    
-    if (surahData && surahData.verses) {
-      const verse = surahData.verses.find((v: any) => v.number === ayahNum);
-      if (verse && verse.page && verse.page !== currentPageNum) {
-        setTimeout(() => {
-          isAyahNavigation.current = false;
-        }, 300);
       }
     }
   }, [audioElement, audioSource, selectedReciter, selectedMoshaf, ayahData, currentPageNum, navigate, preloadNextAyah, isAyahNavigation, updateMediaSession, requestWakeLock, currentSurahAudio, ayahTimings, audioContext, concatenatedSurah, concatenatedBlobUrl, concatenateAllSurahAyahs, ayahTimestamps, releaseWakeLock]);
@@ -614,8 +629,20 @@ export const useAudioPlayer = ({
           navigator.mediaSession.playbackState = 'paused';
         }
       } else {
-        if (currentPlayingAyah && audioElement.src && audioElement.src !== '' && audioElement.readyState >= 2) {
-          // Audio source is loaded and ready to play
+        // Check if currentPlayingAyah is on the current page
+        let shouldPlayCurrentAyah = false;
+        if (currentPlayingAyah) {
+          const surahData = ayahData.find(s => s.number === currentPlayingAyah.surah);
+          if (surahData && surahData.verses) {
+            const verse = surahData.verses.find((v: any) => v.number === currentPlayingAyah.ayah);
+            if (verse && verse.page === currentPageNum) {
+              shouldPlayCurrentAyah = true;
+            }
+          }
+        }
+        
+        if (shouldPlayCurrentAyah && audioElement.src && audioElement.src !== '' && audioElement.readyState >= 2) {
+          // Audio source is loaded and ready to play, and ayah is on current page
           audioElement.play().then(() => {
             setIsPlaying(true);
             if ('mediaSession' in navigator) {
@@ -625,11 +652,12 @@ export const useAudioPlayer = ({
             console.error('Failed to resume audio:', err);
             setIsPlaying(false);
             // If resume fails, try loading the ayah fresh
-            playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+            playAyah(currentPlayingAyah!.surah, currentPlayingAyah!.ayah);
           });
-        } else if (currentPlayingAyah) {
-          playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+        } else if (shouldPlayCurrentAyah) {
+          playAyah(currentPlayingAyah!.surah, currentPlayingAyah!.ayah);
         } else {
+          // Play first ayah of current page
           playAyah(currentSurahId, currentPageAyah || 1);
         }
       }
@@ -644,7 +672,19 @@ export const useAudioPlayer = ({
           navigator.mediaSession.playbackState = 'paused';
         }
       } else {
+        // Check if currentPlayingAyah is on the current page
+        let shouldPlayCurrentAyah = false;
         if (currentPlayingAyah) {
+          const surahData = ayahData.find(s => s.number === currentPlayingAyah.surah);
+          if (surahData && surahData.verses) {
+            const verse = surahData.verses.find((v: any) => v.number === currentPlayingAyah.ayah);
+            if (verse && verse.page === currentPageNum) {
+              shouldPlayCurrentAyah = true;
+            }
+          }
+        }
+        
+        if (shouldPlayCurrentAyah) {
           if (audioElement.src && audioElement.currentTime > 0) {
             setIsPlaying(true);
             if ('mediaSession' in navigator) {
@@ -652,22 +692,23 @@ export const useAudioPlayer = ({
             }
             audioElement.play()
               .then(() => {
-                preloadNextAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+                preloadNextAyah(currentPlayingAyah!.surah, currentPlayingAyah!.ayah);
               })
               .catch(err => {
                 console.error('Failed to resume audio:', err);
                 setIsPlaying(false);
-                playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+                playAyah(currentPlayingAyah!.surah, currentPlayingAyah!.ayah);
               });
           } else {
-            playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+            playAyah(currentPlayingAyah!.surah, currentPlayingAyah!.ayah);
           }
         } else {
+          // Play first ayah of current page
           playAyah(currentSurahId, currentPageAyah || 1);
         }
       }
     }
-  }, [audioElement, audioContext, audioSource, isPlaying, currentPlayingAyah, playAyah, preloadNextAyah, currentSurahId, currentPageAyah]);
+  }, [audioElement, audioContext, audioSource, isPlaying, currentPlayingAyah, playAyah, preloadNextAyah, currentSurahId, currentPageAyah, ayahData, currentPageNum]);
   
   // Stop audio
   const stopAudio = useCallback(() => {
