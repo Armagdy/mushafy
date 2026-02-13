@@ -39,6 +39,7 @@ export function BottomBar({
         "bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg px-2 md:px-6 flex items-stretch justify-between mt-2",
         showBottomBarText ? "py-0.5 md:py-1" : "py-2 md:py-3"
       )}
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       {/* Go To */}
       <div className="flex-1 flex justify-center">

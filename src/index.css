@@ -160,6 +160,9 @@
     font-family: var(--font-body);
     font-size: 1rem;
     line-height: 1.6;
+    /* Safe area handling for notched devices */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   #root {
