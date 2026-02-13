@@ -283,6 +283,174 @@ useEffect(() => {
 }, [tab]);
 ```
 
+## Audio Player Architecture
+
+### Two Audio Source Types
+
+The application supports two distinct audio playback systems, each optimized for different use cases:
+
+1. **EveryAyah Reciters** ([everyayah.com](https://everyayah.com))
+2. **MP3Quran Reciters** ([mp3quran.net](https://mp3quran.net))
+
+### EveryAyah: Concatenated Audio Strategy
+
+**File:** [src/hooks/useAudioPlayer.ts](src/hooks/useAudioPlayer.ts) - `concatenateAllSurahAyahs()`
+
+#### Problem Solved
+EveryAyah.com provides individual MP3 files for each ayah (verse). Playing separate files sequentially causes critical issues on mobile devices:
+- ❌ Phone battery optimization kills the app between ayah transitions
+- ❌ Audio stops when screen locks or app goes to background
+- ❌ Network delays between loading each ayah create playback gaps
+- ❌ Poor user experience with interrupted recitation
+
+#### Solution: Audio Concatenation
+We concatenate all ayahs of a surah into a **SINGLE** continuous audio file:
+
+```typescript
+// Process (see concatenateAllSurahAyahs in useAudioPlayer.ts):
+1. Download all ayah MP3 files for the surah (e.g., 001001.mp3 to 001007.mp3)
+2. Decode each MP3 to AudioBuffer using Web Audio API
+3. Concatenate all buffers into one continuous AudioBuffer
+4. Convert to WAV blob and create object URL
+5. Track timestamp for each ayah's start position (e.g., [0, 3.2, 7.5, ...])
+6. Cache the concatenated audio in IndexedDB for instant replay
+```
+
+#### Benefits
+- ✅ **Single media session** - phone treats it as one continuous audio (no killing)
+- ✅ **No interruptions** - seamless recitation between ayahs
+- ✅ **Survives screen lock** - works in background mode
+- ✅ **Works offline** - cached in IndexedDB after first load
+- ✅ **10-100x faster on replay** - no network requests for cached surahs
+- ✅ **Precise ayah tracking** - via timestamps and `timeupdate` events
+
+#### Ayah Tracking & Navigation
+```typescript
+// Data structures:
+ayahTimestamps: number[]  // [0, 3.2, 7.5, 11.8, ...] - start time of each ayah
+concatenatedBlobUrl: string  // Object URL for the WAV blob
+concatenatedSurah: number  // Which surah is currently concatenated
+
+// Playback:
+- To play ayah N: audioElement.currentTime = ayahTimestamps[N - 1]
+- Monitor currentTime via 'timeupdate' event to determine which ayah is playing
+- Auto-navigate to pages as ayahs change during playback
+```
+
+#### Caching Strategy ([src/lib/audio-cache.ts](src/lib/audio-cache.ts))
+```typescript
+// IndexedDB caching:
+Cache Key: `${reciterFolder}-${surahNum}`  // e.g., "Alafasy_128kbps-1"
+Stored Data: { blobData: Blob, timestamps: number[], cachedAt: number }
+
+// Flow:
+1. First play: Download all ayahs → Concatenate → Cache in IndexedDB
+2. Subsequent plays: Load from IndexedDB (instant, no network)
+3. Cache persists across page refreshes and sessions
+```
+
+#### Flag Management
+```typescript
+// isAyahNavigation.current flag prevents unwanted page navigation:
+- Set to TRUE when seeking to specific ayah timestamp
+- Prevents automatic navigation during intentional seeks
+- Reset to FALSE after playback starts (300-500ms delay)
+- Allows normal auto-navigation to resume
+```
+
+### MP3Quran: Continuous Surah Audio
+
+**File:** [src/hooks/useAudioPlayer.ts](src/hooks/useAudioPlayer.ts) - `playAyah()` MP3Quran mode
+
+#### Approach
+MP3Quran provides complete surah recitations as single MP3 files with timing data:
+- Download one MP3 file for entire surah
+- Fetch ayah timing data (start/end times for each ayah)
+- Seek to specific ayah positions within the single file
+
+#### Ayah Timing
+```typescript
+// Timing data structure:
+ayahTimings: AyahTiming[]  // From mp3quran-service
+- Each entry: { ayah_number, start_time, end_time }
+- Seek to ayah: seekToAyah(audioElement, ayahTimings, ayahNum)
+- Track current ayah: getCurrentAyahFromTime(ayahTimings, currentTime)
+```
+
+#### No Page Auto-Navigation
+Unlike EveryAyah, MP3Quran mode does NOT automatically navigate pages during playback:
+- User stays on current page while surah plays
+- Ayah number updates in PlayBar to show progress
+- Manual navigation required if user wants to follow along
+
+### Audio State Management
+
+**Key State Variables:**
+```typescript
+audioSource: 'everyayah' | 'mp3quran'  // Current audio mode
+currentPlayingAyah: { surah: number; ayah: number } | null
+isPlaying: boolean
+isPreloadingAyahs: boolean  // Shows loading spinner during concatenation
+preloadProgress: { current: number; total: number }  // Progress indicator
+```
+
+**Wake Lock Management:**
+```typescript
+// Prevents screen sleep during playback:
+wakeLockRef: React.MutableRefObject<WakeLockSentinel | null>
+- Request wake lock when playback starts
+- Release when playback stops or errors occur
+```
+
+### PlayBar Display Logic
+
+**File:** [src/components/quran/PlayBar.tsx](src/components/quran/PlayBar.tsx)
+
+#### Reciter Name Formatting
+```typescript
+// Clean reciter names by removing style indicators:
+cleanReciterName(name)  // Removes "- مرتل", "- معلم", "- مجود"
+
+// Display format:
+EveryAyah: "ReciterName - SurahName"
+MP3Quran: "ReciterName - SurahName (كاملة)" or "(Full)" in English
+```
+
+#### Language-Aware Display
+- Arabic mode: Shows Arabic reciter names + "كاملة"
+- English mode: Shows English reciter names + "Full"
+- Uses `mp3QuranRecitersAr` for Arabic name lookup
+
+### Toggle Play Behavior
+
+**File:** [src/hooks/useAudioPlayer.ts](src/hooks/useAudioPlayer.ts) - `togglePlayPause()`
+
+#### Smart Resume Logic
+When user manually navigates to a different page:
+```typescript
+1. Check if currentPlayingAyah is on the current page
+2. If YES: Resume from currentPlayingAyah
+3. If NO: Start from first ayah of current page (currentPageAyah)
+```
+
+This prevents confusion when user swipes to a new page and presses play.
+
+### Critical Implementation Notes
+
+#### DO NOT:
+- ❌ Play separate MP3 files sequentially for EveryAyah reciters (will be killed on mobile)
+- ❌ Navigate pages during initial seek to ayah (causes flickering)
+- ❌ Edit concatenated audio while it's playing (revoke old blob URLs properly)
+- ❌ Hardcode reciter names or audio URLs (use services)
+
+#### ALWAYS:
+- ✅ Check cache before downloading/concatenating (performance)
+- ✅ Set `isAyahNavigation.current = true` before seeking
+- ✅ Release wake lock on errors or stop
+- ✅ Show loading progress during concatenation
+- ✅ Revoke old blob URLs to prevent memory leaks
+- ✅ Use timestamps for ayah seeking, not separate audio files
+
 ## Development Workflows
 
 ### Commands
@@ -322,6 +490,7 @@ npm run preview      # Preview production build
 | Modify Surah metadata | ⚠️ DO NOT EDIT [src/data/surahs.ts](src/data/surahs.ts)—canonical data |
 | Change theme colors | Edit HSL variables in [src/index.css](src/index.css) |
 | Access Quran page data | Use functions from [src/lib/quran-mapping.ts](src/lib/quran-mapping.ts) |
+| **Modify audio player** | **Read "Audio Player Architecture" section above - understand concatenation strategy before editing** |
 | **Document new feature** | **Update [README.md](README.md) with feature description, usage, and any configuration** |
 | **Style a button** | Use `bg-gradient-to-r from-emerald-700 to-emerald-600 text-white text-base md:text-xl` |
 | **Style an input** | Use `border-emerald-300 focus:border-emerald-500 text-base md:text-lg` |
