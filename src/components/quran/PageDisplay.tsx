@@ -50,7 +50,7 @@ export function PageDisplay({
         whileTap={{ scale: 0.9 }}
         onClick={onPreviousPage}
         disabled={currentPageNum <= 2}
-        className="hidden md:flex w-14 h-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xl disabled:hover:scale-100"
+        className="hidden md:flex w-14 h-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-700 to-emerald-600 text-[#F2E3BB] hover:from-emerald-800 hover:to-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xl border border-emerald-500/30 disabled:hover:scale-100"
         aria-label="Previous pages"
       >
         <ChevronRight className="w-7 h-7" />
@@ -291,7 +291,7 @@ export function PageDisplay({
         whileTap={{ scale: 0.9 }}
         onClick={onNextPage}
         disabled={currentPageNum >= 604}
-        className="hidden md:flex w-14 h-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xl disabled:hover:scale-100"
+        className="hidden md:flex w-14 h-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-700 to-emerald-600 text-[#F2E3BB] hover:from-emerald-800 hover:to-emerald-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xl border border-emerald-500/30 disabled:hover:scale-100"
         aria-label="Next pages"
       >
         <ChevronLeft className="w-7 h-7" />

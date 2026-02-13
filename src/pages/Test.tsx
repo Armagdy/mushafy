@@ -585,7 +585,7 @@ export default function Test() {
 
   return (
     <div className={cn(
-      "min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-50",
+      "min-h-screen bg-[#FBF9F4]",
       "dark:from-gray-900 dark:via-gray-800 dark:to-gray-900",
       isRTL ? "rtl" : "ltr"
     )}>
@@ -596,24 +596,19 @@ export default function Test() {
             {t('testFeature')}
           </h1>
           <Button
-            variant="outline"
-            size="icon"
             onClick={() => setSettingsOpen(true)}
-            className="border-emerald-500 hover:bg-emerald-50"
+            className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
           >
-            <Settings className="w-5 h-5 text-emerald-600" />
+            <Settings className="w-5 h-5" />
           </Button>
         </div>
 
         {/* Test Content */}
         {!testRange ? (
-          <Card className="p-8 text-center space-y-4 border-emerald-200">
-            <p className="text-lg text-gray-600 dark:text-gray-300">
-              {t('configure')} {t('testSettings')}
-            </p>
+          <Card className="p-8 text-center space-y-4 bg-white dark:bg-gray-800 border-0 shadow-md">
             <Button
               onClick={() => setSettingsOpen(true)}
-              className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600"
+              className="bg-emerald-700 hover:bg-emerald-800 text-[#F2E3BB] text-base md:text-xl rounded-lg border border-emerald-600 shadow-md"
             >
               <Settings className={cn("w-5 h-5", isRTL ? "ml-2" : "mr-2")} />
               {t('testSettings')}
@@ -623,14 +618,14 @@ export default function Test() {
           <div className="space-y-6">
             {/* Question Counter */}
             <div className="text-center">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-base md:text-xl text-emerald-600 dark:text-emerald-400 font-medium">
                 {t('currentQuestion')}: {formatNumber(questionsCount)}
               </p>
             </div>
 
             {/* Hifz Mode */}
             {testMode === 'hifz' && currentQuestion && (
-              <Card className="p-6 md:p-8 border-emerald-200 bg-white dark:bg-gray-800">
+              <Card className="p-6 md:p-8 border-0 bg-white dark:bg-gray-800 shadow-md">
                 <div className="flex items-center justify-center gap-3 mb-6">
                   <h2 className="text-xl md:text-2xl font-bold text-emerald-800 dark:text-emerald-400 text-center">
                     {t('identifyAyah')}
@@ -758,7 +753,7 @@ export default function Test() {
 
             {/* Tikrar Mode */}
             {testMode === 'tikrar' && currentTikrar && (
-              <Card className="p-6 md:p-8 border-blue-200 bg-white dark:bg-gray-800">
+              <Card className="p-6 md:p-8 border-0 bg-white dark:bg-gray-800 shadow-md">
                 <div className="flex items-center justify-center gap-3 mb-6">
                   <h2 className="text-xl md:text-2xl font-bold text-blue-800 dark:text-blue-400 text-center">
                     {currentTikrar.questionType === 'similar-ending' 
@@ -853,8 +848,7 @@ export default function Test() {
                     <Button
                       onClick={handleShowHint}
                       size="lg"
-                      variant="outline"
-                      className="border-blue-500 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                      className="bg-emerald-700 hover:bg-emerald-800 text-[#F2E3BB] text-base md:text-xl rounded-lg border border-emerald-600 shadow-md"
                     >
                       <Lightbulb className={cn("w-5 h-5", isRTL ? "ml-2" : "mr-2")} />
                       {t('hint')}
@@ -863,7 +857,7 @@ export default function Test() {
                   <Button
                     onClick={handleShowAnswer}
                     size="lg"
-                    className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600"
+                    className="bg-emerald-700 hover:bg-emerald-800 text-[#F2E3BB] text-base md:text-xl rounded-lg border border-emerald-600 shadow-md"
                   >
                     <Eye className={cn("w-5 h-5", isRTL ? "ml-2" : "mr-2")} />
                     {t('showAnswer')}
@@ -873,7 +867,7 @@ export default function Test() {
                 <Button
                   onClick={handleNextQuestion}
                   size="lg"
-                  className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600"
+                  className="bg-emerald-700 hover:bg-emerald-800 text-[#F2E3BB] text-base md:text-xl rounded-lg border border-emerald-600 shadow-md"
                 >
                   {t('nextQuestion')}
                   {isRTL ? (
@@ -886,14 +880,14 @@ export default function Test() {
             </div>
           </div>
         ) : isAyahDataLoading ? (
-          <Card className="p-8 text-center border-emerald-200">
-            <p className="text-gray-600 dark:text-gray-300">
+          <Card className="p-8 text-center border-0 bg-white dark:bg-gray-800 shadow-md">
+            <p className="text-base md:text-xl text-emerald-800 dark:text-emerald-300">
               {t('loadingTafseer')}...
             </p>
           </Card>
         ) : (
-          <Card className="p-8 text-center border-emerald-200">
-            <p className="text-gray-600 dark:text-gray-300">
+          <Card className="p-8 text-center border-0 bg-white dark:bg-gray-800 shadow-md">
+            <p className="text-base md:text-xl text-emerald-800 dark:text-emerald-300">
               {t('configure')} {t('testSettings')}
             </p>
           </Card>
