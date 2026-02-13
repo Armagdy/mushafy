@@ -588,7 +588,8 @@ const Surah = () => {
       />
 
       {/* Combined Audio & Navigation Bar */}
-      <div className="bg-gradient-to-t from-emerald-800 to-emerald-600 rounded-t-2xl">
+      <div className="w-full flex justify-center bg-gradient-to-t from-emerald-800 to-emerald-600">
+        <div className="w-full max-w-[1600px] rounded-t-2xl">
         {/* Audio Player Bottom Bar */}
         <PlayBar
           currentPlayingAyah={currentPlayingAyah}
@@ -666,6 +667,7 @@ const Surah = () => {
         }}
         onViewModeToggle={() => setViewMode(viewMode === 'single' ? 'double' : 'single')}
       />
+        </div>
       </div>
 
       {/* Search/Navigation Dialog */}

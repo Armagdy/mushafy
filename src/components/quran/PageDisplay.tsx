@@ -43,7 +43,7 @@ export function PageDisplay({
   const isTashelOrMadinah = mushafType === 'tashel' || mushafType === 'madinah';
 
   return (
-    <main className="flex-1 flex items-center justify-center gap-6 overflow-hidden min-h-0">
+    <main className="flex-1 flex items-center justify-center gap-6 overflow-hidden min-h-0 bg-[#FBF9F4]">
       {/* Navigation Arrow Left - Hidden on mobile */}
       <motion.button
         whileHover={{ scale: 1.1, x: -5 }}

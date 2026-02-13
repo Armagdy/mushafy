@@ -29,13 +29,13 @@ export function TopBar({
   const { isRTL, language } = useLanguage();
 
   return (
-    <motion.header 
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      className="bg-gradient-to-b from-emerald-800 to-emerald-600"
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
-    >
-      <div className="px-4 md:px-8 py-1.5 md:py-2 flex items-center justify-between gap-3 md:gap-6 relative">
+    <div className="w-full flex justify-center bg-gradient-to-b from-emerald-800 to-emerald-600" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <motion.header 
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        className="w-full max-w-[1600px]"
+      >
+        <div className="px-4 md:px-8 py-1.5 md:py-2 flex items-center justify-between gap-3 md:gap-6 relative">
         {/* Surah Button */}
         <button
           onClick={onSurahClick}
@@ -69,5 +69,6 @@ export function TopBar({
         </button>
       </div>
     </motion.header>
+    </div>
   );
 }

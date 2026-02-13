@@ -111,6 +111,89 @@ Add new components: `npx shadcn-ui@latest add <component-name>`
 
 ## Styling Patterns
 
+### Color Palette (Project Standard)
+**Primary Colors:**
+| Color | HSL | Hex (approx) | Usage |
+|-------|-----|--------------|-------|
+| **Emerald Deep** | `160 45% 20%` | `#1c4a3f` | Primary buttons, headers, gradients |
+| **Emerald Light** | `160 35% 40%` | `#428a75` | Hover states, secondary accents |
+| **Cream** | `45 40% 95%` | `#f9f6ed` | Backgrounds, cards |
+| **Cream Dark** | `45 30% 88%` | `#e8e1d3` | Borders, muted backgrounds |
+| **Gold** | `38 70% 50%` | `#d4a021` | Accent highlights, icons |
+| **Gold Light** | `38 60% 65%` | `#e0b85c` | Hover accents |
+
+**Tailwind Usage:**
+```tsx
+// Use emerald-600/700/800 for green shades
+className="bg-emerald-700 text-white"           // Primary background
+className="text-emerald-800"                    // Primary text
+className="border-emerald-500"                  // Borders
+className="from-emerald-800 to-emerald-600"     // Gradients
+
+// Use amber/yellow for gold accents
+className="text-amber-600"                      // Gold text/icons
+className="bg-amber-500"                        // Gold backgrounds
+```
+
+### Default Button Styles
+**ALWAYS use these patterns for buttons:**
+```tsx
+// Primary Button (emerald gradient)
+<Button className="bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-800 hover:to-emerald-700 text-white text-base md:text-xl">
+  {t('action')}
+</Button>
+
+// Secondary/Outline Button
+<Button variant="outline" className="border-emerald-500 text-emerald-700 hover:bg-emerald-50 text-base md:text-xl">
+  {t('cancel')}
+</Button>
+
+// Ghost Button (for toolbars/icons)
+<Button variant="ghost" className="text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800">
+  <Icon className="w-5 h-5" />
+</Button>
+
+// Destructive Button
+<Button variant="destructive" className="text-base md:text-xl">
+  {t('delete')}
+</Button>
+```
+
+### Default Input/TextBox Styles
+**ALWAYS use these patterns for inputs:**
+```tsx
+// Standard Input
+<Input 
+  className="border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg"
+  placeholder={t('placeholder')}
+/>
+
+// Search Input with icon
+<div className="relative">
+  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600" />
+  <Input className="pl-10 border-emerald-300 focus:border-emerald-500 text-base md:text-lg" />
+</div>
+```
+
+### Default Text Styles
+**Typography hierarchy:**
+```tsx
+// Page/Dialog Title
+<h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+
+// Section Header
+<h2 className="text-lg md:text-xl font-semibold text-emerald-800">
+
+// Body Text
+<p className="text-base md:text-lg text-emerald-900">
+
+// Muted/Secondary Text
+<span className="text-sm md:text-base text-emerald-600">
+
+// Labels
+<Label className="text-base md:text-xl font-medium text-emerald-800">
+```
+
 ### RTL-Aware Layouts
 Use `cn()` utility from [src/lib/utils.ts](src/lib/utils.ts):
 ```tsx
@@ -206,9 +289,12 @@ npm run preview      # Preview production build
 | New UI component | `npx shadcn-ui@latest add <name>` |
 | **New dialog** | **MANDATORY: Create separate file in [src/components/](src/components/) (e.g., `SettingsDialog.tsx`)** |
 | Modify Surah metadata | ⚠️ DO NOT EDIT [src/data/surahs.ts](src/data/surahs.ts)—canonical data |
-| Change theme colors | Edit HSL variables in Tailwind config/CSS |
+| Change theme colors | Edit HSL variables in [src/index.css](src/index.css) |
 | Access Quran page data | Use functions from [src/lib/quran-mapping.ts](src/lib/quran-mapping.ts) |
 | **Document new feature** | **Update [README.md](README.md) with feature description, usage, and any configuration** |
+| **Style a button** | Use `bg-gradient-to-r from-emerald-700 to-emerald-600 text-white text-base md:text-xl` |
+| **Style an input** | Use `border-emerald-300 focus:border-emerald-500 text-base md:text-lg` |
+| **Style a title** | Use `bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent` |
 
 ## Lovable Integration
 - Changes via Lovable commit automatically
