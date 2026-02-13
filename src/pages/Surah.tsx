@@ -185,6 +185,8 @@ const Surah = () => {
     currentRepeatAyah,
     currentRepeatSurah,
     currentRepeatAyahCount,
+    isRepeatConcatenatedMode,
+    repeatAyahTimestamps,
     playAyah,
     togglePlayPause,
     stopAudio,
@@ -598,6 +600,16 @@ const Surah = () => {
           ayahTimestamps={ayahTimestamps}
           concatenatedSurah={concatenatedSurah}
           formatNumber={formatNumber}
+          isRepeatActive={isRepeatActive}
+          isRepeatConcatenatedMode={isRepeatConcatenatedMode}
+          repeatAyahTimestamps={repeatAyahTimestamps}
+          repeatAyahCount={repeatAyahCount || 1}
+          repeatPassageCount={repeatPassageCount || 1}
+          surahNames={Object.fromEntries(surahs.map(s => [s.id, language === 'ar' ? s.name : s.englishName]))}
+          isRTL={isRTL}
+          ayahRepeatLabel={t('ayahRepeat')}
+          sectionRepeatLabel={t('sectionRepeat')}
+          ayahLabel={t('ayah')}
           onDragStart={() => {
             wasPlayingBeforeDrag.current = isPlaying;
             if (isPlaying && audioElement) {

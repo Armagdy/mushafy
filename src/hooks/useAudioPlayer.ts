@@ -100,6 +100,11 @@ export const useAudioPlayer = ({
   const [currentRepeatSurah, setCurrentRepeatSurah] = useState(0);
   const [currentRepeatAyahCount, setCurrentRepeatAyahCount] = useState(0);
   
+  // Concatenated repeat audio state
+  const [repeatBlobUrl, setRepeatBlobUrl] = useState<string | null>(null);
+  const [repeatAyahTimestamps, setRepeatAyahTimestamps] = useState<{surah: number; ayah: number; repetition: number; passage: number; startTime: number}[]>([]);
+  const [isRepeatConcatenatedMode, setIsRepeatConcatenatedMode] = useState(false);
+  
   // Helper to extract base reciter name (remove style/quality suffixes)
   const extractBaseName = (name: string, nameAr: string) => {
     const cleanName = name
@@ -400,6 +405,166 @@ export const useAudioPlayer = ({
       return null;
     }
   }, [selectedReciter, ayahData, audioSource, audioContext, audioBufferToWav, concatenatedBlobUrl]);
+  
+  // Concatenate repeat section with ayah repeats and passage repeats baked in
+  const concatenateRepeatAyahs = useCallback(async (
+    startSurah: number,
+    startAyah: number,
+    endSurah: number,
+    endAyah: number,
+    ayahRepeatCount: number,
+    passageRepeatCount: number
+  ): Promise<{ blobUrl: string; timestamps: {surah: number; ayah: number; repetition: number; passage: number; startTime: number}[] } | null> => {
+    if (!selectedReciter || audioSource !== 'everyayah') return null;
+    if (!audioContext) return null;
+    
+    // Generate list of all ayahs in the range
+    const ayahsInRange: {surah: number; ayah: number}[] = [];
+    let currentSurah = startSurah;
+    let currentAyah = startAyah;
+    
+    while (currentSurah < endSurah || (currentSurah === endSurah && currentAyah <= endAyah)) {
+      ayahsInRange.push({ surah: currentSurah, ayah: currentAyah });
+      
+      // Move to next ayah
+      const surahData = ayahData.find(s => s.number === currentSurah);
+      const totalAyahs = surahData?.verses?.length || 1;
+      
+      if (currentAyah < totalAyahs) {
+        currentAyah++;
+      } else {
+        currentSurah++;
+        currentAyah = 1;
+      }
+      
+      // Safety check to prevent infinite loops
+      if (ayahsInRange.length > 6236) break;
+    }
+    
+    if (ayahsInRange.length === 0) return null;
+    
+    // Calculate total audio segments
+    const totalSegments = ayahsInRange.length * ayahRepeatCount * passageRepeatCount;
+    
+    setIsPreloadingAyahs(true);
+    setPreloadProgress({ current: 0, total: totalSegments });
+    
+    try {
+      // First, download all unique ayahs and cache their buffers
+      const audioBufferCache: Map<string, AudioBuffer> = new Map();
+      let downloadProgress = 0;
+      
+      for (const {surah, ayah} of ayahsInRange) {
+        const key = `${surah}:${ayah}`;
+        if (audioBufferCache.has(key)) continue;
+        
+        const surahPadded = surah.toString().padStart(3, '0');
+        const ayahPadded = ayah.toString().padStart(3, '0');
+        const audioUrl = `${selectedReciter.baseUrl}/${surahPadded}${ayahPadded}.mp3`;
+        
+        try {
+          const response = await fetch(audioUrl);
+          if (!response.ok) throw new Error(`Failed to fetch: ${audioUrl}`);
+          
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          audioBufferCache.set(key, audioBuffer);
+          
+          downloadProgress++;
+          setPreloadProgress({ current: downloadProgress, total: totalSegments });
+        } catch (error) {
+          console.error(`Failed to load ayah ${surah}:${ayah}:`, error);
+          setIsPreloadingAyahs(false);
+          setPreloadProgress({ current: 0, total: 0 });
+          return null;
+        }
+      }
+      
+      // Build the sequence of audio buffers with repeats
+      const audioBufferSequence: AudioBuffer[] = [];
+      const timestamps: {surah: number; ayah: number; repetition: number; passage: number; startTime: number}[] = [];
+      let currentTime = 0;
+      let segmentCount = downloadProgress;
+      
+      for (let passage = 1; passage <= passageRepeatCount; passage++) {
+        for (const {surah, ayah} of ayahsInRange) {
+          const key = `${surah}:${ayah}`;
+          const buffer = audioBufferCache.get(key);
+          if (!buffer) continue;
+          
+          for (let repetition = 1; repetition <= ayahRepeatCount; repetition++) {
+            // Record timestamp for this segment
+            timestamps.push({
+              surah,
+              ayah,
+              repetition,
+              passage,
+              startTime: currentTime
+            });
+            
+            audioBufferSequence.push(buffer);
+            currentTime += buffer.duration;
+            
+            segmentCount++;
+            setPreloadProgress({ current: segmentCount, total: totalSegments });
+          }
+        }
+      }
+      
+      if (audioBufferSequence.length === 0) {
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        return null;
+      }
+      
+      // Calculate total duration and create concatenated buffer
+      const totalDuration = audioBufferSequence.reduce((sum, buffer) => sum + buffer.duration, 0);
+      const numberOfChannels = audioBufferSequence[0].numberOfChannels;
+      const sampleRate = audioBufferSequence[0].sampleRate;
+      const totalLength = Math.ceil(totalDuration * sampleRate);
+      
+      const concatenated = audioContext.createBuffer(
+        numberOfChannels,
+        totalLength,
+        sampleRate
+      );
+      
+      // Copy all buffers into the concatenated buffer
+      let offset = 0;
+      for (let i = 0; i < audioBufferSequence.length; i++) {
+        const buffer = audioBufferSequence[i];
+        for (let channel = 0; channel < numberOfChannels; channel++) {
+          const sourceData = buffer.getChannelData(channel);
+          const targetData = concatenated.getChannelData(channel);
+          targetData.set(sourceData, offset);
+        }
+        offset += buffer.length;
+      }
+      
+      // Convert buffer to WAV blob and create URL
+      const wavBlob = audioBufferToWav(concatenated);
+      const blobUrl = URL.createObjectURL(wavBlob);
+      
+      // Revoke old repeat blob URL if exists
+      if (repeatBlobUrl) {
+        URL.revokeObjectURL(repeatBlobUrl);
+      }
+      
+      setRepeatBlobUrl(blobUrl);
+      setRepeatAyahTimestamps(timestamps);
+      setIsPreloadingAyahs(false);
+      setPreloadProgress({ current: 0, total: 0 });
+      
+      console.log(`✅ Created repeat audio: ${ayahsInRange.length} ayahs × ${ayahRepeatCount} repeats × ${passageRepeatCount} passages = ${timestamps.length} segments`);
+      
+      return { blobUrl, timestamps };
+    } catch (error) {
+      console.error('Error concatenating repeat ayahs:', error);
+      setIsPreloadingAyahs(false);
+      setPreloadProgress({ current: 0, total: 0 });
+      return null;
+    }
+  }, [selectedReciter, ayahData, audioSource, audioContext, audioBufferToWav, repeatBlobUrl]);
   
   // Update current ayah based on playback time for concatenated audio (HTML Audio element)
   const updateCurrentAyahFromTime = useCallback((surahNum: number) => {
@@ -730,6 +895,7 @@ export const useAudioPlayer = ({
     
     setIsPlaying(false);
     setIsRepeatActive(false);
+    setIsRepeatConcatenatedMode(false);
     setCurrentRepeatPassage(0);
     setCurrentRepeatAyah(0);
     setCurrentRepeatSurah(0);
@@ -747,13 +913,20 @@ export const useAudioPlayer = ({
       setAyahTimestamps([]);
     }
     
+    // Clear repeat concatenated audio state
+    if (repeatBlobUrl) {
+      URL.revokeObjectURL(repeatBlobUrl);
+      setRepeatBlobUrl(null);
+      setRepeatAyahTimestamps([]);
+    }
+    
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = 'none';
     }
     
     releaseWakeLock();
     console.log('=== STOP AUDIO COMPLETE ===');
-  }, [audioElement, releaseWakeLock, concatenatedBlobUrl]);
+  }, [audioElement, releaseWakeLock, concatenatedBlobUrl, repeatBlobUrl]);
   
   // Seek to a specific time in the audio
   const seekToTime = useCallback((time: number) => {
@@ -836,19 +1009,91 @@ export const useAudioPlayer = ({
   ]);
   
   // Start repeat mode
-  const startRepeat = useCallback(() => {
+  const startRepeat = useCallback(async () => {
+    if (!audioElement) return;
+    
     const passageCount = repeatPassageCount || 1;
     const ayahCount = repeatAyahCount || 1;
     const startSurah = repeatStartSurah || 1;
     const startAyah = repeatStartAyah || 1;
+    const endSurah = repeatEndSurah || startSurah;
+    const endAyah = repeatEndAyah || startAyah;
     
-    setIsRepeatActive(true);
-    setCurrentRepeatPassage(1);
-    setCurrentRepeatSurah(startSurah);
-    setCurrentRepeatAyah(startAyah);
-    setCurrentRepeatAyahCount(1);
-    playAyah(startSurah, startAyah);
-  }, [repeatPassageCount, repeatAyahCount, repeatStartSurah, repeatStartAyah, playAyah]);
+    // For EveryAyah mode, create a single concatenated audio with all repeats baked in
+    if (audioSource === 'everyayah' && selectedReciter) {
+      // Concatenate all ayahs with repeats
+      const result = await concatenateRepeatAyahs(
+        startSurah,
+        startAyah,
+        endSurah,
+        endAyah,
+        ayahCount,
+        passageCount
+      );
+      
+      if (!result) {
+        console.error('Failed to concatenate repeat audio');
+        return;
+      }
+      
+      // Set up repeat mode
+      setIsRepeatActive(true);
+      setIsRepeatConcatenatedMode(true);
+      setCurrentRepeatPassage(1);
+      setCurrentRepeatSurah(startSurah);
+      setCurrentRepeatAyah(startAyah);
+      setCurrentRepeatAyahCount(1);
+      
+      // Navigate to the start page
+      const startSurahData = ayahData.find(s => s.number === startSurah);
+      if (startSurahData && startSurahData.verses) {
+        const verse = startSurahData.verses.find((v: any) => v.number === startAyah);
+        if (verse && verse.page && verse.page !== currentPageNum) {
+          isAyahNavigation.current = true;
+          navigate(`/page/${verse.page}#${startSurah}-${startAyah}`);
+        }
+      }
+      
+      // Play the concatenated repeat audio
+      setCurrentPlayingAyah({ surah: startSurah, ayah: startAyah });
+      updateMediaSession(startSurah, startAyah, true);
+      requestWakeLock();
+      
+      audioElement.src = result.blobUrl;
+      
+      const handleLoadedMetadata = () => {
+        audioElement.currentTime = 0;
+        audioElement.play().then(() => {
+          setIsPlaying(true);
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'playing';
+          }
+          setTimeout(() => {
+            isAyahNavigation.current = false;
+          }, 500);
+        }).catch(err => {
+          console.error('Failed to play repeat audio:', err);
+          setIsPlaying(false);
+          setIsRepeatActive(false);
+          setIsRepeatConcatenatedMode(false);
+          releaseWakeLock();
+          isAyahNavigation.current = false;
+        });
+      };
+      
+      audioElement.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+      audioElement.load();
+    } else {
+      // MP3Quran or fallback: use the old sequential playback method
+      setIsRepeatActive(true);
+      setIsRepeatConcatenatedMode(false);
+      setCurrentRepeatPassage(1);
+      setCurrentRepeatSurah(startSurah);
+      setCurrentRepeatAyah(startAyah);
+      setCurrentRepeatAyahCount(1);
+      playAyah(startSurah, startAyah);
+    }
+  }, [repeatPassageCount, repeatAyahCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, audioSource, selectedReciter, audioElement, ayahData, currentPageNum, navigate, isAyahNavigation, updateMediaSession, requestWakeLock, releaseWakeLock, concatenateRepeatAyahs, playAyah]);
   
   // Handle audio ended (for continuous playback and repeat)
   const handleAudioEnded = useCallback(() => {
@@ -862,6 +1107,26 @@ export const useAudioPlayer = ({
         setIsPlaying(false);
         return;
       }
+    }
+    
+    // Concatenated repeat mode: audio has all repeats baked in, so just stop
+    if (isRepeatActive && isRepeatConcatenatedMode) {
+      console.log('Concatenated repeat audio finished');
+      setIsPlaying(false);
+      setIsRepeatActive(false);
+      setIsRepeatConcatenatedMode(false);
+      setCurrentRepeatPassage(0);
+      setCurrentRepeatAyah(0);
+      setCurrentRepeatSurah(0);
+      setCurrentRepeatAyahCount(0);
+      // Clean up repeat blob URL
+      if (repeatBlobUrl) {
+        URL.revokeObjectURL(repeatBlobUrl);
+        setRepeatBlobUrl(null);
+      }
+      setRepeatAyahTimestamps([]);
+      releaseWakeLock();
+      return;
     }
     
     if (isRepeatActive && currentPlayingAyah) {
@@ -947,7 +1212,7 @@ export const useAudioPlayer = ({
         setIsPlaying(false);
       }
     }
-  }, [isRepeatActive, currentPlayingAyah, currentRepeatAyahCount, repeatAyahCount, currentRepeatSurah, currentRepeatAyah, ayahData, currentRepeatPassage, repeatPassageCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, playAyah, audioSource]);
+  }, [isRepeatActive, isRepeatConcatenatedMode, repeatBlobUrl, releaseWakeLock, currentPlayingAyah, currentRepeatAyahCount, repeatAyahCount, currentRepeatSurah, currentRepeatAyah, ayahData, currentRepeatPassage, repeatPassageCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, playAyah, audioSource]);
   
   // Track current ayah based on playback time (for both MP3Quran and EveryAyah)
   useEffect(() => {
@@ -988,6 +1253,56 @@ export const useAudioPlayer = ({
       audioElement.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [audioElement, audioSource, ayahTimings, ayahTimestamps, concatenatedSurah, currentSurahAudio, currentPlayingAyah, updateMediaSession, updateCurrentAyahFromTime]);
+  
+  // Track current ayah during concatenated repeat mode
+  useEffect(() => {
+    if (!audioElement || !isRepeatActive || !isRepeatConcatenatedMode || repeatAyahTimestamps.length === 0) return;
+    
+    const handleTimeUpdate = () => {
+      const time = audioElement.currentTime;
+      
+      // Find which segment we're currently in
+      let currentSegment = repeatAyahTimestamps[0];
+      for (let i = 0; i < repeatAyahTimestamps.length; i++) {
+        if (time >= repeatAyahTimestamps[i].startTime) {
+          currentSegment = repeatAyahTimestamps[i];
+        } else {
+          break;
+        }
+      }
+      
+      // Update current playing state if changed
+      if (currentPlayingAyah?.surah !== currentSegment.surah || currentPlayingAyah?.ayah !== currentSegment.ayah) {
+        setCurrentPlayingAyah({ surah: currentSegment.surah, ayah: currentSegment.ayah });
+        updateMediaSession(currentSegment.surah, currentSegment.ayah, true);
+        
+        // Navigate to the page containing this ayah
+        const surahData = ayahData.find(s => s.number === currentSegment.surah);
+        if (surahData && surahData.verses && !isAyahNavigation.current) {
+          const verse = surahData.verses.find((v: any) => v.number === currentSegment.ayah);
+          if (verse && verse.page && verse.page !== currentPageNum) {
+            isAyahNavigation.current = true;
+            navigate(`/page/${verse.page}#${currentSegment.surah}-${currentSegment.ayah}`);
+            setTimeout(() => {
+              isAyahNavigation.current = false;
+            }, 300);
+          }
+        }
+      }
+      
+      // Update repeat tracking state
+      setCurrentRepeatSurah(currentSegment.surah);
+      setCurrentRepeatAyah(currentSegment.ayah);
+      setCurrentRepeatAyahCount(currentSegment.repetition);
+      setCurrentRepeatPassage(currentSegment.passage);
+    };
+    
+    audioElement.addEventListener('timeupdate', handleTimeUpdate);
+    
+    return () => {
+      audioElement.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [audioElement, isRepeatActive, isRepeatConcatenatedMode, repeatAyahTimestamps, currentPlayingAyah, updateMediaSession, ayahData, currentPageNum, navigate, isAyahNavigation]);
   
   // Initialize audio elements and Web Audio API context
   useEffect(() => {
@@ -1370,6 +1685,7 @@ export const useAudioPlayer = ({
     // Repeat state
     isRepeatActive,
     setIsRepeatActive,
+    isRepeatConcatenatedMode,
     repeatPassageCount,
     setRepeatPassageCount,
     repeatAyahCount,
@@ -1386,6 +1702,7 @@ export const useAudioPlayer = ({
     currentRepeatAyah,
     currentRepeatSurah,
     currentRepeatAyahCount,
+    repeatAyahTimestamps,
     
     // Concatenated audio data (for progress bar ayah display)
     ayahTimestamps,

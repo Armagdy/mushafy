@@ -1,6 +1,14 @@
 import { useRef, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
+interface RepeatTimestamp {
+  surah: number;
+  ayah: number;
+  repetition: number;
+  passage: number;
+  startTime: number;
+}
+
 interface AudioProgressBarProps {
   currentTime: number;
   duration: number;
@@ -12,6 +20,18 @@ interface AudioProgressBarProps {
   ayahTimestamps?: number[];
   concatenatedSurah?: number | null;
   formatNumber?: (num: number | string) => string;
+  // Repeat mode props
+  isRepeatActive?: boolean;
+  isRepeatConcatenatedMode?: boolean;
+  repeatAyahTimestamps?: RepeatTimestamp[];
+  repeatAyahCount?: number;
+  repeatPassageCount?: number;
+  surahNames?: { [key: number]: string };
+  // Localization props
+  isRTL?: boolean;
+  ayahRepeatLabel?: string;
+  sectionRepeatLabel?: string;
+  ayahLabel?: string;
 }
 
 export function AudioProgressBar({ 
@@ -24,7 +44,17 @@ export function AudioProgressBar({
   audioSource = 'everyayah',
   ayahTimestamps = [],
   concatenatedSurah = null,
-  formatNumber = (n) => n.toString()
+  formatNumber = (n) => n.toString(),
+  isRepeatActive = false,
+  isRepeatConcatenatedMode = false,
+  repeatAyahTimestamps = [],
+  repeatAyahCount = 1,
+  repeatPassageCount = 1,
+  surahNames = {},
+  isRTL = true,
+  ayahRepeatLabel = 'تكرار الآية',
+  sectionRepeatLabel = 'تكرار المقطع',
+  ayahLabel = 'آية'
 }: AudioProgressBarProps) {
   const progressBarRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -233,6 +263,23 @@ export function AudioProgressBar({
     return ayahNum;
   };
 
+  // Get repeat segment info from time (for repeat concatenated mode)
+  const getRepeatSegmentFromTime = (time: number): RepeatTimestamp | null => {
+    if (!isRepeatActive || !isRepeatConcatenatedMode || repeatAyahTimestamps.length === 0) {
+      return null;
+    }
+
+    let segment = repeatAyahTimestamps[0];
+    for (let i = 0; i < repeatAyahTimestamps.length; i++) {
+      if (time >= repeatAyahTimestamps[i].startTime) {
+        segment = repeatAyahTimestamps[i];
+      } else {
+        break;
+      }
+    }
+    return segment;
+  };
+
   return (
     <div className="w-full relative group">
       {/* Progress bar container */}
@@ -286,19 +333,52 @@ export function AudioProgressBar({
       </div>
 
       {/* Time display tooltip on hover */}
-      {hoverTime !== null && (
-        <div
-          className="absolute -top-24 px-4 py-2 bg-emerald-800/90 text-[#F2E3BB] text-base md:text-lg rounded-lg pointer-events-none whitespace-nowrap flex flex-col items-center"
-          style={{ left: `${(hoverTime / duration) * 100}%`, transform: 'translateX(-50%)' }}
-        >
-          {audioSource === 'everyayah' && getAyahFromTime(hoverTime) !== null && (
-            <span>
-              آية {formatNumber(getAyahFromTime(hoverTime)!)}
-            </span>
-          )}
-          <span>{formatTime(hoverTime)}</span>
-        </div>
-      )}
+      {hoverTime !== null && (() => {
+        const isRepeatMode = isRepeatActive && isRepeatConcatenatedMode && getRepeatSegmentFromTime(hoverTime) !== null;
+        const extraLines = isRepeatMode ? (repeatAyahCount > 1 ? 1 : 0) + (repeatPassageCount > 1 ? 1 : 0) : 0;
+        // Adjust top position based on number of lines: higher up so visible above finger on mobile
+        const topClass = extraLines === 0 ? "-top-24" : extraLines === 1 ? "-top-32" : "-top-40";
+        
+        return (
+          <div
+            className={cn(
+              `absolute ${topClass} px-4 py-2 bg-emerald-800/90 text-[#F2E3BB] text-base md:text-lg rounded-lg pointer-events-none whitespace-nowrap flex flex-col items-center`,
+              isRTL ? "rtl" : "ltr"
+            )}
+            style={{ left: `${(hoverTime / duration) * 100}%`, transform: 'translateX(-50%)' }}
+          >
+            {isRepeatMode ? (
+              // Repeat mode tooltip
+              <>
+                <span className="font-semibold">
+                  {surahNames[getRepeatSegmentFromTime(hoverTime)!.surah] || `Surah ${getRepeatSegmentFromTime(hoverTime)!.surah}`} - {ayahLabel} {formatNumber(getRepeatSegmentFromTime(hoverTime)!.ayah)}
+                </span>
+                {repeatAyahCount > 1 && (
+                  <span>
+                    {ayahRepeatLabel}: {formatNumber(getRepeatSegmentFromTime(hoverTime)!.repetition)}/{formatNumber(repeatAyahCount)}
+                  </span>
+                )}
+                {repeatPassageCount > 1 && (
+                  <span>
+                    {sectionRepeatLabel}: {formatNumber(getRepeatSegmentFromTime(hoverTime)!.passage)}/{formatNumber(repeatPassageCount)}
+                  </span>
+                )}
+                <span>{formatTime(hoverTime)}</span>
+              </>
+            ) : (
+              // Normal mode tooltip
+              <>
+                {audioSource === 'everyayah' && concatenatedSurah && getAyahFromTime(hoverTime) !== null && (
+                  <span className="font-semibold">
+                    {surahNames[concatenatedSurah] || `Surah ${concatenatedSurah}`} - {ayahLabel} {formatNumber(getAyahFromTime(hoverTime)!)}
+                  </span>
+                )}
+                <span>{formatTime(hoverTime)}</span>
+              </>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
