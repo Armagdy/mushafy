@@ -80,7 +80,7 @@ Add new components: `npx shadcn-ui@latest add <component-name>`
 - Structure:
   ```tsx
   // src/components/BookmarksDialog.tsx
-  import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+  import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
   import { useLanguage } from "@/contexts/LanguageContext";
   import { cn } from "@/lib/utils";
   
@@ -94,14 +94,18 @@ Add new components: `npx shadcn-ui@latest add <component-name>`
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className={cn(
-          "sm:max-w-md md:max-w-lg lg:max-w-xl max-w-[90vw] max-h-[85vh] overflow-y-auto",
-          "rounded-xl border border-emerald-500",
+          "sm:max-w-md md:max-w-lg lg:max-w-xl max-w-[90vw] max-h-[85vh] overflow-y-auto p-0",
+          "rounded-xl border-0 bg-[#FBF9F4]",
           isRTL ? "rtl" : "ltr"
         )}>
-          <DialogTitle className="text-base md:text-xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
-            {t('bookmarks')}
-          </DialogTitle>
-          {/* Dialog content */}
+          <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
+            <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
+              {t('bookmarks')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-4">
+            {/* Dialog content */}
+          </div>
         </DialogContent>
       </Dialog>
     );
@@ -204,20 +208,41 @@ const { isRTL } = useLanguage();
 ### Dialog Styling (Project Standard)
 **Responsive widths:** Dialogs scale up on larger screens (`md:max-w-lg lg:max-w-xl`).
 **Responsive text:** All dialog text uses `text-base md:text-xl` for readability on larger screens.
+**Header with gradient background:** Dialog headers use the same gradient as TopBar/BottomBar toolbars.
 ```tsx
 <DialogContent className={cn(
-  "sm:max-w-md md:max-w-lg lg:max-w-xl max-w-[90vw] max-h-[85vh] overflow-y-auto",
-  "rounded-xl border border-emerald-500",
+  "sm:max-w-md md:max-w-lg lg:max-w-xl max-w-[90vw] max-h-[85vh] overflow-y-auto p-0",
+  "rounded-xl border-0 bg-[#FBF9F4]",
   isRTL ? "rtl" : "ltr"
 )}>
-  <DialogTitle className="text-base md:text-xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
-    {t('title')}
-  </DialogTitle>
-  {/* Labels, SelectItems, descriptions, buttons all use text-base md:text-xl */}
-  <Label className="text-base md:text-xl font-medium">{t('label')}</Label>
-  <Button className="text-base md:text-xl">{t('action')}</Button>
+  <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
+    <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
+      {t('title')}
+    </DialogTitle>
+  </DialogHeader>
+  
+  <div className="p-4 space-y-2 sm:space-y-3">
+    {/* Dialog content goes here */}
+    {/* Labels, SelectItems, descriptions, buttons all use text-base md:text-xl */}
+    <Label className="text-base md:text-xl font-medium">{t('label')}</Label>
+    <Button className="text-base md:text-xl">{t('action')}</Button>
+  </div>
 </DialogContent>
 ```
+
+**Key points:**
+- `p-0` on DialogContent to remove default padding
+- `border-0` on DialogContent to remove default border
+- `bg-[#FBF9F4]` on DialogContent to match page display background (light cream)
+- DialogHeader has gradient background (`bg-gradient-to-b from-emerald-800 to-emerald-600`)
+- DialogTitle uses cream text color (`text-[#F2E3BB]`) matching toolbar text
+- Content wrapped in `<div className="p-4">` to add padding back to body
+- **No background colors on sections** - sections blend with dialog background for consistency
+- All text/labels use emerald colors: `text-emerald-800 dark:text-emerald-300` for main text, `text-emerald-600 dark:text-emerald-400` for muted text
+- All icons use emerald colors: `text-emerald-600 dark:text-emerald-400`
+- Close button (X) positioned at `top-2 right-4`, styled to match TopBar buttons: `bg-emerald-800/50 hover:bg-emerald-800/70 border border-[#F2E3BB]/30 shadow-md` with `text-[#F2E3BB]` icon color
+- **ALL interactive buttons** inside dialogs use solid emerald style (consistent with Test Feature button and PlayBar buttons): `bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md` with `text-[#F2E3BB]` cream text. Do NOT use outline variant or different colors.
+- Select components use emerald theme: `SelectTrigger` with `border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500`, `SelectContent` with `bg-[#FBF9F4] dark:bg-emerald-950`, and `SelectItem` with `focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100`
 
 ### Bottom Bar Pattern
 ```tsx

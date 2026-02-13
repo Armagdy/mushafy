@@ -42,92 +42,86 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={cn(
-        "sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto",
-        "rounded-xl border border-emerald-500",
+        "sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto p-0",
+        "rounded-xl border-0 bg-[#FBF9F4]",
         isRTL ? "rtl" : "ltr"
       )}>
-        <DialogHeader>
-          <DialogTitle className="text-center text-base md:text-xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+        <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
+          <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
             {t('settings')}
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-2 sm:space-y-3">
+        <div className="space-y-2 sm:space-y-3 p-4">
           {/* Mushaf Type Setting */}
-          <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+          <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg">
             <div className="flex items-center gap-2 sm:gap-3">
-              <BookOpen className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-              <span className="text-base md:text-xl font-medium">{t('mushafType')}</span>
+              <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">{t('mushafType')}</span>
             </div>
             <Select value={mushafType} onValueChange={(value) => setMushafType(value as MushafType)}>
-              <SelectTrigger className="w-full h-8 sm:h-9">
+              <SelectTrigger className="w-full h-8 sm:h-9 border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mwdoa">{t('mushafMwdoa')}</SelectItem>
-                <SelectItem value="tashel">{t('mushafTashel')}</SelectItem>
-                <SelectItem value="madinah">{t('mushafMadinah')}</SelectItem>
+              <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
+                <SelectItem value="mwdoa" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafMwdoa')}</SelectItem>
+                <SelectItem value="tashel" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafTashel')}</SelectItem>
+                <SelectItem value="madinah" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafMadinah')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* View Mode Setting - Hide on mobile */}
           {!isMobile && (
-            <div className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+            <div className="flex items-center justify-between p-2 sm:p-3 rounded-lg">
               <div className="flex items-center gap-2 sm:gap-3">
-                <Book className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                <span className="text-base md:text-xl font-medium">{isRTL ? 'وضع العرض' : 'View Mode'}</span>
+                <Book className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">{isRTL ? 'وضع العرض' : 'View Mode'}</span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
+              <button
                 onClick={() => onViewModeChange(viewMode === 'single' ? 'double' : 'single')}
-                className="flex items-center gap-2 h-7 sm:h-8 px-2 sm:px-3 text-base md:text-xl"
+                className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg px-3 md:px-4 h-8 md:h-10 border border-emerald-600 shadow-md transition-all text-base md:text-xl"
               >
-                <span>
+                <span className="text-[#F2E3BB] font-bold" style={{ fontFamily: "'Amiri', serif" }}>
                   {viewMode === 'single' ? (isRTL ? 'صفحتين' : '2 Pages') : (isRTL ? 'صفحة' : '1 Page')}
                 </span>
-              </Button>
+              </button>
             </div>
           )}
 
           {/* Pages to Load Setting - Only show in single page mode or mobile */}
           {(viewMode === 'single' || isMobile) && (
-            <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+            <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg">
               <div className="flex items-center gap-2 sm:gap-3">
-                <Navigation className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                <span className="text-base md:text-xl font-medium">
+                <Navigation className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">
                   {isRTL ? 'الصفحات المحملة' : 'Swipe Sensitivity'}
                 </span>
               </div>
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <button
                     onClick={() => pagesToLoad > 1 && updatePagesToLoad(pagesToLoad - 1)}
                     disabled={pagesToLoad <= 1}
-                    className="h-8 w-8 p-0 text-base md:text-xl"
+                    className="flex items-center justify-center bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg h-10 md:h-12 w-10 md:w-12 border border-emerald-600 shadow-md transition-all"
                   >
-                    -
-                  </Button>
-                  <div className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 bg-white dark:bg-gray-900 rounded-md border border-gray-300 dark:border-gray-600">
-                    <span className="text-base md:text-xl font-medium">{pagesToLoad}</span>
-                    <span className="text-base md:text-xl text-gray-500">
+                    <span className="text-[#F2E3BB] text-xl md:text-2xl font-bold">-</span>
+                  </button>
+                  <div className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 bg-white dark:bg-emerald-950 rounded-md border border-emerald-300 dark:border-emerald-700">
+                    <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-200">{pagesToLoad}</span>
+                    <span className="text-base md:text-xl text-emerald-600 dark:text-emerald-400">
                       {pagesToLoad === 1 ? (isRTL ? 'صفحة' : 'page') : (isRTL ? 'صفحات' : 'pages')}
                     </span>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <button
                     onClick={() => pagesToLoad < 5 && updatePagesToLoad(pagesToLoad + 1)}
                     disabled={pagesToLoad >= 5}
-                    className="h-8 w-8 p-0 text-base md:text-xl"
+                    className="flex items-center justify-center bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg h-10 md:h-12 w-10 md:w-12 border border-emerald-600 shadow-md transition-all"
                   >
-                    +
-                  </Button>
+                    <span className="text-[#F2E3BB] text-xl md:text-2xl font-bold">+</span>
+                  </button>
                 </div>
-                <p className="text-base md:text-xl text-gray-500 dark:text-gray-400">
+                <p className="text-base md:text-xl text-emerald-600 dark:text-emerald-400">
                   {isRTL 
                     ? 'يحدد عدد الصفحات التي يمكنك التمرير إليها بحركة واحدة' 
                     : 'Controls how many pages you can swipe at once'}
@@ -137,10 +131,10 @@ export function SettingsDialog({
           )}
 
           {/* Bottom Bar Text Toggle */}
-          <div className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+          <div className="flex items-center justify-between p-2 sm:p-3 rounded-lg">
             <div className="flex items-center gap-2 sm:gap-3">
-              <Menu className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-              <span className="text-base md:text-xl font-medium">
+              <Menu className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">
                 {isRTL ? 'إظهار نص الشريط السفلي' : 'Show Bottom Bar Text'}
               </span>
             </div>
@@ -157,18 +151,15 @@ export function SettingsDialog({
 
           {/* Test Feature Button */}
           <Link to="/test" className="block">
-            <Button
-              variant="outline"
-              className="w-full p-2 sm:p-3 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 dark:from-emerald-900/20 dark:to-teal-900/20 dark:hover:from-emerald-900/30 dark:hover:to-teal-900/30 border-emerald-300 dark:border-emerald-700"
+            <button
               onClick={() => onOpenChange(false)}
+              className="w-full flex items-center justify-center gap-2 sm:gap-3 bg-emerald-700 hover:bg-emerald-800 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-emerald-600 shadow-md transition-all"
             >
-              <div className="flex items-center gap-2 sm:gap-3 w-full">
-                <GraduationCap className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                <span className="text-base md:text-xl font-medium text-emerald-700 dark:text-emerald-300">
-                  {t('testFeature')}
-                </span>
-              </div>
-            </Button>
+              <GraduationCap className="w-5 h-5 md:w-6 md:h-6 text-[#F2E3BB]" />
+              <span className="text-[#F2E3BB] text-base md:text-xl font-bold" style={{ fontFamily: "'Amiri', serif" }}>
+                {t('testFeature')}
+              </span>
+            </button>
           </Link>
         </div>
       </DialogContent>
