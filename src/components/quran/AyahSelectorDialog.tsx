@@ -42,6 +42,7 @@ export function AyahSelectorDialog({
   const ayahListRef = useRef<HTMLDivElement>(null);
 
   const handleAyahClick = (surahNum: number, ayahNum: number, versePage: number) => {
+    console.log('=== NAVIGATING FROM AYAH SELECTOR ===');
     console.log('Ayah clicked:', surahNum, ayahNum, 'page:', versePage);
     // Set flag to prevent auto-switch to first ayah
     isAyahNavigationRef.current = true;

@@ -340,6 +340,8 @@ export function NavigationDialog({
           }
           // Use setTimeout to ensure the ayah is set before navigation triggers page load
           setTimeout(() => {
+            console.log('=== NAVIGATING TO SURAH/AYAH ===');
+            console.log('Surah:', surahId, 'Ayah:', ayahNumber, 'Page:', ayahInfo.page);
             onNavigate(ayahInfo.page);
           }, 0);
         }
@@ -353,6 +355,8 @@ export function NavigationDialog({
         }
         // Use setTimeout to ensure the ayah is set before navigation triggers page load
         setTimeout(() => {
+          console.log('=== NAVIGATING TO SURAH (first page) ===');
+          console.log('Surah:', surahId, 'Page:', firstPage);
           onNavigate(firstPage);
         }, 0);
       }
@@ -384,6 +388,8 @@ export function NavigationDialog({
         targetPage = await getJuzFirstPage(juzNum);
       }
       
+      console.log('=== NAVIGATING TO JUZ ===');
+      console.log('Juz:', juzNum, 'Page:', targetPage);
       onNavigate(targetPage);
       setSearchJuz('');
       setSearchJuzHezb('');
@@ -395,6 +401,8 @@ export function NavigationDialog({
   const handleGoToSearchPage = () => {
     const pageNum = parseInt(searchPage);
     if (pageNum > 0 && pageNum <= 604) {
+      console.log('=== NAVIGATING TO PAGE ===');
+      console.log('Page:', pageNum);
       onNavigate(pageNum);
       setSearchPage('');
       onOpenChange(false);

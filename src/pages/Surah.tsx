@@ -137,6 +137,10 @@ const Surah = () => {
     isPlaying,
     currentPlayingAyah,
     setCurrentPlayingAyah,
+    isPreloadingAyahs,
+    preloadProgress,
+    audioSource,
+    setAudioSource,
     reciters,
     selectedReciter,
     setSelectedReciter,
@@ -153,6 +157,12 @@ const Surah = () => {
     availableReadings,
     availableStyles,
     availableQualities,
+    mp3QuranReciters,
+    mp3QuranRecitersAr,
+    selectedMp3QuranReciter,
+    setSelectedMp3QuranReciter,
+    selectedMoshaf,
+    setSelectedMoshaf,
     isRepeatActive,
     setIsRepeatActive,
     repeatPassageCount,
@@ -183,32 +193,6 @@ const Surah = () => {
     ayahData,
     isAyahNavigation
   });
-  
-  // Redirect to last page if no page is specified in URL
-  useEffect(() => {
-    if (!page) {
-      const lastPage = localStorage.getItem('quran-last-page');
-      if (lastPage) {
-        const pageNum = parseInt(lastPage);
-        if (pageNum >= 1 && pageNum <= 604) {
-          navigate(`/page/${pageNum}`, { replace: true });
-        }
-      }
-    }
-  }, [page, navigate]);
-  
-  // Redirect to last page if no page is specified in URL
-  useEffect(() => {
-    if (!page) {
-      const lastPage = localStorage.getItem('quran-last-page');
-      if (lastPage) {
-        const pageNum = parseInt(lastPage);
-        if (pageNum >= 1 && pageNum <= 604) {
-          navigate(`/page/${pageNum}`, { replace: true });
-        }
-      }
-    }
-  }, [page, navigate]);
   
   // Redirect to last page if no page is specified in URL
   useEffect(() => {
@@ -306,13 +290,19 @@ const Surah = () => {
       
       // Stop audio playback when page changes ONLY if it's a manual navigation
       // Don't stop if it's automatic navigation (following the recitation)
+      console.log('=== PAGE CHANGE DETECTED ===');
+      console.log('Current page:', currentPageNum);
+      console.log('isAyahNavigation.current:', isAyahNavigation.current);
       if (audioElement && !isAyahNavigation.current) {
+        console.log('Stopping audio due to page navigation');
         stopAudio();
+      } else {
+        console.log('Skipping audio stop (ayah navigation or no audio element)');
       }
     };
     
     loadPageInfo();
-  }, [currentPageNum, audioElement, stopAudio]);
+  }, [currentPageNum]);
 
   // Scroll to currently playing ayah when ayah selector dialog opens
   useEffect(() => {
@@ -593,9 +583,21 @@ const Surah = () => {
         {/* Audio Player Bottom Bar */}
         <PlayBar
           currentPlayingAyah={currentPlayingAyah}
-          selectedReciter={selectedReciter}
+          selectedReciter={audioSource === 'everyayah' ? selectedReciter : null}
+          selectedMp3QuranReciter={audioSource === 'mp3quran' ? selectedMp3QuranReciter : null}
+          mp3QuranRecitersAr={mp3QuranRecitersAr}
           isPlaying={isPlaying}
           isRepeatActive={isRepeatActive}
+          isPreloadingAyahs={isPreloadingAyahs}
+          preloadProgress={preloadProgress}
+          audioSource={audioSource}
+          currentSurahName={
+            currentPlayingAyah 
+              ? (language === 'ar' 
+                  ? (surahs.find(s => s.id === currentPlayingAyah.surah)?.name || currentSurah.name)
+                  : (surahs.find(s => s.id === currentPlayingAyah.surah)?.englishName || currentSurah.englishName))
+              : (language === 'ar' ? currentSurah.name : currentSurah.englishName)
+          }
           formatNumber={formatNumber}
           onAyahSelectorClick={() => setShowAyahSelector(true)}
           onRepeatClick={() => {
@@ -717,6 +719,8 @@ const Surah = () => {
       <ReciterDialog
         open={showReciterDialog}
         onOpenChange={setShowReciterDialog}
+        audioSource={audioSource}
+        onAudioSourceChange={setAudioSource}
         selectedReciter={selectedReciter}
         filteredReciters={filteredReciters}
         uniqueReciterNames={uniqueReciterNames}
@@ -727,6 +731,12 @@ const Surah = () => {
         availableReadings={availableReadings}
         availableStyles={availableStyles}
         availableQualities={availableQualities}
+        mp3QuranReciters={mp3QuranReciters}
+        mp3QuranRecitersAr={mp3QuranRecitersAr}
+        selectedMp3QuranReciter={selectedMp3QuranReciter}
+        selectedMoshaf={selectedMoshaf}
+        onMp3QuranReciterChange={setSelectedMp3QuranReciter}
+        onMoshafChange={setSelectedMoshaf}
         currentPlayingAyah={currentPlayingAyah}
         currentSurahId={currentSurahId}
         onFilterReciterNameChange={setFilterReciterName}
@@ -734,29 +744,41 @@ const Surah = () => {
         onFilterStyleChange={setFilterStyle}
         onFilterQualityChange={setFilterQuality}
         onListen={() => {
-          // Ensure the reciter from filtered list is selected
-          if (filteredReciters.length > 0) {
-            const reciterToApply = selectedReciter || filteredReciters[0];
-            setSelectedReciter(reciterToApply);
-            
-            // Persist selected reciter
-            if (reciterToApply && reciterToApply.folder) {
-              localStorage.setItem('quran-last-reciter', reciterToApply.folder);
+          if (audioSource === 'everyayah') {
+            // Ensure the reciter from filtered list is selected
+            if (filteredReciters.length > 0) {
+              const reciterToApply = selectedReciter || filteredReciters[0];
+              setSelectedReciter(reciterToApply);
+              
+              // Persist selected reciter
+              if (reciterToApply && reciterToApply.folder) {
+                localStorage.setItem('quran-last-reciter', reciterToApply.folder);
+              }
             }
-            
-            // Close the dialog first
-            setShowReciterDialog(false);
-            
-            // Then start playing after a brief delay to ensure state is updated
-            setTimeout(() => {
+          } else if (audioSource === 'mp3quran') {
+            // MP3Quran: Ensure moshaf is selected
+            if (selectedMp3QuranReciter && selectedMoshaf) {
+              localStorage.setItem('quran-last-mp3quran-moshaf', selectedMoshaf.id.toString());
+            }
+          }
+          
+          // Close the dialog first
+          setShowReciterDialog(false);
+          
+          // Then start playing after a brief delay to ensure state is updated
+          setTimeout(() => {
+            if (audioSource === 'mp3quran') {
+              // MP3Quran: Always start from first ayah of current surah (full surah audio)
+              playAyah(currentSurahId, 1);
+            } else {
+              // EveryAyah: Play current ayah or first ayah of current surah
               if (currentPlayingAyah) {
                 playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
               } else {
-                // If no ayah is selected, play the first ayah of current page
                 playAyah(currentSurahId, 1);
               }
-            }, 100);
-          }
+            }
+          }, 100);
         }}
       />
 
@@ -793,6 +815,7 @@ const Surah = () => {
         repeatEndAyah={repeatEndAyah}
         repeatPassageCount={repeatPassageCount}
         repeatAyahCount={repeatAyahCount}
+        audioSource={audioSource}
         onRepeatStartSurahChange={setRepeatStartSurah}
         onRepeatStartAyahChange={setRepeatStartAyah}
         onRepeatEndSurahChange={setRepeatEndSurah}

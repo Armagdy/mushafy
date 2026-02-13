@@ -1,12 +1,19 @@
 import { motion } from 'framer-motion';
-import { Play, Pause, Square, Repeat } from 'lucide-react';
+import { Play, Pause, Square, Repeat, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import type { Mp3QuranReciter } from '@/lib/mp3quran-service';
 
 interface PlayBarProps {
   currentPlayingAyah: { surah: number; ayah: number } | null;
   selectedReciter: { name: string; nameAr: string } | null;
+  selectedMp3QuranReciter?: Mp3QuranReciter | null;
+  mp3QuranRecitersAr?: Mp3QuranReciter[];
   isPlaying: boolean;
   isRepeatActive: boolean;
+  isPreloadingAyahs?: boolean;
+  preloadProgress?: { current: number; total: number };
+  audioSource?: 'everyayah' | 'mp3quran';
+  currentSurahName?: string;
   formatNumber: (num: number | string) => string;
   onAyahSelectorClick: () => void;
   onRepeatClick: () => void;
@@ -18,8 +25,14 @@ interface PlayBarProps {
 export function PlayBar({
   currentPlayingAyah,
   selectedReciter,
+  selectedMp3QuranReciter,
+  mp3QuranRecitersAr = [],
   isPlaying,
   isRepeatActive,
+  isPreloadingAyahs = false,
+  preloadProgress = { current: 0, total: 0 },
+  audioSource = 'everyayah',
+  currentSurahName,
   formatNumber,
   onAyahSelectorClick,
   onRepeatClick,
@@ -28,6 +41,27 @@ export function PlayBar({
   onTogglePlayPause,
 }: PlayBarProps) {
   const { language, t } = useLanguage();
+
+  // Get the appropriate reciter name based on audio source
+  const getReciterName = () => {
+    if (selectedReciter) {
+      // EveryAyah reciter - show reciter name with surah name
+      const reciterName = language === 'ar' ? selectedReciter.nameAr : selectedReciter.name;
+      return currentSurahName ? `${reciterName} - ${currentSurahName}` : reciterName;
+    } else if (selectedMp3QuranReciter) {
+      // MP3Quran reciter - show reciter name with surah name and (كاملة) indicating complete surah
+      let reciterName = selectedMp3QuranReciter.name;
+      
+      // If Arabic language is selected, use Arabic reciter name
+      if (language === 'ar') {
+        const arReciter = mp3QuranRecitersAr.find(r => r.id === selectedMp3QuranReciter.id);
+        reciterName = arReciter ? arReciter.name : selectedMp3QuranReciter.name;
+      }
+      
+      return currentSurahName ? `${reciterName} - ${currentSurahName} (${language === 'ar' ? 'كاملة' : 'Full'})` : reciterName;
+    }
+    return t('selectReciter');
+  };
 
   return (
     <div className="flex justify-center px-2 md:px-0 pt-2 pb-1">
@@ -41,7 +75,9 @@ export function PlayBar({
           <div className="flex items-center gap-1.5 md:gap-3">
             <button
               onClick={onAyahSelectorClick}
-              className="flex items-center justify-center bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-[#F2E3BB]/30 shadow-md transition-all"
+              disabled={audioSource === 'mp3quran'}
+              className="flex items-center justify-center bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-[#F2E3BB]/30 shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-800/50"
+              title={audioSource === 'mp3quran' ? t('ayahSelectionNotAvailable') : ''}
             >
               <span className="text-[#F2E3BB] text-base md:text-xl font-bold" style={{ fontFamily: "'Amiri', serif" }}>
                 {currentPlayingAyah ? formatNumber(currentPlayingAyah.ayah) : '--'}
@@ -67,7 +103,7 @@ export function PlayBar({
             className="flex items-center justify-center bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-[#F2E3BB]/30 shadow-md transition-all flex-[2] md:flex-1 min-w-0 md:max-w-md lg:max-w-lg"
           >
             <span className="text-[#F2E3BB] text-base md:text-xl font-bold truncate" style={{ fontFamily: "'Amiri', serif" }}>
-              {selectedReciter ? (language === 'ar' ? selectedReciter.nameAr : selectedReciter.name) : t('selectReciter')}
+              {getReciterName()}
             </span>
           </button>
           
@@ -87,10 +123,20 @@ export function PlayBar({
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={onTogglePlayPause}
-              className="flex items-center justify-center bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-[#F2E3BB]/30 shadow-md transition-all"
-              title={isPlaying ? t('pause') : t('play')}
+              disabled={isPreloadingAyahs}
+              className="flex items-center justify-center bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-[#F2E3BB]/30 shadow-md transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+              title={isPreloadingAyahs ? t('loading') : (isPlaying ? t('pause') : t('play'))}
             >
-              {isPlaying ? (
+              {isPreloadingAyahs ? (
+                <div className="flex flex-col items-center justify-center gap-0.5">
+                  <Loader2 className="w-5 h-5 md:w-6 md:h-6 text-[#F2E3BB] animate-spin" />
+                  {preloadProgress.total > 0 && (
+                    <span className="text-[#F2E3BB] text-[8px] md:text-[10px] font-medium">
+                      {preloadProgress.current}/{preloadProgress.total}
+                    </span>
+                  )}
+                </div>
+              ) : isPlaying ? (
                 <Pause className="w-5 h-5 md:w-6 md:h-6 text-[#F2E3BB]" />
               ) : (
                 <Play className="w-5 h-5 md:w-6 md:h-6 text-[#F2E3BB]" />

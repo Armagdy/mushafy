@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ASSETS_BASE_URL } from '@/config/assets';
 import { getAudioData } from '@/lib/quran-data-service';
+import { getMp3QuranReciters, getAyahTiming, getSurahAudioUrl, getCurrentAyahFromTime, seekToAyah, type Mp3QuranReciter, type Mp3QuranMoshaf, type AyahTiming } from '@/lib/mp3quran-service';
 import { surahs } from '@/data/surahs';
 
 interface CurrentAyah {
@@ -18,6 +19,8 @@ interface Reciter {
   style: string;
   quality: string;
 }
+
+type AudioSource = 'everyayah' | 'mp3quran';
 
 interface UseAudioPlayerProps {
   currentPageNum: number;
@@ -41,6 +44,27 @@ export const useAudioPlayer = ({
   const [preloadAudioElement, setPreloadAudioElement] = useState<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayingAyah, setCurrentPlayingAyah] = useState<CurrentAyah | null>(null);
+  
+  // Web Audio API for concatenating ayahs
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [concatenatedBlobUrl, setConcatenatedBlobUrl] = useState<string | null>(null);
+  const [concatenatedSurah, setConcatenatedSurah] = useState<number | null>(null);
+  const [ayahTimestamps, setAyahTimestamps] = useState<number[]>([]);
+  const [isPreloadingAyahs, setIsPreloadingAyahs] = useState(false);
+  const [preloadProgress, setPreloadProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+  
+  // Audio source selection
+  const [audioSource, setAudioSource] = useState<AudioSource>(() => {
+    return (localStorage.getItem('quran-audio-source') as AudioSource) || 'everyayah';
+  });
+  
+  // MP3Quran state
+  const [mp3QuranReciters, setMp3QuranReciters] = useState<Mp3QuranReciter[]>([]);
+  const [mp3QuranRecitersAr, setMp3QuranRecitersAr] = useState<Mp3QuranReciter[]>([]);
+  const [selectedMp3QuranReciter, setSelectedMp3QuranReciter] = useState<Mp3QuranReciter | null>(null);
+  const [selectedMoshaf, setSelectedMoshaf] = useState<Mp3QuranMoshaf | null>(null);
+  const [ayahTimings, setAyahTimings] = useState<AyahTiming[]>([]);
+  const [currentSurahAudio, setCurrentSurahAudio] = useState<number | null>(null);
   
   // Wake Lock state to prevent screen sleep during playback
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -181,7 +205,7 @@ export const useAudioPlayer = ({
     return null;
   }, [ayahData]);
   
-  // Preload next ayah audio for smooth playback
+  // Preload next ayah audio for smooth playback (for non-concatenated mode)
   const preloadNextAyah = useCallback((currentSurah: number, currentAyah: number) => {
     if (!preloadAudioElement || !selectedReciter) return;
     
@@ -196,28 +220,187 @@ export const useAudioPlayer = ({
     preloadAudioElement.load();
   }, [preloadAudioElement, selectedReciter, getNextAyah]);
   
-  // Play specific ayah
-  const playAyah = useCallback((surahNum: number, ayahNum: number) => {
-    if (!audioElement || !selectedReciter) return;
+  // Convert AudioBuffer to WAV blob
+  const audioBufferToWav = useCallback((buffer: AudioBuffer): Blob => {
+    const numberOfChannels = buffer.numberOfChannels;
+    const length = buffer.length * numberOfChannels * 2;
+    const arrayBuffer = new ArrayBuffer(44 + length);
+    const view = new DataView(arrayBuffer);
+    const channels: Float32Array[] = [];
+    let offset = 0;
+    let pos = 0;
     
-    // Persist selected reciter
-    if (selectedReciter.folder) {
-      localStorage.setItem('quran-last-reciter', selectedReciter.folder);
+    // Write WAV header
+    const setUint16 = (data: number) => {
+      view.setUint16(pos, data, true);
+      pos += 2;
+    };
+    const setUint32 = (data: number) => {
+      view.setUint32(pos, data, true);
+      pos += 4;
+    };
+    
+    // "RIFF" chunk descriptor
+    setUint32(0x46464952); // "RIFF"
+    setUint32(36 + length); // file length - 8
+    setUint32(0x45564157); // "WAVE"
+    
+    // "fmt " sub-chunk
+    setUint32(0x20746d66); // "fmt "
+    setUint32(16); // length = 16
+    setUint16(1); // PCM
+    setUint16(numberOfChannels);
+    setUint32(buffer.sampleRate);
+    setUint32(buffer.sampleRate * numberOfChannels * 2); // byte rate
+    setUint16(numberOfChannels * 2); // block align
+    setUint16(16); // bits per sample
+    
+    // "data" sub-chunk
+    setUint32(0x61746164); // "data"
+    setUint32(length);
+    
+    // Write audio data
+    for (let i = 0; i < numberOfChannels; i++) {
+      channels.push(buffer.getChannelData(i));
     }
     
+    // Interleave channels
+    while (offset < buffer.length) {
+      for (let i = 0; i < numberOfChannels; i++) {
+        const sample = Math.max(-1, Math.min(1, channels[i][offset]));
+        view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        pos += 2;
+      }
+      offset++;
+    }
+    
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
+  }, []);
+  
+  // Concatenate all ayahs in a surah into a single audio buffer
+  const concatenateAllSurahAyahs = useCallback(async (surahNum: number): Promise<{ blobUrl: string; timestamps: number[] } | null> => {
+    if (!selectedReciter || audioSource !== 'everyayah') return null;
+    if (!audioContext) return null;
+    
+    const surahData = ayahData.find(s => s.number === surahNum);
+    if (!surahData || !surahData.verses) return null;
+    
+    const totalAyahs = surahData.verses.length;
+    setIsPreloadingAyahs(true);
+    setPreloadProgress({ current: 0, total: totalAyahs });
+    
     const surahPadded = surahNum.toString().padStart(3, '0');
-    const ayahPadded = ayahNum.toString().padStart(3, '0');
-    const audioUrl = `${selectedReciter.baseUrl}/${surahPadded}${ayahPadded}.mp3`;
+    
+    try {
+      // Load all ayah audio buffers
+      const audioBuffers: AudioBuffer[] = [];
+      const timestamps: number[] = [0]; // Start time of each ayah
+      
+      for (let ayahNum = 1; ayahNum <= totalAyahs; ayahNum++) {
+        const ayahPadded = ayahNum.toString().padStart(3, '0');
+        const audioUrl = `${selectedReciter.baseUrl}/${surahPadded}${ayahPadded}.mp3`;
+        
+        try {
+          // Fetch audio file
+          const response = await fetch(audioUrl);
+          if (!response.ok) throw new Error(`Failed to fetch: ${audioUrl}`);
+          
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          
+          audioBuffers.push(audioBuffer);
+          
+          // Calculate timestamp for next ayah
+          if (ayahNum < totalAyahs) {
+            const totalDuration = timestamps[timestamps.length - 1] + audioBuffer.duration;
+            timestamps.push(totalDuration);
+          }
+          
+          setPreloadProgress({ current: ayahNum, total: totalAyahs });
+        } catch (error) {
+          console.error(`Failed to load ayah ${surahNum}:${ayahNum}:`, error);
+          setIsPreloadingAyahs(false);
+          setPreloadProgress({ current: 0, total: 0 });
+          return null;
+        }
+      }
+      
+      // Calculate total duration and create concatenated buffer
+      const totalDuration = audioBuffers.reduce((sum, buffer) => sum + buffer.duration, 0);
+      const numberOfChannels = audioBuffers[0].numberOfChannels;
+      const sampleRate = audioBuffers[0].sampleRate;
+      const totalLength = Math.ceil(totalDuration * sampleRate);
+      
+      const concatenated = audioContext.createBuffer(
+        numberOfChannels,
+        totalLength,
+        sampleRate
+      );
+      
+      // Copy all buffers into the concatenated buffer
+      let offset = 0;
+      for (let i = 0; i < audioBuffers.length; i++) {
+        const buffer = audioBuffers[i];
+        for (let channel = 0; channel < numberOfChannels; channel++) {
+          const sourceData = buffer.getChannelData(channel);
+          const targetData = concatenated.getChannelData(channel);
+          targetData.set(sourceData, offset);
+        }
+        offset += buffer.length;
+      }
+      
+      // Convert buffer to WAV blob and create URL
+      const wavBlob = audioBufferToWav(concatenated);
+      const blobUrl = URL.createObjectURL(wavBlob);
+      
+      // Revoke old blob URL if exists
+      if (concatenatedBlobUrl) {
+        URL.revokeObjectURL(concatenatedBlobUrl);
+      }
+      
+      setConcatenatedBlobUrl(blobUrl);
+      setConcatenatedSurah(surahNum);
+      setAyahTimestamps(timestamps);
+      setIsPreloadingAyahs(false);
+      setPreloadProgress({ current: 0, total: 0 });
+      
+      return { blobUrl, timestamps };
+    } catch (error) {
+      console.error('Error concatenating ayahs:', error);
+      setIsPreloadingAyahs(false);
+      setPreloadProgress({ current: 0, total: 0 });
+      return null;
+    }
+  }, [selectedReciter, ayahData, audioSource, audioContext, audioBufferToWav, concatenatedBlobUrl]);
+  
+  // Update current ayah based on playback time for concatenated audio (HTML Audio element)
+  const updateCurrentAyahFromTime = useCallback((surahNum: number) => {
+    if (!audioElement || ayahTimestamps.length === 0) return;
+    
+    const currentTime = audioElement.currentTime;
+    
+    // Find which ayah we're currently playing based on time
+    let ayahNum = 1;
+    for (let i = 0; i < ayahTimestamps.length; i++) {
+      if (currentTime >= ayahTimestamps[i]) {
+        ayahNum = i + 1;
+      } else {
+        break;
+      }
+    }
+    
+    if (currentPlayingAyah?.surah !== surahNum || currentPlayingAyah?.ayah !== ayahNum) {
+      setCurrentPlayingAyah({ surah: surahNum, ayah: ayahNum });
+      updateMediaSession(surahNum, ayahNum, true);
+    }
+  }, [audioElement, ayahTimestamps, currentPlayingAyah, updateMediaSession]);
+  
+  // Play specific ayah
+  const playAyah = useCallback(async (surahNum: number, ayahNum: number) => {
+    if (!audioElement) return;
     
     setCurrentPlayingAyah({ surah: surahNum, ayah: ayahNum });
-    
-    // Keep playing state true to prevent button flashing
-    setIsPlaying(true);
-    
-    // Update Media Session for Android notification
     updateMediaSession(surahNum, ayahNum, true);
-    
-    // Request wake lock to prevent screen sleep
     requestWakeLock();
     
     // Navigate to the page containing this ayah if not already on it
@@ -226,88 +409,269 @@ export const useAudioPlayer = ({
       const verse = surahData.verses.find((v: any) => v.number === ayahNum);
       if (verse && verse.page && verse.page !== currentPageNum) {
         isAyahNavigation.current = true;
-        audioElement.src = audioUrl;
         navigate(`/page/${verse.page}#${surahNum}-${ayahNum}`);
-        
-        setTimeout(() => {
-          if (audioElement && audioElement.src === audioUrl) {
+      }
+    }
+    
+    if (audioSource === 'mp3quran' && selectedMoshaf) {
+      // MP3Quran mode: Continuous surah audio with timing
+      setIsPlaying(true);
+      
+      try {
+        // Check if we need to load a new surah or if we're already playing it
+        if (currentSurahAudio !== surahNum) {
+          // Load new surah audio
+          const audioUrl = getSurahAudioUrl(selectedMoshaf.server, surahNum);
+          audioElement.src = audioUrl;
+          
+          // Fetch timing data for this surah
+          const timings = await getAyahTiming(surahNum, selectedMoshaf.id);
+          setAyahTimings(timings);
+          setCurrentSurahAudio(surahNum);
+          
+          // Wait for audio to be ready, then seek to ayah
+          audioElement.addEventListener('loadedmetadata', () => {
+            seekToAyah(audioElement, timings, ayahNum);
             audioElement.play().catch(err => {
               console.error('Failed to play audio:', err);
               setIsPlaying(false);
             });
-            preloadNextAyah(surahNum, ayahNum);
+          }, { once: true });
+          
+          audioElement.load();
+        } else {
+          // Same surah, just seek to the ayah
+          if (ayahTimings.length > 0) {
+            seekToAyah(audioElement, ayahTimings, ayahNum);
+            audioElement.play().catch(err => {
+              console.error('Failed to play audio:', err);
+              setIsPlaying(false);
+            });
           }
-          isAyahNavigation.current = false;
-        }, 300);
+        }
         
-        return;
+        // Persist selected moshaf
+        localStorage.setItem('quran-last-mp3quran-moshaf', selectedMoshaf.id.toString());
+      } catch (error) {
+        console.error('Error playing MP3Quran audio:', error);
+        setIsPlaying(false);
+      }
+    } else if (audioSource === 'everyayah' && selectedReciter && audioContext) {
+      // EveryAyah mode: Concatenated audio via HTML Audio element
+      if (selectedReciter.folder) {
+        localStorage.setItem('quran-last-reciter', selectedReciter.folder);
+      }
+      
+      const wasPlaying = isPlaying;
+      let blobUrl: string;
+      let timestamps: number[];
+      let needsNewSource = false;
+      
+      // Check if we need to concatenate the surah or if it's already concatenated
+      if (concatenatedSurah !== surahNum || !concatenatedBlobUrl) {
+        // Different surah - need to load new audio
+        // Pause current playback if playing
+        if (wasPlaying) {
+          audioElement.pause();
+        }
+        
+        // Don't set isPlaying yet - wait for concatenation to complete
+        setIsPlaying(false);
+        
+        // Concatenate all ayahs in this surah (this will show loading spinner)
+        const result = await concatenateAllSurahAyahs(surahNum);
+        
+        if (!result) {
+          console.error('Failed to concatenate ayahs');
+          setIsPlaying(false);
+          releaseWakeLock();
+          return;
+        }
+        
+        blobUrl = result.blobUrl;
+        timestamps = result.timestamps;
+        needsNewSource = true;
+      } else {
+        // Same surah - already have the blob URL
+        blobUrl = concatenatedBlobUrl;
+        timestamps = ayahTimestamps;
+        needsNewSource = audioElement.src !== blobUrl;
+      }
+      
+      // Calculate start time for the requested ayah
+      const startTime = timestamps[ayahNum - 1] || 0;
+      
+      if (needsNewSource) {
+        // New source needed - set it and wait for load
+        audioElement.src = blobUrl;
+        
+        // Wait for the audio to be ready before seeking
+        const handleLoadedMetadata = () => {
+          audioElement.currentTime = startTime;
+          audioElement.play().then(() => {
+            setIsPlaying(true);
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'playing';
+            }
+          }).catch(err => {
+            console.error('Failed to play audio:', err);
+            setIsPlaying(false);
+            releaseWakeLock();
+          });
+        };
+        
+        audioElement.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+        audioElement.load();
+      } else {
+        // Same source, just seek to new position
+        // If already playing, this will seamlessly jump to the new ayah
+        audioElement.currentTime = startTime;
+        
+        if (wasPlaying) {
+          // Continue playing from new position
+          audioElement.play().then(() => {
+            setIsPlaying(true);
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'playing';
+            }
+          }).catch(err => {
+            console.error('Failed to play audio:', err);
+            setIsPlaying(false);
+            releaseWakeLock();
+          });
+        } else {
+          // Start playing from this position
+          audioElement.play().then(() => {
+            setIsPlaying(true);
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'playing';
+            }
+          }).catch(err => {
+            console.error('Failed to play audio:', err);
+            setIsPlaying(false);
+            releaseWakeLock();
+          });
+        }
       }
     }
     
-    // Same page - play immediately
-    audioElement.src = audioUrl;
-    audioElement.play().catch(err => {
-      console.error('Failed to play audio:', err);
-      setIsPlaying(false);
-    });
-    preloadNextAyah(surahNum, ayahNum);
-  }, [audioElement, selectedReciter, ayahData, currentPageNum, navigate, preloadNextAyah, isAyahNavigation, updateMediaSession, requestWakeLock]);
+    if (surahData && surahData.verses) {
+      const verse = surahData.verses.find((v: any) => v.number === ayahNum);
+      if (verse && verse.page && verse.page !== currentPageNum) {
+        setTimeout(() => {
+          isAyahNavigation.current = false;
+        }, 300);
+      }
+    }
+  }, [audioElement, audioSource, selectedReciter, selectedMoshaf, ayahData, currentPageNum, navigate, preloadNextAyah, isAyahNavigation, updateMediaSession, requestWakeLock, currentSurahAudio, ayahTimings, audioContext, concatenatedSurah, concatenatedBlobUrl, concatenateAllSurahAyahs, ayahTimestamps, releaseWakeLock]);
   
   // Toggle play/pause
   const togglePlayPause = useCallback(() => {
     if (!audioElement) return;
     
-    if (isPlaying) {
-      audioElement.pause();
-      setIsPlaying(false);
-      // Update media session to paused
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.playbackState = 'paused';
-      }
-    } else {
-      if (currentPlayingAyah) {
-        if (audioElement.src && audioElement.currentTime > 0) {
-          setIsPlaying(true);
-          // Update media session to playing
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.playbackState = 'playing';
-          }
-          audioElement.play()
-            .then(() => {
-              preloadNextAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
-            })
-            .catch(err => {
-              console.error('Failed to resume audio:', err);
-              setIsPlaying(false);
-              playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
-            });
-        } else {
-          playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+    if (audioSource === 'everyayah') {
+      // EveryAyah mode using HTML Audio element
+      if (isPlaying) {
+        audioElement.pause();
+        setIsPlaying(false);
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = 'paused';
         }
       } else {
-        playAyah(currentSurahId, currentPageAyah || 1);
+        if (currentPlayingAyah && audioElement.src) {
+          audioElement.play().then(() => {
+            setIsPlaying(true);
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'playing';
+            }
+          }).catch(err => {
+            console.error('Failed to resume audio:', err);
+            setIsPlaying(false);
+          });
+        } else if (currentPlayingAyah) {
+          playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+        } else {
+          playAyah(currentSurahId, currentPageAyah || 1);
+        }
+      }
+    } else {
+      // HTML Audio Element mode (mp3quran)
+      if (!audioElement) return;
+      
+      if (isPlaying) {
+        audioElement.pause();
+        setIsPlaying(false);
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.playbackState = 'paused';
+        }
+      } else {
+        if (currentPlayingAyah) {
+          if (audioElement.src && audioElement.currentTime > 0) {
+            setIsPlaying(true);
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'playing';
+            }
+            audioElement.play()
+              .then(() => {
+                preloadNextAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+              })
+              .catch(err => {
+                console.error('Failed to resume audio:', err);
+                setIsPlaying(false);
+                playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+              });
+          } else {
+            playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
+          }
+        } else {
+          playAyah(currentSurahId, currentPageAyah || 1);
+        }
       }
     }
-  }, [audioElement, isPlaying, currentPlayingAyah, playAyah, preloadNextAyah, currentSurahId, currentPageAyah]);
+  }, [audioElement, audioContext, audioSource, isPlaying, currentPlayingAyah, playAyah, preloadNextAyah, currentSurahId, currentPageAyah]);
   
   // Stop audio
   const stopAudio = useCallback(() => {
-    if (!audioElement) return;
-    audioElement.pause();
-    audioElement.currentTime = 0;
+    console.log('=== STOP AUDIO TRIGGERED ===');
+    console.log('Audio source:', audioSource);
+    console.log('Current playing ayah:', currentPlayingAyah);
+    console.log('Is playing:', isPlaying);
+    
+    if (audioElement) {
+      // Stop HTML Audio Element
+      audioElement.pause();
+      audioElement.currentTime = 0;
+      // Clear the audio source to fully stop playback
+      audioElement.src = '';
+      console.log('Audio element stopped and cleared');
+    }
+    
     setIsPlaying(false);
     setIsRepeatActive(false);
     setCurrentRepeatPassage(0);
     setCurrentRepeatAyah(0);
     setCurrentRepeatSurah(0);
     setCurrentRepeatAyahCount(0);
-    // Clear media session
+    
+    // Clear MP3Quran state
+    setCurrentSurahAudio(null);
+    setAyahTimings([]);
+    
+    // Clear concatenated ayah state
+    if (concatenatedBlobUrl) {
+      URL.revokeObjectURL(concatenatedBlobUrl);
+      setConcatenatedBlobUrl(null);
+      setConcatenatedSurah(null);
+      setAyahTimestamps([]);
+    }
+    
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = 'none';
     }
-    // Release wake lock
+    
     releaseWakeLock();
-  }, [audioElement, releaseWakeLock]);
+    console.log('=== STOP AUDIO COMPLETE ===');
+  }, [audioElement, releaseWakeLock, concatenatedBlobUrl]);
   
   // Start repeat mode
   const startRepeat = useCallback(() => {
@@ -326,6 +690,18 @@ export const useAudioPlayer = ({
   
   // Handle audio ended (for continuous playback and repeat)
   const handleAudioEnded = useCallback(() => {
+    if (audioSource === 'mp3quran' && currentPlayingAyah) {
+      // MP3Quran mode: When surah ends, move to next surah
+      if (currentPlayingAyah.surah < 114) {
+        playAyah(currentPlayingAyah.surah + 1, 1);
+        return;
+      } else {
+        // Last surah - stop playback
+        setIsPlaying(false);
+        return;
+      }
+    }
+    
     if (isRepeatActive && currentPlayingAyah) {
       // Handle repeat logic
       if (currentRepeatAyahCount < repeatAyahCount) {
@@ -409,9 +785,49 @@ export const useAudioPlayer = ({
         setIsPlaying(false);
       }
     }
-  }, [isRepeatActive, currentPlayingAyah, currentRepeatAyahCount, repeatAyahCount, currentRepeatSurah, currentRepeatAyah, ayahData, currentRepeatPassage, repeatPassageCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, playAyah]);
+  }, [isRepeatActive, currentPlayingAyah, currentRepeatAyahCount, repeatAyahCount, currentRepeatSurah, currentRepeatAyah, ayahData, currentRepeatPassage, repeatPassageCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, playAyah, audioSource]);
   
-  // Initialize audio elements
+  // Track current ayah based on playback time (for both MP3Quran and EveryAyah)
+  useEffect(() => {
+    if (!audioElement) return;
+    
+    if (audioSource === 'everyayah' && ayahTimestamps.length > 0 && concatenatedSurah) {
+      // EveryAyah mode - track ayah changes
+      const handleTimeUpdate = () => {
+        updateCurrentAyahFromTime(concatenatedSurah);
+      };
+      
+      audioElement.addEventListener('timeupdate', handleTimeUpdate);
+      
+      return () => {
+        audioElement.removeEventListener('timeupdate', handleTimeUpdate);
+      };
+    } else if (audioSource === 'mp3quran' && ayahTimings.length === 0) {
+      return;
+    } else if (audioSource !== 'mp3quran') {
+      return;
+    }
+    
+    const handleTimeUpdate = () => {
+      const currentAyah = getCurrentAyahFromTime(ayahTimings, audioElement.currentTime);
+      
+      if (currentAyah !== null && currentSurahAudio && currentPlayingAyah) {
+        // Update current ayah if it changed (but not if it's ayah 0 which is intro/bismillah)
+        if (currentAyah > 0 && currentAyah !== currentPlayingAyah.ayah) {
+          setCurrentPlayingAyah({ surah: currentSurahAudio, ayah: currentAyah });
+          updateMediaSession(currentSurahAudio, currentAyah, true);
+        }
+      }
+    };
+    
+    audioElement.addEventListener('timeupdate', handleTimeUpdate);
+    
+    return () => {
+      audioElement.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [audioElement, audioSource, ayahTimings, ayahTimestamps, concatenatedSurah, currentSurahAudio, currentPlayingAyah, updateMediaSession, updateCurrentAyahFromTime]);
+  
+  // Initialize audio elements and Web Audio API context
   useEffect(() => {
     const audio = new Audio();
     setAudioElement(audio);
@@ -419,12 +835,26 @@ export const useAudioPlayer = ({
     const preloadAudio = new Audio();
     setPreloadAudioElement(preloadAudio);
     
+    // Initialize Web Audio API context for concatenation
+    const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+    setAudioContext(context);
+    
     return () => {
       audio.pause();
       audio.remove();
       preloadAudio.pause();
       preloadAudio.remove();
+      
+      if (context) {
+        context.close();
+      }
+      
+      // Revoke blob URL on cleanup
+      if (concatenatedBlobUrl) {
+        URL.revokeObjectURL(concatenatedBlobUrl);
+      }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   // Set up Media Session action handlers for Android notification controls
@@ -433,16 +863,20 @@ export const useAudioPlayer = ({
     
     // Play action
     navigator.mediaSession.setActionHandler('play', () => {
-      if (audioElement && currentPlayingAyah) {
-        audioElement.play().catch(console.error);
-        setIsPlaying(true);
-        navigator.mediaSession.playbackState = 'playing';
+      if (currentPlayingAyah) {
+        if (audioElement) {
+          // HTML Audio Element mode
+          audioElement.play().catch(console.error);
+          setIsPlaying(true);
+          navigator.mediaSession.playbackState = 'playing';
+        }
       }
     });
     
     // Pause action
     navigator.mediaSession.setActionHandler('pause', () => {
       if (audioElement) {
+        // HTML Audio Element mode
         audioElement.pause();
         setIsPlaying(false);
         navigator.mediaSession.playbackState = 'paused';
@@ -469,6 +903,11 @@ export const useAudioPlayer = ({
       }
     });
     
+    // Stop action
+    navigator.mediaSession.setActionHandler('stop', () => {
+      stopAudio();
+    });
+    
     // Cleanup - remove action handlers
     return () => {
       try {
@@ -476,11 +915,12 @@ export const useAudioPlayer = ({
         navigator.mediaSession.setActionHandler('pause', null);
         navigator.mediaSession.setActionHandler('previoustrack', null);
         navigator.mediaSession.setActionHandler('nexttrack', null);
+        navigator.mediaSession.setActionHandler('stop', null);
       } catch (e) {
         // Some browsers might not support removing handlers
       }
     };
-  }, [audioElement, currentPlayingAyah, playAyah, getNextAyah, getPreviousAyah]);
+  }, [audioElement, audioContext, audioSource, currentPlayingAyah, playAyah, getNextAyah, getPreviousAyah, stopAudio]);
   
   // Re-acquire wake lock when page becomes visible (after screen unlock or tab switch)
   useEffect(() => {
@@ -502,6 +942,7 @@ export const useAudioPlayer = ({
   
   // Load reciters from audio.json
   useEffect(() => {
+    // Load EveryAyah reciters
     getAudioData()
       .then(data => {
         setReciters(data);
@@ -542,6 +983,43 @@ export const useAudioPlayer = ({
         }
       })
       .catch(err => console.error('Failed to load reciters:', err));
+    
+    // Load MP3Quran reciters in both languages
+    Promise.all([
+      getMp3QuranReciters('en'),
+      getMp3QuranReciters('ar')
+    ])
+      .then(([recitersEn, recitersAr]) => {
+        setMp3QuranReciters(recitersEn);
+        setMp3QuranRecitersAr(recitersAr);
+        
+        // Load last selected moshaf or use default
+        const lastMoshafId = localStorage.getItem('quran-last-mp3quran-moshaf');
+        
+        if (lastMoshafId) {
+          // Find reciter and moshaf by ID
+          for (const reciter of recitersEn) {
+            const moshaf = reciter.moshaf.find(m => m.id.toString() === lastMoshafId);
+            if (moshaf) {
+              setSelectedMp3QuranReciter(reciter);
+              setSelectedMoshaf(moshaf);
+              return;
+            }
+          }
+        }
+        
+        // Default: Find Maher Al Muaiqly (id: 102) with Murattal
+        const defaultReciter = recitersEn.find(r => r.id === 102);
+        if (defaultReciter && defaultReciter.moshaf.length > 0) {
+          const defaultMoshaf = defaultReciter.moshaf.find(m => m.moshaf_type === 11) || defaultReciter.moshaf[0];
+          setSelectedMp3QuranReciter(defaultReciter);
+          setSelectedMoshaf(defaultMoshaf);
+        } else if (recitersEn.length > 0 && recitersEn[0].moshaf.length > 0) {
+          setSelectedMp3QuranReciter(recitersEn[0]);
+          setSelectedMoshaf(recitersEn[0].moshaf[0]);
+        }
+      })
+      .catch(err => console.error('Failed to load MP3Quran reciters:', err));
   }, []);
   
   // Update audio element event listener when handleAudioEnded changes
@@ -650,6 +1128,11 @@ export const useAudioPlayer = ({
     }
   }, [reciters, filterReciterName, filterReading, filterStyle, filterQuality, selectedReciter]);
   
+  // Persist audio source selection
+  useEffect(() => {
+    localStorage.setItem('quran-audio-source', audioSource);
+  }, [audioSource]);
+  
   return {
     // Audio state
     audioElement,
@@ -657,12 +1140,28 @@ export const useAudioPlayer = ({
     currentPlayingAyah,
     setCurrentPlayingAyah,
     
-    // Reciter state
+    // Preloading state
+    isPreloadingAyahs,
+    preloadProgress,
+    
+    // Audio source
+    audioSource,
+    setAudioSource,
+    
+    // EveryAyah reciter state
     reciters,
     selectedReciter,
     setSelectedReciter,
     filteredReciters,
     uniqueReciterNames,
+    
+    // MP3Quran reciter state
+    mp3QuranReciters,
+    mp3QuranRecitersAr,
+    selectedMp3QuranReciter,
+    setSelectedMp3QuranReciter,
+    selectedMoshaf,
+    setSelectedMoshaf,
     
     // Filter state
     filterReciterName,
