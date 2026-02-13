@@ -79,6 +79,27 @@ export function ReciterDialog({
   const [openEveryAyahReciter, setOpenEveryAyahReciter] = useState(false);
   const [openMp3QuranReciter, setOpenMp3QuranReciter] = useState(false);
 
+  // Normalize Arabic text - convert all alif variants to plain alif
+  const normalizeArabic = (text: string): string => {
+    return text
+      // Normalize alif variants (أ إ آ ٱ) to plain alif (ا)
+      .replace(/[أإآٱ]/g, 'ا')
+      // Remove tashkeel/diacritics
+      .replace(/[\u064B-\u065F\u0670]/g, '')
+      // Remove tatweel
+      .replace(/\u0640/g, '')
+      .toLowerCase();
+  };
+
+  // Custom filter for Arabic text search
+  const arabicFilter = (value: string, search: string): number => {
+    if (!search || !search.trim()) return 1;
+    const normalizedValue = normalizeArabic(value.trim());
+    const normalizedSearch = normalizeArabic(search.trim());
+    // Check if the value contains the full search string
+    return normalizedValue.includes(normalizedSearch) ? 1 : 0;
+  };
+
   // Get Arabic name for MP3Quran reciter
   const getMp3QuranReciterName = (reciter: Mp3QuranReciter) => {
     const arReciter = mp3QuranRecitersAr.find(r => r.id === reciter.id);
@@ -168,7 +189,7 @@ export function ReciterDialog({
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[300px] sm:w-[400px] p-0 bg-[#FBF9F4] dark:bg-emerald-950" align="start">
-                <Command className="bg-[#FBF9F4] dark:bg-emerald-950">
+                <Command className="bg-[#FBF9F4] dark:bg-emerald-950" filter={arabicFilter}>
                   <CommandInput placeholder={t('searchReciter')} className="text-base md:text-lg" />
                   <CommandList>
                     <CommandEmpty>{t('noResults')}</CommandEmpty>
@@ -311,7 +332,7 @@ export function ReciterDialog({
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[300px] sm:w-[400px] p-0 bg-[#FBF9F4] dark:bg-emerald-950" align="start">
-                    <Command className="bg-[#FBF9F4] dark:bg-emerald-950">
+                    <Command className="bg-[#FBF9F4] dark:bg-emerald-950" filter={arabicFilter}>
                       <CommandInput placeholder={t('searchReciter')} className="text-base md:text-lg" />
                       <CommandList>
                         <CommandEmpty>{t('noResults')}</CommandEmpty>
