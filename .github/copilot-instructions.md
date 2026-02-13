@@ -217,7 +217,7 @@ const { isRTL } = useLanguage();
     "rounded-xl border-0 bg-[#FBF9F4]",
     isRTL ? "rtl" : "ltr"
   )}
-  style={{ fontFamily: "'Amiri', serif" }}  // Controls font for entire dialog
+  style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}  // Controls font for entire dialog
 >
   <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
     <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
@@ -235,7 +235,8 @@ const { isRTL } = useLanguage();
 ```
 
 **Key points:**
-- **Font Family:** Set `style={{ fontFamily: "..." }}` on DialogContent to control typography for entire dialog (cascades to all child elements). Default: `"system-ui, -apple-system, sans-serif"`. For Arabic emphasis: `"'Amiri', serif"`.
+- **Font Family:** Set `style={{ fontFamily: "..." }}` on DialogContent to control typography for entire dialog (cascades to all child elements). Default: `"system-ui, -apple-system, sans-serif"`.
+- **Ayah Text Font:** ALWAYS preserve Arabic font for Quranic ayah text by using `font-arabic` class (defined in [src/index.css](src/index.css) as `'Amiri', 'Noto Naskh Arabic', serif`). This class overrides the dialog's system font for proper Arabic text rendering.
 - `p-0` on DialogContent to remove default padding
 - `border-0` on DialogContent to remove default border
 - `bg-[#FBF9F4]` on DialogContent to match page display background (light cream)

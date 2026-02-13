@@ -79,46 +79,50 @@ export function RepeatDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(
-        "sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto rounded-xl border border-emerald-500",
-        isRTL && "rtl"
-      )}>
-        <DialogHeader>
-          <DialogTitle className="text-center text-base md:text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+      <DialogContent 
+        className={cn(
+          "sm:max-w-md md:max-w-lg lg:max-w-xl max-w-[90vw] max-h-[85vh] overflow-y-auto p-0",
+          "rounded-xl border-0 bg-[#FBF9F4]",
+          isRTL ? "rtl" : "ltr"
+        )}
+        style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
+      >
+        <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
+          <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
             {t('repeatSettings')}
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className="p-4 space-y-2 sm:space-y-3">
           {/* Start Position */}
           <div className="space-y-2">
-            <Label className={cn("text-sm font-medium", isRTL ? "text-right" : "text-left")}>
+            <Label className={cn("text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300", isRTL ? "text-right" : "text-left")}>
               {t('startFrom')}
             </Label>
             <div className="flex gap-2">
               <Select value={repeatStartSurah.toString()} onValueChange={handleStartSurahChange}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="flex-1 text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="max-h-60">
+                <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                   {ayahData.map((surah: any) => (
-                    <SelectItem key={surah.number} value={surah.number.toString()}>
+                    <SelectItem key={surah.number} value={surah.number.toString()} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                       {language === 'ar' ? surah.name?.ar : surah.name?.en}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Select value={repeatStartAyah.toString()} onValueChange={handleStartAyahChange}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="flex-1 text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                   <SelectValue placeholder={t('ayahNumber')} />
                 </SelectTrigger>
-                <SelectContent className="max-h-60">
+                <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                   {(() => {
                     const startSurahData = ayahData.find((s: any) => s.number === repeatStartSurah);
                     const maxAyah = startSurahData?.verses?.length || 1;
                     
                     return Array.from({ length: maxAyah }, (_, i) => i + 1).map(num => (
-                      <SelectItem key={num} value={num.toString()}>
+                      <SelectItem key={num} value={num.toString()} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                         {isRTL ? `الآية ${num}` : `Ayah ${num}`}
                       </SelectItem>
                     ));
@@ -130,34 +134,34 @@ export function RepeatDialog({
 
           {/* End Position */}
           <div className="space-y-2">
-            <Label className={cn("text-sm font-medium", isRTL ? "text-right" : "text-left")}>
+            <Label className={cn("text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300", isRTL ? "text-right" : "text-left")}>
               {t('endAt')}
             </Label>
             <div className="flex gap-2">
               <Select value={repeatEndSurah.toString()} onValueChange={handleEndSurahChange}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="flex-1 text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="max-h-60">
+                <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                   {ayahData.filter((surah: any) => surah.number >= repeatStartSurah).map((surah: any) => (
-                    <SelectItem key={surah.number} value={surah.number.toString()}>
+                    <SelectItem key={surah.number} value={surah.number.toString()} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                       {language === 'ar' ? surah.name?.ar : surah.name?.en}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Select value={repeatEndAyah.toString()} onValueChange={(val) => onRepeatEndAyahChange(parseInt(val))}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="flex-1 text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                   <SelectValue placeholder={t('ayahNumber')} />
                 </SelectTrigger>
-                <SelectContent className="max-h-60">
+                <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                   {(() => {
                     const endSurahData = ayahData.find((s: any) => s.number === repeatEndSurah);
                     const maxAyah = endSurahData?.verses?.length || 1;
                     const minAyah = repeatStartSurah === repeatEndSurah ? repeatStartAyah + 1 : 1;
                     
                     return Array.from({ length: maxAyah - minAyah + 1 }, (_, i) => minAyah + i).map(num => (
-                      <SelectItem key={num} value={num.toString()}>
+                      <SelectItem key={num} value={num.toString()} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                         {isRTL ? `الآية ${num}` : `Ayah ${num}`}
                       </SelectItem>
                     ));
@@ -169,7 +173,7 @@ export function RepeatDialog({
 
           {/* Repeat Passage Count */}
           <div className="space-y-2">
-            <Label htmlFor="repeat-passage" className={cn("text-sm font-medium", isRTL ? "text-right" : "text-left")}>
+            <Label htmlFor="repeat-passage" className={cn("text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300", isRTL ? "text-right" : "text-left")}>
               {t('repeatPassage')}
             </Label>
             <div className="flex items-center gap-2">
@@ -180,15 +184,15 @@ export function RepeatDialog({
                 max="100"
                 value={repeatPassageCount || ''}
                 onChange={(e) => onRepeatPassageCountChange(parseInt(e.target.value) || 0)}
-                className="flex-1"
+                className="flex-1 text-base md:text-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500"
               />
-              <span className="text-sm text-gray-500 dark:text-gray-400">{t('times')}</span>
+              <span className="text-sm md:text-base text-emerald-600 dark:text-emerald-400">{t('times')}</span>
             </div>
           </div>
 
           {/* Repeat Each Ayah Count */}
           <div className="space-y-2">
-            <Label htmlFor="repeat-ayah" className={cn("text-sm font-medium", isRTL ? "text-right" : "text-left")}>
+            <Label htmlFor="repeat-ayah" className={cn("text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300", isRTL ? "text-right" : "text-left")}>
               {t('repeatEachAyah')}
             </Label>
             <div className="flex items-center gap-2">
@@ -199,16 +203,16 @@ export function RepeatDialog({
                 max="100"
                 value={repeatAyahCount || ''}
                 onChange={(e) => onRepeatAyahCountChange(parseInt(e.target.value) || 0)}
-                className="flex-1"
+                className="flex-1 text-base md:text-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500"
               />
-              <span className="text-sm text-gray-500 dark:text-gray-400">{t('times')}</span>
+              <span className="text-sm md:text-base text-emerald-600 dark:text-emerald-400">{t('times')}</span>
             </div>
           </div>
 
           {/* Apply Button */}
           <Button
             onClick={handleApply}
-            className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white"
+            className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]"
           >
             {t('applyRepeat')}
           </Button>

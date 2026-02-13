@@ -64,17 +64,22 @@ export function AyahSelectorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(
-        "sm:max-w-md max-w-[90vw] max-h-[98vh] overflow-y-auto rounded-xl border border-emerald-500",
-        isRTL && "rtl"
-      )}> 
-        <DialogHeader>
-          <DialogTitle className="text-center text-base md:text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+      <DialogContent 
+        className={cn(
+          "sm:max-w-md md:max-w-lg lg:max-w-xl max-w-[90vw] max-h-[85vh] overflow-y-auto p-0",
+          "rounded-xl border-0 bg-[#FBF9F4]",
+          isRTL ? "rtl" : "ltr"
+        )}
+        style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
+      > 
+        <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
+          <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
             {t('selectAyahToPlay')}
           </DialogTitle>
         </DialogHeader>
         
-        <div ref={ayahListRef} className="space-y-3 overflow-y-auto">
+        <div className="p-4 space-y-2 sm:space-y-3">
+          <div ref={ayahListRef} className="space-y-3 overflow-y-auto">
           {(() => {
             // In double page mode on large screens, check both pages for surahs
             const pagesToCheck = viewMode === 'double' && !isMobile && currentPageNum < 604 
@@ -98,9 +103,9 @@ export function AyahSelectorDialog({
               : ayahData.filter((surah: any) => surah.number === currentSurahId);
             
             return surahsToShow.map((surah: any) => (
-              <div key={surah.number} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <div className="bg-gray-100 dark:bg-gray-800 px-3 py-2 flex items-center justify-between">
-                  <span className="font-semibold text-sm">
+              <div key={surah.number} className="border border-emerald-200 dark:border-emerald-700 rounded-lg overflow-hidden">
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 flex items-center justify-between">
+                  <span className="font-semibold text-sm text-emerald-800 dark:text-emerald-300">
                     {language === 'ar' ? surah.name?.ar : surah.name?.en}
                   </span>
                   {onViewTafseer && (
@@ -112,7 +117,7 @@ export function AyahSelectorDialog({
                           handleTafseerClick(e, surah.number, firstVerse.number, language === 'ar' ? surah.name?.ar : surah.name?.en);
                         }
                       }}
-                      className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 dark:text-teal-400 dark:hover:text-teal-300"
+                      className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
                       title={t('tafseer')}
                     >
                       <BookText className="w-4 h-4" />
@@ -139,7 +144,7 @@ export function AyahSelectorDialog({
                       {onViewTafseer && (
                         <button
                           onClick={(e) => handleTafseerClick(e, surah.number, verse.number, language === 'ar' ? surah.name?.ar : surah.name?.en)}
-                          className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-teal-500 hover:bg-teal-600 text-white rounded-full p-0.5 shadow-lg"
+                          className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-emerald-600 hover:bg-emerald-700 text-white rounded-full p-0.5 shadow-lg"
                           title={t('tafseer')}
                         >
                           <BookText className="w-3 h-3" />
@@ -151,6 +156,7 @@ export function AyahSelectorDialog({
               </div>
             ));
           })()}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
