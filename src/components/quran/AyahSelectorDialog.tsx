@@ -20,6 +20,7 @@ interface AyahSelectorDialogProps {
   onPlayAyah: (surahNum: number, ayahNum: number) => void;
   onSetCurrentPlayingAyah: (ayah: { surah: number; ayah: number }) => void;
   onViewTafseer?: (surahNum: number, ayahNum: number, surahName: string) => void;
+  onStopAudio?: () => void;
 }
 
 export function AyahSelectorDialog({
@@ -36,6 +37,7 @@ export function AyahSelectorDialog({
   onPlayAyah,
   onSetCurrentPlayingAyah,
   onViewTafseer,
+  onStopAudio,
 }: AyahSelectorDialogProps) {
   const { t, isRTL, language } = useLanguage();
   const navigate = useNavigate();
@@ -44,6 +46,10 @@ export function AyahSelectorDialog({
   const handleAyahClick = (surahNum: number, ayahNum: number, versePage: number) => {
     console.log('=== NAVIGATING FROM AYAH SELECTOR ===');
     console.log('Ayah clicked:', surahNum, ayahNum, 'page:', versePage);
+    // Stop any currently playing audio (for EveryAyah reciter)
+    if (onStopAudio) {
+      onStopAudio();
+    }
     // Set flag to prevent auto-switch to first ayah
     isAyahNavigationRef.current = true;
     console.log('Set isAyahNavigation flag to true');

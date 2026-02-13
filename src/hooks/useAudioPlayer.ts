@@ -578,7 +578,8 @@ export const useAudioPlayer = ({
           navigator.mediaSession.playbackState = 'paused';
         }
       } else {
-        if (currentPlayingAyah && audioElement.src) {
+        if (currentPlayingAyah && audioElement.src && audioElement.src !== '' && audioElement.readyState >= 2) {
+          // Audio source is loaded and ready to play
           audioElement.play().then(() => {
             setIsPlaying(true);
             if ('mediaSession' in navigator) {
@@ -587,6 +588,8 @@ export const useAudioPlayer = ({
           }).catch(err => {
             console.error('Failed to resume audio:', err);
             setIsPlaying(false);
+            // If resume fails, try loading the ayah fresh
+            playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
           });
         } else if (currentPlayingAyah) {
           playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);

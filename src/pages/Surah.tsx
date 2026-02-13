@@ -802,6 +802,7 @@ const Surah = () => {
           setTafseerSurahName(surahName);
           setShowTafseerDialog(true);
         }}
+        onStopAudio={stopAudio}
       />
 
       {/* Repeat Settings Dialog */}
