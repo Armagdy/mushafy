@@ -209,12 +209,16 @@ const { isRTL } = useLanguage();
 **Responsive widths:** Dialogs scale up on larger screens (`md:max-w-lg lg:max-w-xl`).
 **Responsive text:** All dialog text uses `text-base md:text-xl` for readability on larger screens.
 **Header with gradient background:** Dialog headers use the same gradient as TopBar/BottomBar toolbars.
+**Centralized font control:** Set font on DialogContent to cascade to all children.
 ```tsx
-<DialogContent className={cn(
-  "sm:max-w-md md:max-w-lg lg:max-w-xl max-w-[90vw] max-h-[85vh] overflow-y-auto p-0",
-  "rounded-xl border-0 bg-[#FBF9F4]",
-  isRTL ? "rtl" : "ltr"
-)}>
+<DialogContent 
+  className={cn(
+    "sm:max-w-md md:max-w-lg lg:max-w-xl max-w-[90vw] max-h-[85vh] overflow-y-auto p-0",
+    "rounded-xl border-0 bg-[#FBF9F4]",
+    isRTL ? "rtl" : "ltr"
+  )}
+  style={{ fontFamily: "'Amiri', serif" }}  // Controls font for entire dialog
+>
   <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
     <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
       {t('title')}
@@ -231,6 +235,7 @@ const { isRTL } = useLanguage();
 ```
 
 **Key points:**
+- **Font Family:** Set `style={{ fontFamily: "..." }}` on DialogContent to control typography for entire dialog (cascades to all child elements). Default: `"system-ui, -apple-system, sans-serif"`. For Arabic emphasis: `"'Amiri', serif"`.
 - `p-0` on DialogContent to remove default padding
 - `border-0` on DialogContent to remove default border
 - `bg-[#FBF9F4]` on DialogContent to match page display background (light cream)

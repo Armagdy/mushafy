@@ -41,11 +41,14 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(
-        "sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto p-0",
-        "rounded-xl border-0 bg-[#FBF9F4]",
-        isRTL ? "rtl" : "ltr"
-      )}>
+      <DialogContent 
+        className={cn(
+          "sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto p-0",
+          "rounded-xl border-0 bg-[#FBF9F4]",
+          isRTL ? "rtl" : "ltr"
+        )}
+        style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
+      >
         <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
           <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
             {t('settings')}
@@ -82,7 +85,7 @@ export function SettingsDialog({
                 onClick={() => onViewModeChange(viewMode === 'single' ? 'double' : 'single')}
                 className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg px-3 md:px-4 h-8 md:h-10 border border-emerald-600 shadow-md transition-all text-base md:text-xl"
               >
-                <span className="text-[#F2E3BB] font-bold" style={{ fontFamily: "'Amiri', serif" }}>
+                <span className="text-[#F2E3BB] font-bold">
                   {viewMode === 'single' ? (isRTL ? 'صفحتين' : '2 Pages') : (isRTL ? 'صفحة' : '1 Page')}
                 </span>
               </button>
@@ -156,7 +159,7 @@ export function SettingsDialog({
               className="w-full flex items-center justify-center gap-2 sm:gap-3 bg-emerald-700 hover:bg-emerald-800 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-emerald-600 shadow-md transition-all"
             >
               <GraduationCap className="w-5 h-5 md:w-6 md:h-6 text-[#F2E3BB]" />
-              <span className="text-[#F2E3BB] text-base md:text-xl font-bold" style={{ fontFamily: "'Amiri', serif" }}>
+              <span className="text-[#F2E3BB] text-base md:text-xl font-bold">
                 {t('testFeature')}
               </span>
             </button>
