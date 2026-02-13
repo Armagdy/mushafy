@@ -42,22 +42,36 @@ export function PlayBar({
 }: PlayBarProps) {
   const { language, t } = useLanguage();
 
+  // Clean reciter name by removing style indicators
+  const cleanReciterName = (name: string): string => {
+    return name
+      .replace(/\s*-\s*مرتل\s*/g, '')
+      .replace(/\s*-\s*معلم\s*/g, '')
+      .replace(/\s*-\s*مجود\s*/g, '')
+      .replace(/\s*مرتل\s*/g, '')
+      .replace(/\s*معلم\s*/g, '')
+      .replace(/\s*مجود\s*/g, '')
+      .trim();
+  };
+
   // Get the appropriate reciter name based on audio source
   const getReciterName = () => {
     if (selectedReciter) {
       // EveryAyah reciter - show reciter name with surah name
-      const reciterName = language === 'ar' ? selectedReciter.nameAr : selectedReciter.name;
+      const rawName = language === 'ar' ? selectedReciter.nameAr : selectedReciter.name;
+      const reciterName = cleanReciterName(rawName);
       return currentSurahName ? `${reciterName} - ${currentSurahName}` : reciterName;
     } else if (selectedMp3QuranReciter) {
       // MP3Quran reciter - show reciter name with surah name and (كاملة) indicating complete surah
-      let reciterName = selectedMp3QuranReciter.name;
+      let rawName = selectedMp3QuranReciter.name;
       
       // If Arabic language is selected, use Arabic reciter name
       if (language === 'ar') {
         const arReciter = mp3QuranRecitersAr.find(r => r.id === selectedMp3QuranReciter.id);
-        reciterName = arReciter ? arReciter.name : selectedMp3QuranReciter.name;
+        rawName = arReciter ? arReciter.name : selectedMp3QuranReciter.name;
       }
       
+      const reciterName = cleanReciterName(rawName);
       return currentSurahName ? `${reciterName} - ${currentSurahName} (${language === 'ar' ? 'كاملة' : 'Full'})` : reciterName;
     }
     return t('selectReciter');
