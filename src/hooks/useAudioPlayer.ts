@@ -72,6 +72,9 @@ export const useAudioPlayer = ({
   // Wake Lock state to prevent screen sleep during playback
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   
+  // AbortController to cancel ongoing preloading operations
+  const preloadAbortControllerRef = useRef<AbortController | null>(null);
+  
   // Reciter state
   const [reciters, setReciters] = useState<Reciter[]>([]);
   const [selectedReciter, setSelectedReciter] = useState<Reciter | null>(null);
@@ -355,6 +358,11 @@ export const useAudioPlayer = ({
     
     // Not in cache - download and concatenate
     console.log(`⬇️ Downloading and caching audio for ${selectedReciter.folder} surah ${surahNum}`);
+    
+    // Create new AbortController for this operation
+    preloadAbortControllerRef.current = new AbortController();
+    const signal = preloadAbortControllerRef.current.signal;
+    
     setIsPreloadingAyahs(true);
     setPreloadProgress({ current: 0, total: totalAyahs });
     
@@ -370,8 +378,16 @@ export const useAudioPlayer = ({
         const audioUrl = `${selectedReciter.baseUrl}/${surahPadded}${ayahPadded}.mp3`;
         
         try {
-          // Fetch audio file
-          const response = await fetch(audioUrl);
+          // Check if aborted before fetch
+          if (signal.aborted) {
+            console.log('⛔ Preload aborted before fetch');
+            setIsPreloadingAyahs(false);
+            setPreloadProgress({ current: 0, total: 0 });
+            return null;
+          }
+          
+          // Fetch audio file with abort signal
+          const response = await fetch(audioUrl, { signal });
           if (!response.ok) throw new Error(`Failed to fetch: ${audioUrl}`);
           
           const arrayBuffer = await response.arrayBuffer();
@@ -387,11 +403,26 @@ export const useAudioPlayer = ({
           
           setPreloadProgress({ current: ayahNum, total: totalAyahs });
         } catch (error) {
+          // Check if this was an abort
+          if (error instanceof Error && error.name === 'AbortError') {
+            console.log('⛔ Preload aborted during fetch');
+            setIsPreloadingAyahs(false);
+            setPreloadProgress({ current: 0, total: 0 });
+            return null;
+          }
           console.error(`Failed to load ayah ${surahNum}:${ayahNum}:`, error);
           setIsPreloadingAyahs(false);
           setPreloadProgress({ current: 0, total: 0 });
           return null;
         }
+      }
+      
+      // Check if aborted before concatenation
+      if (signal.aborted) {
+        console.log('⛔ Preload aborted before concatenation');
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        return null;
       }
       
       // Calculate total duration and create concatenated buffer
@@ -486,6 +517,10 @@ export const useAudioPlayer = ({
     // Calculate total audio segments
     const totalSegments = ayahsInRange.length * ayahRepeatCount * passageRepeatCount;
     
+    // Create new AbortController for this operation
+    preloadAbortControllerRef.current = new AbortController();
+    const signal = preloadAbortControllerRef.current.signal;
+    
     setIsPreloadingAyahs(true);
     setPreloadProgress({ current: 0, total: totalSegments });
     
@@ -498,12 +533,20 @@ export const useAudioPlayer = ({
         const key = `${surah}:${ayah}`;
         if (audioBufferCache.has(key)) continue;
         
+        // Check if aborted
+        if (signal.aborted) {
+          console.log('⛔ Repeat preload aborted');
+          setIsPreloadingAyahs(false);
+          setPreloadProgress({ current: 0, total: 0 });
+          return null;
+        }
+        
         const surahPadded = surah.toString().padStart(3, '0');
         const ayahPadded = ayah.toString().padStart(3, '0');
         const audioUrl = `${selectedReciter.baseUrl}/${surahPadded}${ayahPadded}.mp3`;
         
         try {
-          const response = await fetch(audioUrl);
+          const response = await fetch(audioUrl, { signal });
           if (!response.ok) throw new Error(`Failed to fetch: ${audioUrl}`);
           
           const arrayBuffer = await response.arrayBuffer();
@@ -513,11 +556,26 @@ export const useAudioPlayer = ({
           downloadProgress++;
           setPreloadProgress({ current: downloadProgress, total: totalSegments });
         } catch (error) {
+          // Check if this was an abort
+          if (error instanceof Error && error.name === 'AbortError') {
+            console.log('⛔ Repeat preload aborted during fetch');
+            setIsPreloadingAyahs(false);
+            setPreloadProgress({ current: 0, total: 0 });
+            return null;
+          }
           console.error(`Failed to load ayah ${surah}:${ayah}:`, error);
           setIsPreloadingAyahs(false);
           setPreloadProgress({ current: 0, total: 0 });
           return null;
         }
+      }
+      
+      // Check if aborted before building sequence
+      if (signal.aborted) {
+        console.log('⛔ Repeat preload aborted before building sequence');
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        return null;
       }
       
       // Build the sequence of audio buffers with repeats
@@ -923,6 +981,17 @@ export const useAudioPlayer = ({
     console.log('Audio source:', audioSource);
     console.log('Current playing ayah:', currentPlayingAyah);
     console.log('Is playing:', isPlaying);
+    
+    // Abort any ongoing preloading operations
+    if (preloadAbortControllerRef.current) {
+      console.log('⛔ Aborting ongoing preload operation');
+      preloadAbortControllerRef.current.abort();
+      preloadAbortControllerRef.current = null;
+    }
+    
+    // Reset preloading state
+    setIsPreloadingAyahs(false);
+    setPreloadProgress({ current: 0, total: 0 });
     
     if (audioElement) {
       // Stop HTML Audio Element
