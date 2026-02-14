@@ -406,14 +406,14 @@ export function ReciterDialog({
                 </div>
               )}
 
-              {/* Listen Button */}
+              {/* Save Button for MP3Quran */}
               <div className="pt-2 sm:pt-3 mt-2">
                 <Button
                   onClick={onListen}
                   disabled={!selectedMp3QuranReciter || !selectedMoshaf}
                   className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {t('listen')}
+                  {t('save')}
                 </Button>
               </div>
             </TabsContent>
