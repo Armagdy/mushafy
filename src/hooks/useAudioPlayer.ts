@@ -29,6 +29,7 @@ interface UseAudioPlayerProps {
   currentPageAyah: number | null;
   ayahData: any[];
   isAyahNavigation: React.MutableRefObject<boolean>;
+  onSurahUnavailable?: (reason: 'unavailable' | 'completed') => void;
 }
 
 export const useAudioPlayer = ({
@@ -36,7 +37,8 @@ export const useAudioPlayer = ({
   currentSurahId,
   currentPageAyah,
   ayahData,
-  isAyahNavigation
+  isAyahNavigation,
+  onSurahUnavailable
 }: UseAudioPlayerProps) => {
   const navigate = useNavigate();
   
@@ -730,14 +732,35 @@ export const useAudioPlayer = ({
           const audioUrl = getSurahAudioUrl(selectedMoshaf.server, surahNum);
           audioElement.src = audioUrl;
           
-          // Fetch timing data for this surah
-          const timings = await getAyahTiming(surahNum, selectedMoshaf.id);
+          // Fetch timing data for this surah (don't stop if it fails)
+          let timings: AyahTiming[] = [];
+          try {
+            timings = await getAyahTiming(surahNum, selectedMoshaf.id);
+          } catch (timingError) {
+            console.warn('Could not fetch ayah timing, playing without precise tracking:', timingError);
+          }
           setAyahTimings(timings);
           setCurrentSurahAudio(surahNum);
           
-          // Wait for audio to be ready, then seek to ayah
+          // Handle audio load error (surah doesn't exist for this reciter)
+          const handleError = () => {
+            console.error('Failed to load audio - surah may not exist for this reciter');
+            setIsPlaying(false);
+            setCurrentSurahAudio(null);
+            releaseWakeLock();
+            if (onSurahUnavailable) {
+              onSurahUnavailable('unavailable');
+            }
+          };
+          audioElement.addEventListener('error', handleError, { once: true });
+          
+          // Wait for audio to be ready, then seek to ayah (if timing available)
           audioElement.addEventListener('loadedmetadata', () => {
-            seekToAyah(audioElement, timings, ayahNum);
+            // Remove error handler since audio loaded successfully
+            audioElement.removeEventListener('error', handleError);
+            if (timings.length > 0) {
+              seekToAyah(audioElement, timings, ayahNum);
+            }
             audioElement.play().catch(err => {
               console.error('Failed to play audio:', err);
               setIsPlaying(false);
@@ -749,11 +772,11 @@ export const useAudioPlayer = ({
           // Same surah, just seek to the ayah
           if (ayahTimings.length > 0) {
             seekToAyah(audioElement, ayahTimings, ayahNum);
-            audioElement.play().catch(err => {
-              console.error('Failed to play audio:', err);
-              setIsPlaying(false);
-            });
           }
+          audioElement.play().catch(err => {
+            console.error('Failed to play audio:', err);
+            setIsPlaying(false);
+          });
         }
         
         // Persist selected moshaf
@@ -879,7 +902,7 @@ export const useAudioPlayer = ({
         }
       }
     }
-  }, [audioElement, audioSource, selectedReciter, selectedMoshaf, ayahData, currentPageNum, navigate, preloadNextAyah, isAyahNavigation, updateMediaSession, requestWakeLock, currentSurahAudio, ayahTimings, audioContext, concatenatedSurah, concatenatedBlobUrl, concatenateAllSurahAyahs, ayahTimestamps, releaseWakeLock]);
+  }, [audioElement, audioSource, selectedReciter, selectedMoshaf, ayahData, currentPageNum, navigate, preloadNextAyah, isAyahNavigation, updateMediaSession, requestWakeLock, currentSurahAudio, ayahTimings, audioContext, concatenatedSurah, concatenatedBlobUrl, concatenateAllSurahAyahs, ayahTimestamps, releaseWakeLock, onSurahUnavailable]);
   
   // Toggle play/pause
   const togglePlayPause = useCallback(() => {
@@ -1204,16 +1227,50 @@ export const useAudioPlayer = ({
     }
   }, [repeatPassageCount, repeatAyahCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, audioSource, selectedReciter, audioElement, ayahData, currentPageNum, navigate, isAyahNavigation, updateMediaSession, requestWakeLock, releaseWakeLock, concatenateRepeatAyahs, playAyah]);
   
+  // Helper function to check if a surah is available in the current moshaf
+  const isSurahAvailableInMoshaf = useCallback((surahNum: number): boolean => {
+    if (!selectedMoshaf || !selectedMoshaf.surah_list) return false;
+    const surahList = selectedMoshaf.surah_list.split(',').map(s => parseInt(s.trim(), 10));
+    return surahList.includes(surahNum);
+  }, [selectedMoshaf]);
+  
   // Handle audio ended (for continuous playback and repeat)
   const handleAudioEnded = useCallback(() => {
     if (audioSource === 'mp3quran' && currentPlayingAyah) {
       // MP3Quran mode: When surah ends, move to next surah
-      if (currentPlayingAyah.surah < 114) {
-        playAyah(currentPlayingAyah.surah + 1, 1);
-        return;
-      } else {
+      const nextSurah = currentPlayingAyah.surah + 1;
+      
+      if (nextSurah > 114) {
         // Last surah - stop playback
         setIsPlaying(false);
+        releaseWakeLock();
+        // Notify that Quran is completed
+        if (onSurahUnavailable) {
+          onSurahUnavailable('completed');
+        }
+        return;
+      }
+      
+      // Check if the next surah is available for this reciter
+      if (isSurahAvailableInMoshaf(nextSurah)) {
+        // Navigate to the next surah page and play
+        const nextSurahData = ayahData.find(s => s.number === nextSurah);
+        if (nextSurahData && nextSurahData.verses && nextSurahData.verses.length > 0) {
+          const firstVerse = nextSurahData.verses[0];
+          if (firstVerse && firstVerse.page) {
+            isAyahNavigation.current = true;
+            navigate(`/page/${firstVerse.page}#${nextSurah}-1`);
+          }
+        }
+        playAyah(nextSurah, 1);
+        return;
+      } else {
+        // Next surah not available - stop playback and notify
+        setIsPlaying(false);
+        releaseWakeLock();
+        if (onSurahUnavailable) {
+          onSurahUnavailable('unavailable');
+        }
         return;
       }
     }
@@ -1321,7 +1378,7 @@ export const useAudioPlayer = ({
         setIsPlaying(false);
       }
     }
-  }, [isRepeatActive, isRepeatConcatenatedMode, repeatBlobUrl, releaseWakeLock, currentPlayingAyah, currentRepeatAyahCount, repeatAyahCount, currentRepeatSurah, currentRepeatAyah, ayahData, currentRepeatPassage, repeatPassageCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, playAyah, audioSource]);
+  }, [isRepeatActive, isRepeatConcatenatedMode, repeatBlobUrl, releaseWakeLock, currentPlayingAyah, currentRepeatAyahCount, repeatAyahCount, currentRepeatSurah, currentRepeatAyah, ayahData, currentRepeatPassage, repeatPassageCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, playAyah, audioSource, isSurahAvailableInMoshaf, navigate, isAyahNavigation, onSurahUnavailable]);
   
   // Track current ayah based on playback time (for both MP3Quran and EveryAyah)
   useEffect(() => {

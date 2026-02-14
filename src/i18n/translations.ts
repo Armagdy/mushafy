@@ -163,6 +163,8 @@ export const translations = {
     questionType: 'نوع السؤال',
     continueAyah: 'إكمال الآية',
     fullAyah: 'الآية كاملة',
+    surahNotAvailableForReciter: 'هذه السورة غير متاحة لهذا القارئ',
+    quranCompleted: 'تم الانتهاء من القرآن الكريم',
   },
   en: {
     appName: 'Mushafy',
@@ -328,6 +330,8 @@ export const translations = {
     questionType: 'Question Type',
     continueAyah: 'Continue Ayah',
     fullAyah: 'Full Ayah',
+    surahNotAvailableForReciter: 'This surah is not available for this reciter',
+    quranCompleted: 'Quran recitation completed',
   },
 };
 

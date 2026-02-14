@@ -201,7 +201,19 @@ const Surah = () => {
     currentSurahId,
     currentPageAyah,
     ayahData,
-    isAyahNavigation
+    isAyahNavigation,
+    onSurahUnavailable: (reason) => {
+      if (reason === 'unavailable') {
+        toast({
+          title: t('surahNotAvailableForReciter'),
+          variant: 'destructive',
+        });
+      } else if (reason === 'completed') {
+        toast({
+          title: t('quranCompleted'),
+        });
+      }
+    }
   });
   
   // Redirect to last page if no page is specified in URL
