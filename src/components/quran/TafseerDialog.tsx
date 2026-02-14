@@ -252,7 +252,7 @@ export function TafseerDialog({
               <Loader2 className="w-5 h-5 animate-spin text-emerald-600 dark:text-emerald-400" />
             </div>
           ) : ayahText ? (
-            <ScrollArea className="max-h-[100px] sm:max-h-[120px] md:max-h-[140px] p-3 border border-emerald-200 dark:border-emerald-700 rounded-lg">
+            <ScrollArea className="max-h-[120px] sm:max-h-[150px] md:max-h-[180px] lg:max-h-[200px] p-3 border border-emerald-200 dark:border-emerald-700 rounded-lg">
               <div className="text-lg md:text-xl lg:text-2xl leading-relaxed text-right font-arabic text-emerald-900 dark:text-emerald-100">
                 {ayahText}
               </div>
@@ -297,7 +297,7 @@ export function TafseerDialog({
         </div>
 
         {/* Tafseer Content */}
-        <ScrollArea className="h-[250px] sm:h-[350px] md:h-[450px] lg:h-[550px] w-full rounded-md border border-emerald-200 dark:border-emerald-700 p-4">
+        <ScrollArea className="h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px] w-full rounded-md border border-emerald-200 dark:border-emerald-700 p-4">
           {isLoading ? (
             <div className="flex items-center justify-center h-full gap-2">
               <Loader2 className="w-6 h-6 md:w-8 md:h-8 animate-spin text-emerald-600 dark:text-emerald-400" />
@@ -326,7 +326,7 @@ export function TafseerDialog({
           ) : tafseerText ? (
             <div className={cn(
               "leading-relaxed text-emerald-900 dark:text-emerald-100",
-              language === 'ar' ? "text-lg md:text-xl lg:text-2xl font-arabic" : "text-base md:text-lg lg:text-xl",
+              "text-base md:text-lg lg:text-xl",
               isRTL ? "text-right" : "text-left"
             )}>
               {tafseerText.text}
