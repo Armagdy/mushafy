@@ -419,7 +419,7 @@ export default function Test() {
       });
     }
     
-    // Filter to endings that appear in multiple different ayahs (3+)
+    // Filter to endings that appear in multiple different ayahs (2+)
     const similarEndings: { phrase: string; occurrences: TikrarOccurrence[] }[] = [];
     endingMap.forEach((occs, ending) => {
       const unique = new Map<string, TikrarOccurrence>();
@@ -428,13 +428,24 @@ export default function Test() {
         if (!unique.has(key)) unique.set(key, o);
       }
       const uniqueOccs = Array.from(unique.values());
-      if (uniqueOccs.length >= 3) {
+      if (uniqueOccs.length >= 2) {
         similarEndings.push({ phrase: ending, occurrences: uniqueOccs });
       }
     });
     
     return similarEndings;
   };
+
+  // Helper function to check if a phrase overlaps with any used phrases
+  const isPhraseOverlapping = useCallback((phrase: string, usedPhrases: Set<string>): boolean => {
+    for (const used of usedPhrases) {
+      // Check if new phrase is substring of used phrase OR used phrase is substring of new phrase
+      if (phrase.includes(used) || used.includes(phrase)) {
+        return true;
+      }
+    }
+    return false;
+  }, []);
 
   // Generate a tikrar (repetition) question
   const generateTikrarQuestion = useCallback(() => {
@@ -450,8 +461,10 @@ export default function Test() {
       // الفواصل المتشابهة - Find similar endings (2-word endings that repeat)
       const similarEndings = findSimilarEndings(allVerses);
       if (similarEndings.length > 0) {
-        // Filter to phrases not yet used
-        let available = similarEndings.filter(e => !usedTikrarPhrases.has(e.phrase));
+        // Filter to phrases not yet used and not overlapping with used phrases
+        let available = similarEndings.filter(e => 
+          !usedTikrarPhrases.has(e.phrase) && !isPhraseOverlapping(e.phrase, usedTikrarPhrases)
+        );
         
         // Further filter to only include phrases with unseen ayahs
         available = available.map(e => ({
@@ -529,8 +542,10 @@ export default function Test() {
       return;
     }
 
-    // Filter out already-used phrases
-    let available = repeatedPhrases.filter(p => !usedTikrarPhrases.has(p.phrase));
+    // Filter out already-used phrases and overlapping phrases
+    let available = repeatedPhrases.filter(p => 
+      !usedTikrarPhrases.has(p.phrase) && !isPhraseOverlapping(p.phrase, usedTikrarPhrases)
+    );
     
     // Further filter to only include phrases with unseen ayahs
     available = available.map(p => ({
@@ -556,7 +571,7 @@ export default function Test() {
     setUsedTikrarPhrases(prev => new Set(prev).add(pick.phrase));
     setShowAnswer(false);
     setQuestionsCount(prev => prev + 1);
-  }, [testRange, ayahData, getVersesInRange, difficult, usedTikrarPhrases]);
+  }, [testRange, ayahData, getVersesInRange, difficult, usedTikrarPhrases, usedTikrarAyahs, isPhraseOverlapping, findSimilarEndings]);
 
   const handleStartTest = (range: TestRange) => {
     setTestRange(range);
