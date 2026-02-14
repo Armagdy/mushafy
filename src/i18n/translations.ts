@@ -153,7 +153,7 @@ export const translations = {
     testTypeHifzDesc: 'يُعرض جزء من آية وعليك تحديد السورة والآية وإكمالها',
     testTypeTikrarDesc: 'تُعرض عبارة مكررة في عدة آيات وعليك تحديد مواضعها',
     testType: 'نوع الاختبار',
-    tikrarQuestion: 'في أي آيات وسور وردت هذه العبارة؟',
+    tikrarQuestion: 'في أي آيات وسور  القران وردت هذه العبار ة؟',
     appearsIn: 'وردت في',
     occurrences: 'مواضع',
     difficultMode: 'الوضع الصعب',

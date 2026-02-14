@@ -80,7 +80,7 @@ export function BookmarksDialog({
         selectedBookmarkType
       });
     }
-  }, [open, currentPage, currentSurahId, currentAyahNum, currentPlayingAyah, selectedBookmarkType]);
+  }, [open, currentPage, currentSurahId, currentAyahNum, currentPlayingAyah]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -100,11 +100,11 @@ export function BookmarksDialog({
         
         <div className="p-4 space-y-2 sm:space-y-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-11 md:h-12">
-            <TabsTrigger value="add" className="text-base md:text-xl">
+          <TabsList className="grid w-full grid-cols-2 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
+            <TabsTrigger value="add" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">
               {isRTL ? 'اضف علامة جديدة' : 'Add New Bookmark'}
             </TabsTrigger>
-            <TabsTrigger value="view" className="text-base md:text-xl">
+            <TabsTrigger value="view" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">
               {isRTL ? 'العلامات' : 'Bookmarks'}
             </TabsTrigger>
           </TabsList>

@@ -57,26 +57,26 @@ export function SettingsDialog({
         
         <div className="space-y-2 sm:space-y-3 p-4">
           {/* Mushaf Type Setting */}
-          <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg">
+          <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 sm:gap-3">
               <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">{t('mushafType')}</span>
             </div>
             <Select value={mushafType} onValueChange={(value) => setMushafType(value as MushafType)}>
-              <SelectTrigger className="w-full h-8 sm:h-9 border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+              <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                <SelectItem value="mwdoa" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafMwdoa')}</SelectItem>
-                <SelectItem value="tashel" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafTashel')}</SelectItem>
-                <SelectItem value="madinah" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafMadinah')}</SelectItem>
+                <SelectItem value="mwdoa" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafMwdoa')}</SelectItem>
+                <SelectItem value="tashel" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafTashel')}</SelectItem>
+                <SelectItem value="madinah" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafMadinah')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* View Mode Setting - Hide on mobile */}
           {!isMobile && (
-            <div className="flex items-center justify-between p-2 sm:p-3 rounded-lg">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3">
                 <Book className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">{isRTL ? 'وضع العرض' : 'View Mode'}</span>
@@ -94,7 +94,7 @@ export function SettingsDialog({
 
           {/* Pages to Load Setting - Only show in single page mode or mobile */}
           {(viewMode === 'single' || isMobile) && (
-            <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2 sm:gap-3">
                 <Navigation className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">
@@ -134,7 +134,7 @@ export function SettingsDialog({
           )}
 
           {/* Bottom Bar Text Toggle */}
-          <div className="flex items-center justify-between p-2 sm:p-3 rounded-lg">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-3">
               <Menu className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">

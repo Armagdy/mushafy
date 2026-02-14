@@ -260,14 +260,27 @@ const { isRTL } = useLanguage();
 ```
 
 ### Tabs Pattern
+**CRITICAL:** All dialog tabs MUST use emerald styling for consistency.
 ```tsx
-<Tabs defaultValue="tab1">
-  <TabsList className="grid w-full grid-cols-2">
-    <TabsTrigger value="tab1">{t('tab1')}</TabsTrigger>
-    <TabsTrigger value="tab2">{t('tab2')}</TabsTrigger>
+// Standard dialog tabs (2 or 3 columns):
+<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+  <TabsList className="grid w-full grid-cols-2 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
+    <TabsTrigger value="tab1" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">
+      {t('tab1')}
+    </TabsTrigger>
+    <TabsTrigger value="tab2" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">
+      {t('tab2')}
+    </TabsTrigger>
   </TabsList>
-  <TabsContent value="tab1">...</TabsContent>
+  <TabsContent value="tab1" className="space-y-4">...</TabsContent>
+  <TabsContent value="tab2" className="space-y-4">...</TabsContent>
 </Tabs>
+
+// Key styles:
+// - TabsList: bg-emerald-100 dark:bg-emerald-900/30 (light emerald background)
+// - TabsList: h-11 md:h-12 (consistent height across dialogs)
+// - TabsTrigger: text-base md:text-xl (responsive text size)
+// - TabsTrigger active: bg-emerald-700 with text-[#F2E3BB] cream text
 ```
 
 ## State Persistence Pattern

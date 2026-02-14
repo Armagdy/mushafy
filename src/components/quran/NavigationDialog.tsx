@@ -512,10 +512,10 @@ export function NavigationDialog({
         ) : (
           /* Navigation Search - With tabs */
           <Tabs value={searchTab} onValueChange={setSearchTab as any} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 h-11 md:h-12">
-              <TabsTrigger value="juz" className="text-base md:text-xl">{isRTL ? 'جزء' : 'Juz'}</TabsTrigger>
-              <TabsTrigger value="page" className="text-base md:text-xl">{isRTL ? 'صفحة' : 'Page'}</TabsTrigger>
-              <TabsTrigger value="surah" className="text-base md:text-xl">{isRTL ? 'سورة' : 'Surah'}</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
+              <TabsTrigger value="juz" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">{isRTL ? 'جزء' : 'Juz'}</TabsTrigger>
+              <TabsTrigger value="page" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">{isRTL ? 'صفحة' : 'Page'}</TabsTrigger>
+              <TabsTrigger value="surah" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">{isRTL ? 'سورة' : 'Surah'}</TabsTrigger>
             </TabsList>
 
             {/* Surah Tab */}

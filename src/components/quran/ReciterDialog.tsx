@@ -154,7 +154,7 @@ export function ReciterDialog({
         <div className="p-4 space-y-3">
           {/* Audio Source Tabs */}
           <Tabs value={audioSource} onValueChange={(value) => onAudioSourceChange(value as 'everyayah' | 'mp3quran')} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-emerald-100 dark:bg-emerald-900/30">
+            <TabsList className="grid w-full grid-cols-2 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
               <TabsTrigger value="everyayah" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">
                 {t('everyAyah')}
               </TabsTrigger>
@@ -166,7 +166,7 @@ export function ReciterDialog({
             {/* EveryAyah Tab Content */}
             <TabsContent value="everyayah" className="space-y-2 sm:space-y-3 mt-3">
           {/* Reciter Name Filter */}
-          <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+          <div className="flex flex-col gap-2">
             <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
               {t('reciterName')}
             </span>
@@ -176,7 +176,7 @@ export function ReciterDialog({
                   variant="outline"
                   role="combobox"
                   aria-expanded={openEveryAyahReciter}
-                  className="w-full justify-between h-8 sm:h-9 text-base md:text-xl border-emerald-300 hover:bg-emerald-50 hover:text-emerald-900"
+                  className="w-full justify-between text-base md:text-xl border-emerald-300 hover:!bg-emerald-50 hover:!text-emerald-900"
                 >
                   {filterReciterName === 'all' 
                     ? t('all') 
@@ -245,12 +245,12 @@ export function ReciterDialog({
           </div>
           
           {/* Reading Type Filter */}
-          <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+          <div className="flex flex-col gap-2">
             <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
               {t('readingType')}
             </span>
             <Select value={filterReading} onValueChange={onFilterReadingChange}>
-              <SelectTrigger className="w-full h-8 sm:h-9 text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+              <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
@@ -262,12 +262,12 @@ export function ReciterDialog({
           </div>
           
           {/* Recitation Style Filter */}
-          <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+          <div className="flex flex-col gap-2">
             <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
               {t('recitationStyle')}
             </span>
             <Select value={filterStyle} onValueChange={onFilterStyleChange}>
-              <SelectTrigger className="w-full h-8 sm:h-9 text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+              <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
@@ -279,12 +279,12 @@ export function ReciterDialog({
           </div>
           
           {/* Quality Filter */}
-          <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+          <div className="flex flex-col gap-2">
             <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
               {t('quality')}
             </span>
             <Select value={filterQuality} onValueChange={onFilterQualityChange}>
-              <SelectTrigger className="w-full h-8 sm:h-9 text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+              <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
@@ -305,7 +305,7 @@ export function ReciterDialog({
             <Button
               onClick={onListen}
               disabled={!selectedReciter && filteredReciters.length === 0}
-              className="w-full h-9 sm:h-10 text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {t('listen')}
             </Button>
@@ -315,7 +315,7 @@ export function ReciterDialog({
             {/* MP3Quran Tab Content */}
             <TabsContent value="mp3quran" className="space-y-2 sm:space-y-3 mt-3">
               {/* Reciter Selection */}
-              <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+              <div className="flex flex-col gap-2">
                 <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
                   {t('reciterName')}
                 </span>
@@ -325,7 +325,7 @@ export function ReciterDialog({
                       variant="outline"
                       role="combobox"
                       aria-expanded={openMp3QuranReciter}
-                      className="w-full justify-between h-8 sm:h-9 text-base md:text-xl border-emerald-300 hover:bg-emerald-50 hover:text-emerald-900"
+                      className="w-full justify-between text-base md:text-xl border-emerald-300 hover:!bg-emerald-50 hover:!text-emerald-900"
                     >
                       {selectedMp3QuranReciterName}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -375,7 +375,7 @@ export function ReciterDialog({
 
               {/* Moshaf/Recitation Type Selection */}
               {selectedMp3QuranReciter && selectedMp3QuranReciter.moshaf.length > 0 && (
-                <div className="flex flex-col gap-2 p-2 sm:p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+                <div className="flex flex-col gap-2">
                   <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
                     {t('recitationType')}
                   </span>
@@ -388,7 +388,7 @@ export function ReciterDialog({
                       }
                     }}
                   >
-                    <SelectTrigger className="w-full h-8 sm:h-9 text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                    <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
@@ -411,7 +411,7 @@ export function ReciterDialog({
                 <Button
                   onClick={onListen}
                   disabled={!selectedMp3QuranReciter || !selectedMoshaf}
-                  className="w-full h-9 sm:h-10 text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {t('listen')}
                 </Button>

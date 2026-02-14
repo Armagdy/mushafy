@@ -50,6 +50,8 @@ export default function Test() {
   const [questionsCount, setQuestionsCount] = useState(0);
   const [usedHifzKeys, setUsedHifzKeys] = useState<Set<string>>(new Set());
   const [usedTikrarPhrases, setUsedTikrarPhrases] = useState<Set<string>>(new Set());
+  const [usedTikrarAyahs, setUsedTikrarAyahs] = useState<Set<string>>(new Set());
+  const [allTestsCompleted, setAllTestsCompleted] = useState(false);
 
   // Format number based on language
   const formatNumber = (num: number): string => {
@@ -448,10 +450,21 @@ export default function Test() {
       // الفواصل المتشابهة - Find similar endings (2-word endings that repeat)
       const similarEndings = findSimilarEndings(allVerses);
       if (similarEndings.length > 0) {
+        // Filter to phrases not yet used
         let available = similarEndings.filter(e => !usedTikrarPhrases.has(e.phrase));
+        
+        // Further filter to only include phrases with unseen ayahs
+        available = available.map(e => ({
+          ...e,
+          occurrences: e.occurrences.filter(occ => !usedTikrarAyahs.has(`${occ.surahId}:${occ.ayahNumber}`))
+        })).filter(e => e.occurrences.length >= 2); // Need at least 2 unseen ayahs
+        
         if (available.length === 0) {
-          setUsedTikrarPhrases(new Set());
-          available = similarEndings;
+          // All questions exhausted
+          setAllTestsCompleted(true);
+          setCurrentTikrar(null);
+          setCurrentQuestion(null);
+          return;
         }
         
         const pick = available[Math.floor(Math.random() * available.length)];
@@ -462,6 +475,7 @@ export default function Test() {
         });
         setCurrentQuestion(null);
         setUsedTikrarPhrases(prev => new Set(prev).add(pick.phrase));
+        // Mark ayahs as used when answer is shown (in handleShowAnswer)
         setShowAnswer(false);
         setQuestionsCount(prev => prev + 1);
         return;
@@ -510,16 +524,25 @@ export default function Test() {
 
     if (repeatedPhrases.length === 0) {
       // Fallback: no repeated phrases found
+      setAllTestsCompleted(true);
       setCurrentTikrar(null);
       return;
     }
 
     // Filter out already-used phrases
     let available = repeatedPhrases.filter(p => !usedTikrarPhrases.has(p.phrase));
+    
+    // Further filter to only include phrases with unseen ayahs
+    available = available.map(p => ({
+      ...p,
+      occurrences: p.occurrences.filter(occ => !usedTikrarAyahs.has(`${occ.surahId}:${occ.ayahNumber}`))
+    })).filter(p => p.occurrences.length >= 2); // Need at least 2 unseen ayahs
+    
     if (available.length === 0) {
-      // All phrases exhausted, reset tracking
-      setUsedTikrarPhrases(new Set());
-      available = repeatedPhrases;
+      // All phrases exhausted
+      setAllTestsCompleted(true);
+      setCurrentTikrar(null);
+      return;
     }
 
     // Pick a random repeated phrase
@@ -544,6 +567,8 @@ export default function Test() {
     setCurrentTikrar(null);
     setUsedHifzKeys(new Set());
     setUsedTikrarPhrases(new Set());
+    setUsedTikrarAyahs(new Set());
+    setAllTestsCompleted(false);
   };
 
   const handleNextQuestion = () => {
@@ -565,6 +590,15 @@ export default function Test() {
   const handleShowAnswer = () => {
     setShowAnswer(true);
     setHintLevel(0);
+    
+    // Mark tikrar ayahs as used when answer is shown
+    if (testMode === 'tikrar' && currentTikrar) {
+      const newUsedAyahs = new Set(usedTikrarAyahs);
+      currentTikrar.occurrences.forEach(occ => {
+        newUsedAyahs.add(`${occ.surahId}:${occ.ayahNumber}`);
+      });
+      setUsedTikrarAyahs(newUsedAyahs);
+    }
   };
 
   // Auto-generate first question when test range is set and ayah data is loaded
@@ -639,7 +673,7 @@ export default function Test() {
                 
                 {/* Partial Ayah (Question) */}
                 <div className={cn(
-                  "p-6 rounded-lg bg-emerald-50 dark:bg-gray-700",
+                  "p-6 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800",
                   "text-right"
                 )}>
                   <p
@@ -699,52 +733,64 @@ export default function Test() {
 
                 {/* Answer Section */}
                 {showAnswer && (
-                  <div className="mt-6 space-y-4">
+                  <div className="mt-6">
                     {/* Full Ayah + Following Ayahs */}
                     <div className={cn(
-                      "p-6 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800",
+                      "p-6 rounded-lg bg-emerald-50 dark:bg-gray-700 border border-emerald-200 dark:border-emerald-800",
                       "text-right"
                     )}>
-                      <p
-                        className="text-2xl md:text-3xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 mb-3"
-                        style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
-                      >
-                        {currentQuestion.questionAyah.text}
-                      </p>
-                      {currentQuestion.followingAyahs.map((ayah, index) => (
-                        <div key={index}>
-                          {index === 0 && ayah.surahId !== currentQuestion.surahId && (
-                            <p className="text-sm font-bold text-blue-600 dark:text-blue-400 mt-4 mb-2">
-                              {getSurahName(ayah.surahId)}
-                            </p>
-                          )}
-                          <p
-                            className="text-2xl md:text-3xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 mb-3 last:mb-0"
-                            style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
-                          >
-                            {ayah.text}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Surah & Ayah Info */}
-                    <div className="p-4 rounded-lg bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/30 border border-emerald-300">
-                      <p className="text-lg font-semibold text-emerald-800 dark:text-emerald-300 mb-2">
-                        {t('correctAnswer')}:
-                      </p>
-                      <p className="text-xl font-bold text-emerald-900 dark:text-emerald-200">
-                        {t('surahName')}: {getSurahName(currentQuestion.surahId)}
-                      </p>
-                      <p className="text-lg text-emerald-800 dark:text-emerald-300 mt-1">
-                        {t('ayahNumber')}: {formatNumber(currentQuestion.questionAyah.numberInSurah)}
-                      </p>
-                      {currentQuestion.followingAyahs.length > 0 && 
-                       currentQuestion.followingAyahs[0].surahId !== currentQuestion.surahId && (
-                        <p className="text-lg text-blue-700 dark:text-blue-300 mt-2 font-semibold">
-                          {t('nextSurah')}: {getSurahName(currentQuestion.followingAyahs[0].surahId)}
+                      {/* Surah Name - Ayah Number Header */}
+                      <div className="mb-4 pb-3 border-b border-emerald-300 dark:border-emerald-600">
+                        <p className="text-lg md:text-xl font-bold text-emerald-800 dark:text-emerald-300 text-center">
+                          {getSurahName(currentQuestion.surahId)} - {t('ayahNumber')} {formatNumber(currentQuestion.questionAyah.numberInSurah)}
                         </p>
-                      )}
+                        {currentQuestion.followingAyahs.length > 0 && 
+                         currentQuestion.followingAyahs[0].surahId !== currentQuestion.surahId && (
+                          <p className="text-base text-blue-700 dark:text-blue-300 mt-1 font-semibold text-center">
+                            {t('nextSurah')}: {getSurahName(currentQuestion.followingAyahs[0].surahId)}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-2xl md:text-3xl font-amiri text-gray-800 dark:text-gray-200"
+                           style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif", lineHeight: "2.5" }}>
+                        {/* Question Ayah */}
+                        <span>{currentQuestion.questionAyah.text}</span>
+                        <span 
+                          className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 mx-2 my-1 align-middle bg-center bg-no-repeat bg-contain"
+                          style={{ 
+                            backgroundImage: 'url(/assets/ayah.svg)',
+                            filter: 'invert(38%) sepia(55%) saturate(654%) hue-rotate(116deg) brightness(80%) contrast(130%) drop-shadow(0 0 0.5px currentColor)'
+                          }}
+                        >
+                          <span className="text-emerald-800 dark:text-emerald-200 text-base md:text-lg font-bold mt-0.5">
+                            {formatNumber(currentQuestion.questionAyah.numberInSurah)}
+                          </span>
+                        </span>
+                        
+                        {/* Following Ayahs */}
+                        {currentQuestion.followingAyahs.map((ayah, index) => (
+                          <span key={index}>
+                            {index === 0 && ayah.surahId !== currentQuestion.surahId && (
+                              <span className="block text-sm font-bold text-blue-600 dark:text-blue-400 my-4">
+                                {getSurahName(ayah.surahId)}
+                              </span>
+                            )}
+                            <span>{ayah.text}</span>
+                            <span 
+                              className="inline-flex items-center justify-center w-12 h-12 md:w-16 md:h-16 mx-2 my-1 align-middle bg-center bg-no-repeat bg-contain"
+                              style={{ 
+                                backgroundImage: 'url(/assets/ayah.svg)',
+                                filter: 'invert(38%) sepia(55%) saturate(654%) hue-rotate(116deg) brightness(80%) contrast(130%) drop-shadow(0 0 0.5px currentColor)'
+                              }}
+                            >
+                              <span className="text-emerald-800 dark:text-emerald-200 text-base md:text-lg font-bold mt-0.5">
+                                {formatNumber(ayah.numberInSurah)}
+                              </span>
+                            </span>
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -815,10 +861,10 @@ export default function Test() {
                     {currentTikrar.occurrences.map((occ, index) => (
                       <div
                         key={index}
-                        className="p-4 rounded-lg bg-gradient-to-r from-emerald-50 to-blue-50 dark:from-emerald-900/20 dark:to-blue-900/20 border border-emerald-200 dark:border-emerald-800"
+                        className="p-4 rounded-lg bg-emerald-50 dark:bg-gray-700 border border-emerald-200 dark:border-emerald-800"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                          <span className="text-base md:text-lg font-bold text-emerald-700 dark:text-emerald-300">
                             {getSurahName(occ.surahId)} - {t('ayahNumber')} {formatNumber(occ.ayahNumber)}
                           </span>
                           <span className="text-xs text-gray-500 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full">
@@ -879,6 +925,37 @@ export default function Test() {
               )}
             </div>
           </div>
+        ) : allTestsCompleted && testRange ? (
+          <Card className="p-8 text-center border-0 bg-white dark:bg-gray-800 shadow-md space-y-4">
+            <div className="text-6xl mb-4">🎉</div>
+            <h2 className="text-2xl md:text-3xl font-bold text-emerald-800 dark:text-emerald-300">
+              {language === 'ar' ? 'أحسنت!' : 'Excellent!'}
+            </h2>
+            <p className="text-lg md:text-xl text-emerald-700 dark:text-emerald-400">
+              {language === 'ar' ? 'لقد أكملت جميع الأسئلة!' : 'Test Completed!'}
+            </p>
+            <p className="text-base md:text-lg text-gray-600 dark:text-gray-400">
+              {language === 'ar' ? 'لقد أجبت على جميع الأسئلة المتاحة في هذا النطاق' : 'You have answered all available questions in this range'}
+            </p>
+            <Button
+              onClick={() => {
+                setUsedTikrarPhrases(new Set());
+                setUsedTikrarAyahs(new Set());
+                setUsedHifzKeys(new Set());
+                setAllTestsCompleted(false);
+                setQuestionsCount(0);
+                if (testMode === 'tikrar') {
+                  generateTikrarQuestion();
+                } else {
+                  generateQuestion();
+                }
+              }}
+              size="lg"
+              className="bg-emerald-700 hover:bg-emerald-800 text-[#F2E3BB] text-base md:text-xl rounded-lg border border-emerald-600 shadow-md mt-4"
+            >
+              {language === 'ar' ? 'ابدأ من جديد' : 'Start Over'}
+            </Button>
+          </Card>
         ) : isAyahDataLoading ? (
           <Card className="p-8 text-center border-0 bg-white dark:bg-gray-800 shadow-md">
             <p className="text-base md:text-xl text-emerald-800 dark:text-emerald-300">

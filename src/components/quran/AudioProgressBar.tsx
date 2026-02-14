@@ -280,6 +280,43 @@ export function AudioProgressBar({
     return segment;
   };
 
+  // Get markers for repeat mode (section starts and ayah starts)
+  const getRepeatMarkers = () => {
+    if (!isRepeatActive || !isRepeatConcatenatedMode || repeatAyahTimestamps.length === 0 || duration <= 0) {
+      return { sectionMarkers: [], ayahMarkers: [] };
+    }
+
+    const sectionMarkers: number[] = []; // Passage start positions (percentage)
+    const ayahMarkers: number[] = []; // Ayah start positions (percentage)
+
+    for (let i = 0; i < repeatAyahTimestamps.length; i++) {
+      const ts = repeatAyahTimestamps[i];
+      const position = (ts.startTime / duration) * 100;
+
+      // Section marker: first ayah of each passage (passage changes or first entry)
+      if (ts.repetition === 1 && (i === 0 || repeatAyahTimestamps[i - 1].passage !== ts.passage)) {
+        if (position > 0) { // Don't add marker at 0%
+          sectionMarkers.push(position);
+        }
+      }
+
+      // Ayah marker: first repetition of each ayah within a passage
+      if (ts.repetition === 1 && repeatAyahCount > 1) {
+        ayahMarkers.push(position);
+      } else if (repeatAyahCount === 1) {
+        // If no ayah repeat, still show ayah boundaries
+        ayahMarkers.push(position);
+      }
+    }
+
+    // Remove duplicate ayah markers that are also section markers
+    const filteredAyahMarkers = ayahMarkers.filter(m => !sectionMarkers.includes(m) && m > 0);
+
+    return { sectionMarkers, ayahMarkers: filteredAyahMarkers };
+  };
+
+  const { sectionMarkers, ayahMarkers } = getRepeatMarkers();
+
   return (
     <div className="w-full relative group">
       {/* Progress bar container */}
@@ -299,6 +336,24 @@ export function AudioProgressBar({
       >
         {/* Background track */}
         <div className="absolute inset-0 bg-emerald-950/50" />
+        
+        {/* Section repeat markers (thicker, more prominent) */}
+        {sectionMarkers.map((position, index) => (
+          <div
+            key={`section-${index}`}
+            className="absolute top-0 bottom-0 w-1 bg-amber-400/80 z-10"
+            style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
+          />
+        ))}
+        
+        {/* Ayah markers (thinner, subtle) */}
+        {ayahMarkers.map((position, index) => (
+          <div
+            key={`ayah-${index}`}
+            className="absolute top-0 bottom-0 w-0.5 bg-[#F2E3BB]/40"
+            style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
+          />
+        ))}
         
         {/* Progress fill */}
         <div
@@ -321,7 +376,7 @@ export function AudioProgressBar({
         {/* Playhead */}
         <div
           className={cn(
-            "absolute top-1/2 -translate-y-1/2 w-6 h-6 md:w-5 md:h-5 bg-[#F2E3BB] rounded-full shadow-lg cursor-grab active:cursor-grabbing",
+            "absolute top-1/2 -translate-y-1/2 w-6 h-6 md:w-5 md:h-5 bg-[#F2E3BB] rounded-full shadow-lg cursor-grab active:cursor-grabbing z-20",
             !isDragging && "transition-all duration-100",
             isDragging && "will-change-[left,transform]",
             (isDragging || isPlaying) && "opacity-100",
@@ -353,14 +408,14 @@ export function AudioProgressBar({
                 <span className="font-semibold">
                   {surahNames[getRepeatSegmentFromTime(hoverTime)!.surah] || `Surah ${getRepeatSegmentFromTime(hoverTime)!.surah}`} - {ayahLabel} {formatNumber(getRepeatSegmentFromTime(hoverTime)!.ayah)}
                 </span>
-                {repeatAyahCount > 1 && (
-                  <span>
-                    {ayahRepeatLabel}: {formatNumber(getRepeatSegmentFromTime(hoverTime)!.repetition)}/{formatNumber(repeatAyahCount)}
-                  </span>
-                )}
                 {repeatPassageCount > 1 && (
                   <span>
                     {sectionRepeatLabel}: {formatNumber(getRepeatSegmentFromTime(hoverTime)!.passage)}/{formatNumber(repeatPassageCount)}
+                  </span>
+                )}
+                {repeatAyahCount > 1 && (
+                  <span>
+                    {ayahRepeatLabel}: {formatNumber(getRepeatSegmentFromTime(hoverTime)!.repetition)}/{formatNumber(repeatAyahCount)}
                   </span>
                 )}
                 <span>{formatTime(hoverTime)}</span>

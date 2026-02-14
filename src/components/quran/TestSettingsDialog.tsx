@@ -141,9 +141,9 @@ export function TestSettingsDialog({
           </div>
 
           <Tabs value={rangeType} onValueChange={(v) => setRangeType(v as 'surah' | 'juz')}>
-            <TabsList className="grid w-full grid-cols-2 h-11 md:h-12">
-              <TabsTrigger value="surah" className="text-base md:text-xl">{t('surahRange')}</TabsTrigger>
-              <TabsTrigger value="juz" className="text-base md:text-xl">{t('juzRange')}</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
+              <TabsTrigger value="surah" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">{t('surahRange')}</TabsTrigger>
+              <TabsTrigger value="juz" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">{t('juzRange')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="surah" className="space-y-4 mt-4">
@@ -153,12 +153,12 @@ export function TestSettingsDialog({
                   value={startSurah.toString()}
                   onValueChange={(v) => setStartSurah(parseInt(v))}
                 >
-                  <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", isRTL && "text-right")}>
+                  <SelectTrigger className={cn("text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", isRTL && "text-right")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                     {surahs.map((surah) => (
-                      <SelectItem key={surah.id} value={surah.id.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
+                      <SelectItem key={surah.id} value={surah.id.toString()} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                         {formatNumber(surah.id)}. {language === 'ar' ? surah.name : surah.englishName}
                       </SelectItem>
                     ))}
@@ -172,12 +172,12 @@ export function TestSettingsDialog({
                   value={endSurah.toString()}
                   onValueChange={(v) => setEndSurah(parseInt(v))}
                 >
-                  <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", isRTL && "text-right")}>
+                  <SelectTrigger className={cn("text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", isRTL && "text-right")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                     {surahs.filter(s => s.id >= startSurah).map((surah) => (
-                      <SelectItem key={surah.id} value={surah.id.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
+                      <SelectItem key={surah.id} value={surah.id.toString()} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                         {formatNumber(surah.id)}. {language === 'ar' ? surah.name : surah.englishName}
                       </SelectItem>
                     ))}
@@ -193,12 +193,12 @@ export function TestSettingsDialog({
                   value={startJuz.toString()}
                   onValueChange={(v) => setStartJuz(parseInt(v))}
                 >
-                  <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", isRTL && "text-right")}>
+                  <SelectTrigger className={cn("text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", isRTL && "text-right")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                     {Array.from({ length: 30 }, (_, i) => i + 1).map((juz) => (
-                      <SelectItem key={juz} value={juz.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
+                      <SelectItem key={juz} value={juz.toString()} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                         {t('juz')} {formatNumber(juz)}
                       </SelectItem>
                     ))}
@@ -212,14 +212,14 @@ export function TestSettingsDialog({
                   value={endJuz.toString()}
                   onValueChange={(v) => setEndJuz(parseInt(v))}
                 >
-                  <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", isRTL && "text-right")}>
+                  <SelectTrigger className={cn("text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", isRTL && "text-right")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                     {Array.from({ length: 30 }, (_, i) => i + 1)
                       .filter(juz => juz >= startJuz)
                       .map((juz) => (
-                        <SelectItem key={juz} value={juz.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
+                        <SelectItem key={juz} value={juz.toString()} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                           {t('juz')} {formatNumber(juz)}
                         </SelectItem>
                       ))}
