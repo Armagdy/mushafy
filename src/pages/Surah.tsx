@@ -65,7 +65,8 @@ const Surah = () => {
     reloadAyahData
   } = useQuranData();
   
-  const isTashelOrMadinah = mushafType === 'tashel' || mushafType === 'madinah';
+  // All mushaf types now use the same styling
+  const isTashelOrMadinah = true;
   
   // Helper function to convert numbers based on language
   const formatNumber = (num: number | string): string => {

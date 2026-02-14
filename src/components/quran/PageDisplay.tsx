@@ -40,7 +40,8 @@ export function PageDisplay({
   const { t, isRTL } = useLanguage();
   const { getMushafPath, mushafType } = useMushaf();
   
-  const isTashelOrMadinah = mushafType === 'tashel' || mushafType === 'madinah';
+  // All mushaf types now use the same styling
+  const isTashelOrMadinah = true;
 
   return (
     <main className="flex-1 flex items-center justify-center gap-6 overflow-hidden min-h-0 bg-[#FBF9F4]">
@@ -74,7 +75,7 @@ export function PageDisplay({
                 <>
                   {/* Left Page */}
                   {leftPageNum > 0 && leftPageNum <= 604 && (
-                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-2' : ''}`}>
+                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
                       <div className="relative group">
                         {(bookmarks.includes(leftPageNum) || memorizationBookmarks.includes(leftPageNum) || readingBookmarks.includes(leftPageNum)) && (
                           <div className="absolute top-0 left-0 z-10 flex gap-0.5 -translate-x-1">
@@ -92,7 +93,7 @@ export function PageDisplay({
                         <img
                           src={`${getMushafPath()}/${getPageImageFilename(leftPageNum)}`}
                           alt={`${t('page')} ${leftPageNum}`}
-                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100dvh-200px)]' : 'max-h-[calc(100dvh-180px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
+                          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
                           loading="lazy"
                         />
                       </div>
@@ -100,7 +101,7 @@ export function PageDisplay({
                   )}
                   {/* Right Page */}
                   {rightPageNum > 0 && rightPageNum <= 604 && (
-                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-2' : ''}`}>
+                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
                       <div className="relative group">
                         {(bookmarks.includes(rightPageNum) || memorizationBookmarks.includes(rightPageNum) || readingBookmarks.includes(rightPageNum)) && (
                           <div className="absolute top-0 right-0 z-10 flex gap-0.5 translate-x-1">
@@ -118,7 +119,7 @@ export function PageDisplay({
                         <img
                           src={`${getMushafPath()}/${getPageImageFilename(rightPageNum)}`}
                           alt={`${t('page')} ${rightPageNum}`}
-                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100dvh-200px)]' : 'max-h-[calc(100dvh-180px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
+                          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
                           loading="lazy"
                         />
                       </div>
@@ -129,7 +130,7 @@ export function PageDisplay({
                 <>
                   {/* Right Page (shown first in RTL) */}
                   {rightPageNum > 0 && rightPageNum <= 604 && (
-                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-2' : ''}`}>
+                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
                       <div className="relative group">
                         {(bookmarks.includes(rightPageNum) || memorizationBookmarks.includes(rightPageNum) || readingBookmarks.includes(rightPageNum)) && (
                           <div className="absolute top-0 right-0 z-10 flex gap-0.5 translate-x-1">
@@ -147,7 +148,7 @@ export function PageDisplay({
                         <img
                           src={`${getMushafPath()}/${getPageImageFilename(rightPageNum)}`}
                           alt={`${t('page')} ${rightPageNum}`}
-                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100dvh-200px)]' : 'max-h-[calc(100dvh-180px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
+                          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
                           loading="lazy"
                         />
                       </div>
@@ -155,7 +156,7 @@ export function PageDisplay({
                   )}
                   {/* Left Page (shown second in RTL) */}
                   {leftPageNum > 0 && leftPageNum <= 604 && (
-                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-2' : ''}`}>
+                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
                       <div className="relative group">
                         {(bookmarks.includes(leftPageNum) || memorizationBookmarks.includes(leftPageNum) || readingBookmarks.includes(leftPageNum)) && (
                           <div className="absolute top-0 left-0 z-10 flex gap-0.5 -translate-x-1">
@@ -173,7 +174,7 @@ export function PageDisplay({
                         <img
                           src={`${getMushafPath()}/${getPageImageFilename(leftPageNum)}`}
                           alt={`${t('page')} ${leftPageNum}`}
-                          className={`relative max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100dvh-200px)]' : 'max-h-[calc(100dvh-180px)]'} w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto`}
+                          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
                           loading="lazy"
                         />
                       </div>
@@ -224,7 +225,7 @@ export function PageDisplay({
               <div
                 key={pageNum}
                 id={`page-${pageNum}`}
-                className={`flex-shrink-0 h-full flex items-center justify-center snap-center ${isTashelOrMadinah ? 'py-2' : ''}`}
+                className={`flex-shrink-0 h-full flex items-center justify-center snap-center ${isTashelOrMadinah ? 'py-1' : ''}`}
                 style={{ width: '100%', minWidth: '100%' }}
               >
                 <div className={`relative flex items-center justify-center ${mushafType === 'tashel' ? 'px-2' : ''}`}>
@@ -275,7 +276,7 @@ export function PageDisplay({
                   <img
                     src={`${getMushafPath()}/${imageFilename}`}
                     alt={`${t('page')} ${pageNum}`}
-                    className={`max-w-full ${isTashelOrMadinah ? 'max-h-[calc(100dvh-200px)]' : 'max-h-[calc(100dvh-180px)]'} w-auto h-auto object-contain md:shadow-2xl md:rounded-xl md:border-4 md:border-white mx-auto`}
+                    className="max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain md:shadow-2xl md:rounded-xl md:border-4 md:border-white mx-auto"
                     loading="eager"
                   />
                 </div>
