@@ -175,15 +175,55 @@ export const useAudioPlayer = ({
   const updateMediaSession = useCallback((surahNum: number, ayahNum: number, playing: boolean) => {
     if (!('mediaSession' in navigator)) return;
     
+    // Clean reciter name by removing style indicators (مرتل, معلم, مجود, Murattal, Mujawwad, etc.)
+    const cleanName = (name: string): string => {
+      return name
+        .replace(/\s*-\s*مرتل\s*/g, '')
+        .replace(/\s*-\s*معلم\s*/g, '')
+        .replace(/\s*-\s*مجود\s*/g, '')
+        .replace(/\s*مرتل\s*/g, '')
+        .replace(/\s*معلم\s*/g, '')
+        .replace(/\s*مجود\s*/g, '')
+        .replace(/\s*-?\s*Murattal\s*/gi, '')
+        .replace(/\s*-?\s*Mujawwad\s*/gi, '')
+        .replace(/\s*-?\s*Muallim\s*/gi, '')
+        .replace(/\s*-?\s*Mo'lim\s*/gi, '')
+        .replace(/\s*-?\s*Teacher\s*/gi, '')
+        .trim();
+    };
+    
     const surah = surahs.find(s => s.id === surahNum);
     const surahName = surah?.name || `سورة ${surahNum}`;
     const surahEnglishName = surah?.englishName || `Surah ${surahNum}`;
-    const reciterName = selectedReciter?.nameAr || selectedReciter?.name || 'Reciter';
+    
+    // For mp3quran: show "Reciter - Surah" since it's one continuous audio for entire surah
+    // For everyayah: show "Surah - Ayah X" since ayahs are tracked individually
+    let title: string;
+    let artist: string;
+    
+    if (audioSource === 'mp3quran' && selectedMp3QuranReciter) {
+      // MP3Quran: Reciter name as title, Surah as artist
+      // Show both English and Arabic names: "English name - Arabic name"
+      const arabicReciter = mp3QuranRecitersAr.find(r => r.id === selectedMp3QuranReciter.id);
+      const englishName = cleanName(selectedMp3QuranReciter.name || 'Reciter');
+      const arabicName = cleanName(arabicReciter?.name || '');
+      const reciterName = arabicName ? `${englishName} - ${arabicName}` : englishName;
+      title = reciterName;
+      artist = surahName;
+    } else {
+      // EveryAyah: Reciter name as title, Surah - Ayah as artist (consistent with mp3quran)
+      // Show both English and Arabic names: "English name - Arabic name"
+      const englishName = cleanName(selectedReciter?.name || 'Reciter');
+      const arabicName = cleanName(selectedReciter?.nameAr || '');
+      const reciterName = arabicName ? `${englishName} - ${arabicName}` : englishName;
+      title = reciterName;
+      artist = `${surahName} - آية ${ayahNum}`;
+    }
     
     // Set metadata to keep notification visible
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: `${surahName} - آية ${ayahNum}`,
-      artist: reciterName,
+      title: title,
+      artist: artist,
       album: surahEnglishName,
       artwork: [
         { src: `${import.meta.env.BASE_URL}icon-192.png`, sizes: '192x192', type: 'image/png' },
@@ -193,7 +233,7 @@ export const useAudioPlayer = ({
     
     // Set playback state
     navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
-  }, [selectedReciter]);
+  }, [selectedReciter, audioSource, selectedMp3QuranReciter, mp3QuranRecitersAr]);
   
   // Get next ayah in sequence
   const getNextAyah = useCallback((currentSurah: number, currentAyah: number): CurrentAyah | null => {
