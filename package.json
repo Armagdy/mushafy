@@ -11,7 +11,10 @@
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "optimize-images": "node scripts/optimize-images.js",
+    "optimize-images:dry": "node scripts/optimize-images.js --dry-run",
+    "optimize-images:backup": "node scripts/optimize-images.js --backup"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -83,6 +86,7 @@
     "jsdom": "^20.0.3",
     "lovable-tagger": "^1.1.13",
     "postcss": "^8.5.6",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",

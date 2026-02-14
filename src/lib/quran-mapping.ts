@@ -54,9 +54,9 @@ export const getSurahPages = async (surahId: number): Promise<number[]> => {
 
 // Get image filename for a specific page
 export const getPageImageFilename = (pageNumber: number): string => {
-  // Both mushafs now use page_XXXX.jpg format
+  // All mushafs use page_XXXX.webp format (optimized WebP images)
   const paddedPageNumber = String(pageNumber).padStart(4, '0');
-  return `page_${paddedPageNumber}.jpg`;
+  return `page_${paddedPageNumber}.webp`;
 };
 
 // Get surah info for a specific page
