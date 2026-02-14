@@ -829,30 +829,23 @@ const Surah = () => {
                 localStorage.setItem('quran-last-reciter', reciterToApply.folder);
               }
             }
+            // Close the dialog after saving (no auto-play for EveryAyah)
+            setShowReciterDialog(false);
           } else if (audioSource === 'mp3quran') {
             // MP3Quran: Ensure moshaf is selected
             if (selectedMp3QuranReciter && selectedMoshaf) {
               localStorage.setItem('quran-last-mp3quran-moshaf', selectedMoshaf.id.toString());
             }
-          }
-          
-          // Close the dialog first
-          setShowReciterDialog(false);
-          
-          // Then start playing after a brief delay to ensure state is updated
-          setTimeout(() => {
-            if (audioSource === 'mp3quran') {
+            
+            // Close the dialog first
+            setShowReciterDialog(false);
+            
+            // Then start playing after a brief delay to ensure state is updated
+            setTimeout(() => {
               // MP3Quran: Always start from first ayah of current surah (full surah audio)
               playAyah(currentSurahId, 1);
-            } else {
-              // EveryAyah: Play current ayah or first ayah of current surah
-              if (currentPlayingAyah) {
-                playAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
-              } else {
-                playAyah(currentSurahId, 1);
-              }
-            }
-          }, 100);
+            }, 100);
+          }
         }}
       />
 
