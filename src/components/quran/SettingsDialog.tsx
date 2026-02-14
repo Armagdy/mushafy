@@ -3,11 +3,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Button } from "@/components/ui/button";
+import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Check, ChevronsUpDown } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMushaf, MushafType } from "@/contexts/MushafContext";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
+import { surahs } from "@/data/surahs";
+import { ASSETS_BASE_URL } from "@/config/assets";
+import { getAudioData } from "@/lib/quran-data-service";
+import { getMp3QuranReciters, getSurahAudioUrl, type Mp3QuranReciter, type Mp3QuranMoshaf } from "@/lib/mp3quran-service";
+import { cacheAsset } from "@/lib/asset-cache";
+import { getPageImageFilename } from "@/lib/quran-mapping";
+
+interface Reciter {
+  folder: string;
+  name: string;
+  nameAr: string;
+  baseUrl: string;
+  reading: string;
+  style: string;
+  quality: string;
+}
 
 interface SettingsDialogProps {
   open: boolean;
@@ -32,7 +51,7 @@ export function SettingsDialog({
   showBottomBarText,
   onShowBottomBarTextChange,
 }: SettingsDialogProps) {
-  const { t, isRTL } = useLanguage();
+  const { t, isRTL, language } = useLanguage();
   const { mushafType, setMushafType } = useMushaf();
   
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -43,6 +62,160 @@ export function SettingsDialog({
   // Local state for mushaf selection (only applied on save)
   const [selectedMushaf, setSelectedMushaf] = useState<MushafType>(mushafType);
   const hasUnsavedChanges = selectedMushaf !== mushafType;
+  
+  // Download state
+  const [downloadType, setDownloadType] = useState<'pages' | 'everyayah' | 'mp3quran'>('pages');
+  const [downloadMushafType, setDownloadMushafType] = useState<MushafType>(mushafType);
+  const [downloadFromPage, setDownloadFromPage] = useState(1);
+  const [downloadToPage, setDownloadToPage] = useState(604);
+  const [downloadFromSurah, setDownloadFromSurah] = useState(1);
+  const [downloadToSurah, setDownloadToSurah] = useState(114);
+  const [downloadFromAyah, setDownloadFromAyah] = useState(1);
+  const [downloadToAyah, setDownloadToAyah] = useState(7);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
+  
+  // Reciter state for downloads
+  const [everyAyahReciters, setEveryAyahReciters] = useState<Reciter[]>([]);
+  const [selectedEveryAyahReciter, setSelectedEveryAyahReciter] = useState<string>('');
+  const [selectedRecitationStyle, setSelectedRecitationStyle] = useState<string>('__all__');
+  const [selectedQuality, setSelectedQuality] = useState<string>('__all__');
+  const [openReciterPopover, setOpenReciterPopover] = useState(false);
+  const [mp3QuranReciters, setMp3QuranReciters] = useState<Mp3QuranReciter[]>([]);
+  const [selectedMp3QuranReciter, setSelectedMp3QuranReciter] = useState<number | null>(null);
+  const [selectedMoshaf, setSelectedMoshaf] = useState<Mp3QuranMoshaf | null>(null);
+  
+  // Get the selected reciter object
+  const selectedReciterObj = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
+  
+  // Get reciters matching the selected reciter name (same reciter can have different styles/qualities)
+  const recitersMatchingName = selectedReciterObj 
+    ? everyAyahReciters.filter(r => r.nameAr === selectedReciterObj.nameAr)
+    : everyAyahReciters;
+  
+  // Get unique styles based on selected reciter name
+  const uniqueStyles = selectedEveryAyahReciter
+    ? [...new Set(recitersMatchingName.map(r => r.style).filter(Boolean))]
+    : [...new Set(everyAyahReciters.map(r => r.style).filter(Boolean))];
+  
+  // Get reciters matching reciter name AND selected style (for quality filtering)
+  const recitersMatchingNameAndStyle = selectedRecitationStyle === '__all__'
+    ? recitersMatchingName
+    : recitersMatchingName.filter(r => r.style === selectedRecitationStyle);
+  
+  // Get unique qualities based on selected reciter AND style
+  const uniqueQualities = [...new Set(recitersMatchingNameAndStyle.map(r => r.quality).filter(Boolean))].sort((a, b) => {
+    const numA = parseInt(a);
+    const numB = parseInt(b);
+    return numA - numB;
+  });
+  
+  // Filter reciters based on selected style and quality (for final reciter selection)
+  const filteredEveryAyahReciters = everyAyahReciters.filter(r => {
+    if (selectedRecitationStyle !== '__all__' && r.style !== selectedRecitationStyle) return false;
+    if (selectedQuality !== '__all__' && r.quality !== selectedQuality) return false;
+    return true;
+  });
+  
+  // Normalize Arabic text for search
+  const normalizeArabic = (text: string): string => {
+    return text
+      .replace(/[أإآٱ]/g, 'ا')
+      .replace(/[\u064B-\u065F\u0670]/g, '')
+      .replace(/\u0640/g, '')
+      .toLowerCase();
+  };
+  
+  // Custom filter for Arabic text search
+  const arabicFilter = (value: string, search: string): number => {
+    if (!search || !search.trim()) return 1;
+    const normalizedValue = normalizeArabic(value.trim());
+    const normalizedSearch = normalizeArabic(search.trim());
+    return normalizedValue.includes(normalizedSearch) ? 1 : 0;
+  };
+  
+  // Determine if download button should be enabled
+  const isDownloadEnabled = (() => {
+    if (isDownloading) return false;
+    
+    if (downloadType === 'pages') {
+      return true; // Pages just need a range
+    } else if (downloadType === 'everyayah') {
+      // Need reciter, style, and quality all selected (not __all__)
+      return selectedEveryAyahReciter !== '' && 
+             selectedRecitationStyle !== '__all__' && 
+             selectedQuality !== '__all__';
+    } else if (downloadType === 'mp3quran') {
+      return selectedMp3QuranReciter !== null && selectedMoshaf !== null;
+    }
+    return false;
+  })();
+  
+  // Load reciters when download tab is active
+  useEffect(() => {
+    if (activeTab === 'download') {
+      // Load EveryAyah reciters
+      getAudioData().then((data) => {
+        setEveryAyahReciters(data);
+        if (data.length > 0 && !selectedEveryAyahReciter) {
+          setSelectedEveryAyahReciter(data[0].folder);
+        }
+      });
+      
+      // Load MP3Quran reciters
+      getMp3QuranReciters(language).then((data) => {
+        setMp3QuranReciters(data);
+        if (data.length > 0 && !selectedMp3QuranReciter) {
+          setSelectedMp3QuranReciter(data[0].id);
+          if (data[0].moshaf && data[0].moshaf.length > 0) {
+            setSelectedMoshaf(data[0].moshaf[0]);
+          }
+        }
+      });
+    }
+  }, [activeTab, language]);
+  
+  // Update moshaf when reciter changes
+  useEffect(() => {
+    if (selectedMp3QuranReciter) {
+      const reciter = mp3QuranReciters.find(r => r.id === selectedMp3QuranReciter);
+      if (reciter && reciter.moshaf && reciter.moshaf.length > 0) {
+        setSelectedMoshaf(reciter.moshaf[0]);
+      }
+    }
+  }, [selectedMp3QuranReciter, mp3QuranReciters]);
+  
+  // Update max ayahs when surah changes
+  useEffect(() => {
+    const surah = surahs.find(s => s.id === downloadFromSurah);
+    if (surah) {
+      setDownloadToAyah(surah.numberOfAyahs);
+    }
+  }, [downloadFromSurah]);
+
+  // Auto-update reciter selection when style/quality changes and current selection doesn't match
+  useEffect(() => {
+    if (!selectedEveryAyahReciter) return;
+    
+    const currentReciter = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
+    if (!currentReciter) return;
+    
+    const styleMatches = selectedRecitationStyle === '__all__' || currentReciter.style === selectedRecitationStyle;
+    const qualityMatches = selectedQuality === '__all__' || currentReciter.quality === selectedQuality;
+    
+    if (!styleMatches || !qualityMatches) {
+      // Find a matching reciter with same name
+      const matchingReciter = everyAyahReciters.find(r => 
+        r.nameAr === currentReciter.nameAr &&
+        (selectedRecitationStyle === '__all__' || r.style === selectedRecitationStyle) &&
+        (selectedQuality === '__all__' || r.quality === selectedQuality)
+      );
+      
+      if (matchingReciter) {
+        setSelectedEveryAyahReciter(matchingReciter.folder);
+      }
+    }
+  }, [selectedRecitationStyle, selectedQuality, everyAyahReciters]);
 
   // Reset selected mushaf when dialog opens
   useEffect(() => {
@@ -63,6 +236,67 @@ export function SettingsDialog({
     onPagesToLoadChange(pages);
     localStorage.setItem('quran-pages-to-load', String(pages));
   };
+  
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    
+    try {
+      if (downloadType === 'pages') {
+        // Cache mushaf pages
+        const total = downloadToPage - downloadFromPage + 1;
+        setDownloadProgress({ current: 0, total });
+        
+        // Get mushaf path based on download mushaf type
+        const folder = downloadMushafType === 'mwdoa' 
+          ? 'mushuf_mwdoa_images' 
+          : downloadMushafType === 'tashel'
+          ? 'mushaf_tashel_pages'
+          : 'mushaf_madinah_images';
+        const mushafPath = `${ASSETS_BASE_URL}/${folder}`;
+        const category = `mushaf-${downloadMushafType}`;
+        
+        for (let page = downloadFromPage; page <= downloadToPage; page++) {
+          const url = `${mushafPath}/${getPageImageFilename(page)}`;
+          await cacheAsset(url, category);
+          setDownloadProgress({ current: page - downloadFromPage + 1, total });
+        }
+      } else if (downloadType === 'everyayah') {
+        // Cache EveryAyah audio
+        const reciter = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
+        if (!reciter) return;
+        
+        const total = downloadToAyah - downloadFromAyah + 1;
+        setDownloadProgress({ current: 0, total });
+        const category = `audio-everyayah-${reciter.folder}`;
+        
+        for (let ayah = downloadFromAyah; ayah <= downloadToAyah; ayah++) {
+          const surahStr = downloadFromSurah.toString().padStart(3, '0');
+          const ayahStr = ayah.toString().padStart(3, '0');
+          const url = `${reciter.baseUrl}/${surahStr}${ayahStr}.mp3`;
+          await cacheAsset(url, category);
+          setDownloadProgress({ current: ayah - downloadFromAyah + 1, total });
+        }
+      } else if (downloadType === 'mp3quran') {
+        // Cache MP3Quran full surah audio
+        if (!selectedMoshaf) return;
+        
+        const total = downloadToSurah - downloadFromSurah + 1;
+        setDownloadProgress({ current: 0, total });
+        const category = `audio-mp3quran-${selectedMoshaf.id}`;
+        
+        for (let surahNum = downloadFromSurah; surahNum <= downloadToSurah; surahNum++) {
+          const url = getSurahAudioUrl(selectedMoshaf.server, surahNum);
+          await cacheAsset(url, category);
+          setDownloadProgress({ current: surahNum - downloadFromSurah + 1, total });
+        }
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress({ current: 0, total: 0 });
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -82,27 +316,34 @@ export function SettingsDialog({
         
         <div className="p-4">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
+            <TabsList className="grid w-full grid-cols-4 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
               <TabsTrigger 
                 value="mushaf" 
-                className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]"
+                className="text-sm md:text-base data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1"
               >
-                <BookOpen className="w-4 h-4 mr-1.5" />
+                <BookOpen className="w-3 h-3 md:w-4 md:h-4 mr-0.5 md:mr-1" />
                 {isRTL ? 'المصحف' : 'Mushaf'}
               </TabsTrigger>
               <TabsTrigger 
-                value="style" 
-                className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]"
+                value="download" 
+                className="text-sm md:text-base data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1"
               >
-                <Palette className="w-4 h-4 mr-1.5" />
-                {isRTL ? 'العرض' : 'Style'}
+                <HardDriveDownload className="w-3 h-3 md:w-4 md:h-4 mr-0.5 md:mr-1" />
+                {t('download')}
               </TabsTrigger>
               <TabsTrigger 
                 value="test" 
-                className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]"
+                className="text-sm md:text-base data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1"
               >
-                <GraduationCap className="w-4 h-4 mr-1.5" />
+                <GraduationCap className="w-3 h-3 md:w-4 md:h-4 mr-0.5 md:mr-1" />
                 {isRTL ? 'اختبار' : 'Test'}
+              </TabsTrigger>
+              <TabsTrigger 
+                value="style" 
+                className="text-sm md:text-base data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1"
+              >
+                <Palette className="w-3 h-3 md:w-4 md:h-4 mr-0.5 md:mr-1" />
+                {isRTL ? 'العرض' : 'Style'}
               </TabsTrigger>
             </TabsList>
 
@@ -216,6 +457,301 @@ export function SettingsDialog({
                   />
                 </div>
               </div>
+            </TabsContent>
+
+            {/* Download Tab */}
+            <TabsContent value="download" className="space-y-4 mt-4">
+              {/* Download Type Selection */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <HardDriveDownload className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">
+                    {t('downloadType')}
+                  </span>
+                </div>
+                <Select value={downloadType} onValueChange={(value) => setDownloadType(value as 'pages' | 'everyayah' | 'mp3quran')}>
+                  <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
+                    <SelectItem value="pages" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900">
+                      {t('downloadMushafPages')}
+                    </SelectItem>
+                    <SelectItem value="everyayah" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900">
+                      {t('downloadEveryAyahAudio')}
+                    </SelectItem>
+                    <SelectItem value="mp3quran" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900">
+                      {t('downloadMp3QuranAudio')}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Pages Download Options */}
+              {downloadType === 'pages' && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('mushafType')}</label>
+                    <Select value={downloadMushafType} onValueChange={(value) => setDownloadMushafType(value as MushafType)}>
+                      <SelectTrigger className="w-full text-base md:text-lg border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
+                        <SelectItem value="mwdoa" className="text-base focus:bg-emerald-100 focus:text-emerald-900">{t('mushafMwdoa')}</SelectItem>
+                        <SelectItem value="tashel" className="text-base focus:bg-emerald-100 focus:text-emerald-900">{t('mushafTashel')}</SelectItem>
+                        <SelectItem value="madinah" className="text-base focus:bg-emerald-100 focus:text-emerald-900">{t('mushafMadinah')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('fromPage')}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={604}
+                        value={downloadFromPage}
+                        onChange={(e) => setDownloadFromPage(Math.min(604, Math.max(1, parseInt(e.target.value) || 1)))}
+                        className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('toPage')}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={604}
+                        value={downloadToPage}
+                        onChange={(e) => setDownloadToPage(Math.min(604, Math.max(1, parseInt(e.target.value) || 604)))}
+                        className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* EveryAyah Download Options */}
+              {downloadType === 'everyayah' && (
+                <div className="flex flex-col gap-3">
+                  {/* Reciter */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('reciter')}</label>
+                    <Popover open={openReciterPopover} onOpenChange={setOpenReciterPopover}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={openReciterPopover}
+                          className="w-full justify-between text-base md:text-lg border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 bg-white dark:bg-emerald-950"
+                        >
+                          {selectedEveryAyahReciter
+                            ? (isRTL 
+                                ? everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter)?.nameAr 
+                                : everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter)?.name)
+                            : (isRTL ? 'اختر القارئ' : 'Select reciter')}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0 bg-[#FBF9F4] dark:bg-emerald-950" align="start">
+                        <Command filter={arabicFilter}>
+                          <CommandInput placeholder={isRTL ? 'ابحث عن قارئ...' : 'Search reciter...'} className="text-base" />
+                          <CommandList>
+                            <CommandEmpty>{isRTL ? 'لم يتم العثور على قارئ' : 'No reciter found'}</CommandEmpty>
+                            <CommandGroup className="max-h-60 overflow-y-auto">
+                              {filteredEveryAyahReciters.map((reciter) => (
+                                <CommandItem
+                                  key={reciter.folder}
+                                  value={isRTL ? reciter.nameAr : reciter.name}
+                                  onSelect={() => {
+                                    setSelectedEveryAyahReciter(reciter.folder);
+                                    setOpenReciterPopover(false);
+                                  }}
+                                  className="text-base cursor-pointer"
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedEveryAyahReciter === reciter.folder ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {isRTL ? reciter.nameAr : reciter.name}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  
+                  {/* Recitation Style */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('recitationStyle')}</label>
+                    <Select value={selectedRecitationStyle} onValueChange={(v) => {
+                      setSelectedRecitationStyle(v);
+                      // Reset quality selection when style changes (reciter stays)
+                      setSelectedQuality('__all__');
+                    }}>
+                      <SelectTrigger className="w-full text-base md:text-lg border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                        <SelectValue placeholder={isRTL ? 'الكل' : 'All'} />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60">
+                        <SelectItem value="__all__" className="text-base focus:bg-emerald-100 focus:text-emerald-900">
+                          {isRTL ? 'الكل' : 'All'}
+                        </SelectItem>
+                        {uniqueStyles.map((style) => (
+                          <SelectItem key={style} value={style} className="text-base focus:bg-emerald-100 focus:text-emerald-900">
+                            {style === 'murattal' ? (isRTL ? 'مرتل' : 'Murattal') : 
+                             style === 'mujawwad' ? (isRTL ? 'مجود' : 'Mujawwad') :
+                             style === 'muallim' ? (isRTL ? 'معلم' : 'Muallim') : style}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Quality */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('quality')}</label>
+                    <Select value={selectedQuality} onValueChange={setSelectedQuality}>
+                      <SelectTrigger className="w-full text-base md:text-lg border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                        <SelectValue placeholder={isRTL ? 'الكل' : 'All'} />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60">
+                        <SelectItem value="__all__" className="text-base focus:bg-emerald-100 focus:text-emerald-900">
+                          {isRTL ? 'الكل' : 'All'}
+                        </SelectItem>
+                        {uniqueQualities.map((quality) => (
+                          <SelectItem key={quality} value={quality} className="text-base focus:bg-emerald-100 focus:text-emerald-900">
+                            {quality}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('selectSurah')}</label>
+                    <Select value={String(downloadFromSurah)} onValueChange={(v) => setDownloadFromSurah(parseInt(v))}>
+                      <SelectTrigger className="w-full text-base md:text-lg border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60">
+                        {surahs.map((surah) => (
+                          <SelectItem key={surah.id} value={String(surah.id)} className="text-base focus:bg-emerald-100 focus:text-emerald-900">
+                            {surah.id}. {isRTL ? surah.name : surah.englishName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('fromAyah')}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={surahs.find(s => s.id === downloadFromSurah)?.numberOfAyahs || 7}
+                        value={downloadFromAyah}
+                        onChange={(e) => setDownloadFromAyah(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('toAyah')}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={surahs.find(s => s.id === downloadFromSurah)?.numberOfAyahs || 7}
+                        value={downloadToAyah}
+                        onChange={(e) => setDownloadToAyah(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* MP3Quran Download Options */}
+              {downloadType === 'mp3quran' && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('reciter')}</label>
+                    <Select value={selectedMp3QuranReciter?.toString() || ''} onValueChange={(v) => setSelectedMp3QuranReciter(parseInt(v))}>
+                      <SelectTrigger className="w-full text-base md:text-lg border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60">
+                        {mp3QuranReciters.map((reciter) => (
+                          <SelectItem key={reciter.id} value={String(reciter.id)} className="text-base focus:bg-emerald-100 focus:text-emerald-900">
+                            {reciter.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('fromSurah')}</label>
+                      <Select value={String(downloadFromSurah)} onValueChange={(v) => setDownloadFromSurah(parseInt(v))}>
+                        <SelectTrigger className="w-full text-base md:text-lg border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60">
+                          {surahs.map((surah) => (
+                            <SelectItem key={surah.id} value={String(surah.id)} className="text-base focus:bg-emerald-100 focus:text-emerald-900">
+                              {surah.id}. {isRTL ? surah.name : surah.englishName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('toSurah')}</label>
+                      <Select value={String(downloadToSurah)} onValueChange={(v) => setDownloadToSurah(parseInt(v))}>
+                        <SelectTrigger className="w-full text-base md:text-lg border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60">
+                          {surahs.map((surah) => (
+                            <SelectItem key={surah.id} value={String(surah.id)} className="text-base focus:bg-emerald-100 focus:text-emerald-900">
+                              {surah.id}. {isRTL ? surah.name : surah.englishName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Download Progress */}
+              {isDownloading && downloadProgress.total > 0 && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between text-sm md:text-base text-emerald-700">
+                    <span>{t('downloadProgress')}</span>
+                    <span>{downloadProgress.current} / {downloadProgress.total}</span>
+                  </div>
+                  <div className="w-full h-2 bg-emerald-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-600 transition-all duration-300"
+                      style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {/* Download Button */}
+              <button
+                onClick={handleDownload}
+                disabled={!isDownloadEnabled}
+                className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 md:px-4 h-10 md:h-12 border border-emerald-600 shadow-md transition-all"
+              >
+                <HardDriveDownload className="w-5 h-5 text-[#F2E3BB]" />
+                <span className="text-[#F2E3BB] text-base md:text-xl font-bold">
+                  {isDownloading ? t('downloadProgress') : t('startDownload')}
+                </span>
+              </button>
             </TabsContent>
 
             {/* Test Tab */}

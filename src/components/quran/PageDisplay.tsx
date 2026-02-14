@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useMushaf } from '@/contexts/MushafContext';
 import { getPageImageFilename } from '@/lib/quran-mapping';
+import { CachedImage } from './CachedImage';
 
 interface PageDisplayProps {
   currentPageNum: number;
@@ -90,7 +91,7 @@ export function PageDisplay({
                             )}
                           </div>
                         )}
-                        <img
+                        <CachedImage
                           src={`${getMushafPath()}/${getPageImageFilename(leftPageNum)}`}
                           alt={`${t('page')} ${leftPageNum}`}
                           className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
@@ -116,7 +117,7 @@ export function PageDisplay({
                             )}
                           </div>
                         )}
-                        <img
+                        <CachedImage
                           src={`${getMushafPath()}/${getPageImageFilename(rightPageNum)}`}
                           alt={`${t('page')} ${rightPageNum}`}
                           className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
@@ -145,7 +146,7 @@ export function PageDisplay({
                             )}
                           </div>
                         )}
-                        <img
+                        <CachedImage
                           src={`${getMushafPath()}/${getPageImageFilename(rightPageNum)}`}
                           alt={`${t('page')} ${rightPageNum}`}
                           className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
@@ -171,7 +172,7 @@ export function PageDisplay({
                             )}
                           </div>
                         )}
-                        <img
+                        <CachedImage
                           src={`${getMushafPath()}/${getPageImageFilename(leftPageNum)}`}
                           alt={`${t('page')} ${leftPageNum}`}
                           className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
@@ -273,7 +274,7 @@ export function PageDisplay({
                       </defs>
                     </svg>
                   </div>
-                  <img
+                  <CachedImage
                     src={`${getMushafPath()}/${imageFilename}`}
                     alt={`${t('page')} ${pageNum}`}
                     className="max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain md:shadow-2xl md:rounded-xl md:border-4 md:border-white mx-auto"
