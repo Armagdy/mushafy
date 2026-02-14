@@ -666,6 +666,171 @@ export const useAudioPlayer = ({
     }
   }, [selectedReciter, ayahData, audioSource, audioContext, audioBufferToWav, repeatBlobUrl]);
   
+  // Concatenate mp3quran surah audio for repeat (passage-level repeat)
+  const concatenateMp3QuranRepeat = useCallback(async (
+    startSurah: number,
+    endSurah: number,
+    passageRepeatCount: number
+  ): Promise<{ blobUrl: string; timestamps: {surah: number; passage: number; startTime: number}[] } | null> => {
+    if (!selectedMoshaf || audioSource !== 'mp3quran') return null;
+    if (!audioContext) return null;
+    
+    // Generate list of all surahs in the range
+    const surahsInRange: number[] = [];
+    for (let s = startSurah; s <= endSurah; s++) {
+      // Check if surah is available in this moshaf
+      if (selectedMoshaf.surah_list) {
+        const surahList = selectedMoshaf.surah_list.split(',').map(str => parseInt(str.trim(), 10));
+        if (surahList.includes(s)) {
+          surahsInRange.push(s);
+        }
+      } else {
+        surahsInRange.push(s);
+      }
+    }
+    
+    if (surahsInRange.length === 0) return null;
+    
+    // Calculate total segments
+    const totalSegments = surahsInRange.length * passageRepeatCount;
+    
+    // Create new AbortController for this operation
+    preloadAbortControllerRef.current = new AbortController();
+    const signal = preloadAbortControllerRef.current.signal;
+    
+    setIsPreloadingAyahs(true);
+    setPreloadProgress({ current: 0, total: totalSegments });
+    
+    try {
+      // Download all unique surah audio files and cache their buffers
+      const audioBufferCache: Map<number, AudioBuffer> = new Map();
+      let downloadProgress = 0;
+      
+      for (const surahNum of surahsInRange) {
+        if (audioBufferCache.has(surahNum)) continue;
+        
+        // Check if aborted
+        if (signal.aborted) {
+          console.log('⛔ MP3Quran repeat preload aborted');
+          setIsPreloadingAyahs(false);
+          setPreloadProgress({ current: 0, total: 0 });
+          return null;
+        }
+        
+        const audioUrl = getSurahAudioUrl(selectedMoshaf.server, surahNum);
+        
+        try {
+          const response = await fetch(audioUrl, { signal });
+          if (!response.ok) throw new Error(`Failed to fetch: ${audioUrl}`);
+          
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          audioBufferCache.set(surahNum, audioBuffer);
+          
+          downloadProgress++;
+          setPreloadProgress({ current: downloadProgress, total: totalSegments });
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            console.log('⛔ MP3Quran repeat preload aborted during fetch');
+            setIsPreloadingAyahs(false);
+            setPreloadProgress({ current: 0, total: 0 });
+            return null;
+          }
+          console.error(`Failed to load surah ${surahNum}:`, error);
+          setIsPreloadingAyahs(false);
+          setPreloadProgress({ current: 0, total: 0 });
+          return null;
+        }
+      }
+      
+      // Check if aborted before building sequence
+      if (signal.aborted) {
+        console.log('⛔ MP3Quran repeat preload aborted before building sequence');
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        return null;
+      }
+      
+      // Build the sequence of audio buffers with passage repeats
+      const audioBufferSequence: AudioBuffer[] = [];
+      const timestamps: {surah: number; passage: number; startTime: number}[] = [];
+      let currentTime = 0;
+      let segmentCount = downloadProgress;
+      
+      for (let passage = 1; passage <= passageRepeatCount; passage++) {
+        for (const surahNum of surahsInRange) {
+          const buffer = audioBufferCache.get(surahNum);
+          if (!buffer) continue;
+          
+          // Record timestamp for this segment
+          timestamps.push({
+            surah: surahNum,
+            passage,
+            startTime: currentTime
+          });
+          
+          audioBufferSequence.push(buffer);
+          currentTime += buffer.duration;
+          
+          segmentCount++;
+          setPreloadProgress({ current: segmentCount, total: totalSegments });
+        }
+      }
+      
+      if (audioBufferSequence.length === 0) {
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        return null;
+      }
+      
+      // Calculate total duration and create concatenated buffer
+      const totalDuration = audioBufferSequence.reduce((sum, buffer) => sum + buffer.duration, 0);
+      const numberOfChannels = audioBufferSequence[0].numberOfChannels;
+      const sampleRate = audioBufferSequence[0].sampleRate;
+      const totalLength = Math.ceil(totalDuration * sampleRate);
+      
+      const concatenated = audioContext.createBuffer(
+        numberOfChannels,
+        totalLength,
+        sampleRate
+      );
+      
+      // Copy all buffers into the concatenated buffer
+      let offset = 0;
+      for (let i = 0; i < audioBufferSequence.length; i++) {
+        const buffer = audioBufferSequence[i];
+        for (let channel = 0; channel < numberOfChannels; channel++) {
+          const sourceData = buffer.getChannelData(channel);
+          const targetData = concatenated.getChannelData(channel);
+          targetData.set(sourceData, offset);
+        }
+        offset += buffer.length;
+      }
+      
+      // Convert buffer to WAV blob and create URL
+      const wavBlob = audioBufferToWav(concatenated);
+      const blobUrl = URL.createObjectURL(wavBlob);
+      
+      // Revoke old repeat blob URL if exists
+      if (repeatBlobUrl) {
+        URL.revokeObjectURL(repeatBlobUrl);
+      }
+      
+      setRepeatBlobUrl(blobUrl);
+      setIsPreloadingAyahs(false);
+      setPreloadProgress({ current: 0, total: 0 });
+      
+      console.log(`✅ Created MP3Quran repeat audio: ${surahsInRange.length} surahs × ${passageRepeatCount} passages = ${timestamps.length} segments`);
+      
+      return { blobUrl, timestamps };
+    } catch (error) {
+      console.error('Error concatenating MP3Quran repeat:', error);
+      setIsPreloadingAyahs(false);
+      setPreloadProgress({ current: 0, total: 0 });
+      return null;
+    }
+  }, [selectedMoshaf, audioSource, audioContext, audioBufferToWav, repeatBlobUrl]);
+  
   // Update current ayah based on playback time for concatenated audio (HTML Audio element)
   const updateCurrentAyahFromTime = useCallback((surahNum: number) => {
     if (!audioElement || ayahTimestamps.length === 0) return;
@@ -1215,8 +1380,68 @@ export const useAudioPlayer = ({
       
       audioElement.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
       audioElement.load();
+    } else if (audioSource === 'mp3quran' && selectedMoshaf) {
+      // MP3Quran mode: create concatenated audio with surah/passage repeats baked in
+      const result = await concatenateMp3QuranRepeat(
+        startSurah,
+        endSurah,
+        passageCount
+      );
+      
+      if (!result) {
+        console.error('Failed to concatenate MP3Quran repeat audio');
+        return;
+      }
+      
+      // Set up repeat mode
+      setIsRepeatActive(true);
+      setIsRepeatConcatenatedMode(true);
+      setCurrentRepeatPassage(1);
+      setCurrentRepeatSurah(startSurah);
+      setCurrentRepeatAyah(1);
+      setCurrentRepeatAyahCount(1);
+      
+      // Navigate to the start page
+      const startSurahData = ayahData.find(s => s.number === startSurah);
+      if (startSurahData && startSurahData.verses && startSurahData.verses.length > 0) {
+        const firstVerse = startSurahData.verses[0];
+        if (firstVerse && firstVerse.page && firstVerse.page !== currentPageNum) {
+          isAyahNavigation.current = true;
+          navigate(`/page/${firstVerse.page}#${startSurah}-1`);
+        }
+      }
+      
+      // Play the concatenated repeat audio
+      setCurrentPlayingAyah({ surah: startSurah, ayah: 1 });
+      updateMediaSession(startSurah, 1, true);
+      requestWakeLock();
+      
+      audioElement.src = result.blobUrl;
+      
+      const handleMp3QuranLoadedMetadata = () => {
+        audioElement.currentTime = 0;
+        audioElement.play().then(() => {
+          setIsPlaying(true);
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'playing';
+          }
+          setTimeout(() => {
+            isAyahNavigation.current = false;
+          }, 500);
+        }).catch(err => {
+          console.error('Failed to play MP3Quran repeat audio:', err);
+          setIsPlaying(false);
+          setIsRepeatActive(false);
+          setIsRepeatConcatenatedMode(false);
+          releaseWakeLock();
+          isAyahNavigation.current = false;
+        });
+      };
+      
+      audioElement.addEventListener('loadedmetadata', handleMp3QuranLoadedMetadata, { once: true });
+      audioElement.load();
     } else {
-      // MP3Quran or fallback: use the old sequential playback method
+      // Fallback: use the old sequential playback method
       setIsRepeatActive(true);
       setIsRepeatConcatenatedMode(false);
       setCurrentRepeatPassage(1);
@@ -1225,7 +1450,7 @@ export const useAudioPlayer = ({
       setCurrentRepeatAyahCount(1);
       playAyah(startSurah, startAyah);
     }
-  }, [repeatPassageCount, repeatAyahCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, audioSource, selectedReciter, audioElement, ayahData, currentPageNum, navigate, isAyahNavigation, updateMediaSession, requestWakeLock, releaseWakeLock, concatenateRepeatAyahs, playAyah]);
+  }, [repeatPassageCount, repeatAyahCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, audioSource, selectedReciter, selectedMoshaf, audioElement, ayahData, currentPageNum, navigate, isAyahNavigation, updateMediaSession, requestWakeLock, releaseWakeLock, concatenateRepeatAyahs, concatenateMp3QuranRepeat, playAyah]);
   
   // Helper function to check if a surah is available in the current moshaf
   const isSurahAvailableInMoshaf = useCallback((surahNum: number): boolean => {

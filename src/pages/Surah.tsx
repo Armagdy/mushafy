@@ -618,6 +618,8 @@ const Surah = () => {
           repeatAyahTimestamps={repeatAyahTimestamps}
           repeatAyahCount={repeatAyahCount || 1}
           repeatPassageCount={repeatPassageCount || 1}
+          currentRepeatPassage={currentRepeatPassage}
+          currentRepeatAyahCount={currentRepeatAyahCount}
           surahNames={Object.fromEntries(surahs.map(s => [s.id, language === 'ar' ? s.name : s.englishName]))}
           isRTL={isRTL}
           ayahRepeatLabel={t('ayahRepeat')}

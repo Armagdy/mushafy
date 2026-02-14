@@ -26,6 +26,8 @@ interface AudioProgressBarProps {
   repeatAyahTimestamps?: RepeatTimestamp[];
   repeatAyahCount?: number;
   repeatPassageCount?: number;
+  currentRepeatPassage?: number;
+  currentRepeatAyahCount?: number;
   surahNames?: { [key: number]: string };
   // Localization props
   isRTL?: boolean;
@@ -50,6 +52,8 @@ export function AudioProgressBar({
   repeatAyahTimestamps = [],
   repeatAyahCount = 1,
   repeatPassageCount = 1,
+  currentRepeatPassage = 0,
+  currentRepeatAyahCount = 0,
   surahNames = {},
   isRTL = true,
   ayahRepeatLabel = 'تكرار الآية',
@@ -282,30 +286,37 @@ export function AudioProgressBar({
 
   // Get markers for repeat mode (section starts and ayah starts)
   const getRepeatMarkers = () => {
-    if (!isRepeatActive || !isRepeatConcatenatedMode || repeatAyahTimestamps.length === 0 || duration <= 0) {
+    if (!isRepeatActive || duration <= 0) {
       return { sectionMarkers: [], ayahMarkers: [] };
     }
 
     const sectionMarkers: number[] = []; // Passage start positions (percentage)
     const ayahMarkers: number[] = []; // Ayah start positions (percentage)
 
-    for (let i = 0; i < repeatAyahTimestamps.length; i++) {
-      const ts = repeatAyahTimestamps[i];
-      const position = (ts.startTime / duration) * 100;
+    // For concatenated mode (everyayah), use exact timestamps
+    if (isRepeatConcatenatedMode && repeatAyahTimestamps.length > 0) {
+      for (let i = 0; i < repeatAyahTimestamps.length; i++) {
+        const ts = repeatAyahTimestamps[i];
+        const position = (ts.startTime / duration) * 100;
 
-      // Section marker: first ayah of each passage (passage changes or first entry)
-      if (ts.repetition === 1 && (i === 0 || repeatAyahTimestamps[i - 1].passage !== ts.passage)) {
-        if (position > 0) { // Don't add marker at 0%
-          sectionMarkers.push(position);
+        // Section marker: first ayah of each passage (passage changes or first entry)
+        if (ts.repetition === 1 && (i === 0 || repeatAyahTimestamps[i - 1].passage !== ts.passage)) {
+          if (position > 0) { // Don't add marker at 0%
+            sectionMarkers.push(position);
+          }
+        }
+
+        // Ayah marker: only show when ayah repeat count > 1
+        if (ts.repetition === 1 && repeatAyahCount > 1) {
+          ayahMarkers.push(position);
         }
       }
-
-      // Ayah marker: first repetition of each ayah within a passage
-      if (ts.repetition === 1 && repeatAyahCount > 1) {
-        ayahMarkers.push(position);
-      } else if (repeatAyahCount === 1) {
-        // If no ayah repeat, still show ayah boundaries
-        ayahMarkers.push(position);
+    } else if (repeatPassageCount > 1) {
+      // For non-concatenated mode (mp3quran), calculate passage markers evenly
+      // Each passage takes equal portion of the total duration
+      const passageDuration = 100 / repeatPassageCount;
+      for (let i = 1; i < repeatPassageCount; i++) {
+        sectionMarkers.push(passageDuration * i);
       }
     }
 
@@ -316,6 +327,17 @@ export function AudioProgressBar({
   };
 
   const { sectionMarkers, ayahMarkers } = getRepeatMarkers();
+
+  // Get current repeat info from timestamps based on current time
+  const getCurrentRepeatInfo = () => {
+    if (!isRepeatActive || !isRepeatConcatenatedMode || repeatAyahTimestamps.length === 0) {
+      return null;
+    }
+    const segment = getRepeatSegmentFromTime(currentTime);
+    return segment;
+  };
+
+  const currentRepeatInfo = getCurrentRepeatInfo();
 
   return (
     <div className="w-full relative group">
