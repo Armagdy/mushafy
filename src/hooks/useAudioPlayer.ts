@@ -238,7 +238,21 @@ export const useAudioPlayer = ({
     
     // Set playback state
     navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
-  }, [selectedReciter, audioSource, selectedMp3QuranReciter, mp3QuranRecitersAr]);
+    
+    // Update position state for progress tracking in notifications
+    if ('setPositionState' in navigator.mediaSession && audioElement) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: audioElement.duration || 0,
+          playbackRate: audioElement.playbackRate || 1.0,
+          position: audioElement.currentTime || 0,
+        });
+      } catch (error) {
+        // Ignore errors if position state is not supported
+        console.debug('setPositionState not supported:', error);
+      }
+    }
+  }, [selectedReciter, audioSource, selectedMp3QuranReciter, mp3QuranRecitersAr, audioElement]);
   
   // Get next ayah in sequence
   const getNextAyah = useCallback((currentSurah: number, currentAyah: number): CurrentAyah | null => {
@@ -1731,6 +1745,19 @@ export const useAudioPlayer = ({
     
     const handleTimeUpdate = () => {
       setCurrentTime(audioElement.currentTime);
+      
+      // Update Media Session position state for live progress in notifications
+      if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession && isPlaying) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: audioElement.duration || 0,
+            playbackRate: audioElement.playbackRate || 1.0,
+            position: audioElement.currentTime || 0,
+          });
+        } catch (error) {
+          // Ignore if setPositionState is not supported or throws error
+        }
+      }
     };
     
     const handleLoadedMetadata = () => {
@@ -1750,7 +1777,7 @@ export const useAudioPlayer = ({
       audioElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audioElement.removeEventListener('durationchange', handleDurationChange);
     };
-  }, [audioElement]);
+  }, [audioElement, isPlaying]);
   
   // Set up Media Session action handlers for Android notification controls
   useEffect(() => {
