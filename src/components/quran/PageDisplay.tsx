@@ -43,6 +43,9 @@ export function PageDisplay({
   
   // All mushaf types now use the same styling
   const isTashelOrMadinah = true;
+  
+  // Cache category for auto-caching viewed pages
+  const cacheCategory = `mushaf-${mushafType}`;
 
   return (
     <main className="flex-1 flex items-center justify-center gap-6 overflow-hidden min-h-0 bg-[#FBF9F4]">
@@ -96,6 +99,7 @@ export function PageDisplay({
                           alt={`${t('page')} ${leftPageNum}`}
                           className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
                           loading="lazy"
+                          cacheCategory={cacheCategory}
                         />
                       </div>
                     </div>
@@ -122,6 +126,7 @@ export function PageDisplay({
                           alt={`${t('page')} ${rightPageNum}`}
                           className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
                           loading="lazy"
+                          cacheCategory={cacheCategory}
                         />
                       </div>
                     </div>
@@ -151,6 +156,7 @@ export function PageDisplay({
                           alt={`${t('page')} ${rightPageNum}`}
                           className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
                           loading="lazy"
+                          cacheCategory={cacheCategory}
                         />
                       </div>
                     </div>
@@ -177,6 +183,7 @@ export function PageDisplay({
                           alt={`${t('page')} ${leftPageNum}`}
                           className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
                           loading="lazy"
+                          cacheCategory={cacheCategory}
                         />
                       </div>
                     </div>
@@ -279,6 +286,7 @@ export function PageDisplay({
                     alt={`${t('page')} ${pageNum}`}
                     className="max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain md:shadow-2xl md:rounded-xl md:border-4 md:border-white mx-auto"
                     loading="eager"
+                    cacheCategory={cacheCategory}
                   />
                 </div>
               </div>

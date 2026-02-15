@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { cacheTafseer, getCachedTafseer } from '@/lib/tafseer-cache';
 
 export interface TafseerInfo {
   id: number;
@@ -138,6 +139,21 @@ export function useTafseer() {
     setError(null);
 
     try {
+      // Check cache first for offline support
+      const cached = await getCachedTafseer(selectedTafseerId, surahNumber, ayahNumber);
+      if (cached) {
+        console.log('Tafseer loaded from cache');
+        setTafseerText({
+          tafseer_id: selectedTafseerId,
+          tafseer_name: cached.tafseer_name,
+          ayah_url: '',
+          ayah_number: ayahNumber,
+          text: cached.text,
+        });
+        setIsLoading(false);
+        return;
+      }
+
       // Try Quran.com API first
       const response = await fetch(
         `${QURAN_COM_API_BASE}/tafsirs/${selectedTafseerId}/by_ayah/${surahNumber}:${ayahNumber}`
@@ -152,14 +168,21 @@ export function useTafseer() {
       // Transform Quran.com API response to our TafseerText format
       // Strip HTML tags from the text for clean display
       const cleanText = data.tafsir?.text?.replace(/<[^>]*>/g, '') || '';
+      const tafseerName = data.tafsir?.resource_name || '';
       
       const transformedData: TafseerText = {
         tafseer_id: data.tafsir?.resource_id || selectedTafseerId,
-        tafseer_name: data.tafsir?.resource_name || '',
+        tafseer_name: tafseerName,
         ayah_url: '',
         ayah_number: ayahNumber,
         text: cleanText,
       };
+      
+      // Cache for offline use
+      if (cleanText) {
+        await cacheTafseer(selectedTafseerId, tafseerName, surahNumber, ayahNumber, cleanText);
+        console.log('Tafseer cached for offline use');
+      }
       
       setTafseerText(transformedData);
     } catch (err) {
@@ -177,11 +200,23 @@ export function useTafseer() {
         }
 
         const data: TafseerText = await response.json();
+        
+        // Cache for offline use
+        if (data.text) {
+          await cacheTafseer(selectedTafseerId, data.tafseer_name || '', surahNumber, ayahNumber, data.text);
+          console.log('Tafseer cached from fallback API');
+        }
+        
         setTafseerText(data);
       } catch (fallbackErr) {
         console.error('Error fetching tafseer from fallback API:', fallbackErr);
-        const errorMessage = fallbackErr instanceof Error ? fallbackErr.message : 'Failed to load tafseer';
-        setError(`Unable to load tafseer. ${errorMessage}. Please try again later.`);
+        // Check if we're offline
+        if (!navigator.onLine) {
+          setError('You are offline. This tafseer has not been cached yet. View it while online first.');
+        } else {
+          const errorMessage = fallbackErr instanceof Error ? fallbackErr.message : 'Failed to load tafseer';
+          setError(`Unable to load tafseer. ${errorMessage}. Please try again later.`);
+        }
         setTafseerText(null);
       }
     } finally {

@@ -1,5 +1,6 @@
-const CACHE_NAME = 'mushafy-v3';
+const CACHE_NAME = 'mushafy-v4';
 const AUDIO_CACHE_NAME = 'mushafy-audio-v1';
+const APP_SHELL_CACHE = 'mushafy-shell-v1';
 
 // Core assets to cache on install (relative to service worker scope)
 const CORE_ASSETS = [
@@ -23,25 +24,47 @@ self.addEventListener('install', (event) => {
         return cache.addAll(CORE_ASSETS);
       })
       .then(() => self.skipWaiting())
+      .catch((error) => {
+        console.error('Failed to cache core assets:', error);
+        // Continue even if some assets fail
+        return self.skipWaiting();
+      })
   );
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
+  const validCaches = [CACHE_NAME, AUDIO_CACHE_NAME, APP_SHELL_CACHE];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => name !== CACHE_NAME && name !== AUDIO_CACHE_NAME)
+          .filter((name) => !validCaches.includes(name))
           .map((name) => caches.delete(name))
       );
     }).then(() => self.clients.claim())
   );
 });
 
+// Helper: Check if request is for app shell (JS/CSS bundles)
+function isAppShellRequest(url) {
+  return (
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.woff') ||
+    url.pathname.endsWith('.woff2') ||
+    url.pathname.endsWith('.ttf')
+  );
+}
+
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  
+  // Only handle same-origin requests
+  if (url.origin !== location.origin) {
+    return;
+  }
   
   // For navigation requests (HTML pages), always serve index.html for SPA routing
   if (event.request.mode === 'navigate') {
@@ -65,6 +88,33 @@ self.addEventListener('fetch', (event) => {
             return cached || caches.match('./');
           });
         })
+    );
+    return;
+  }
+  
+  // Handle app shell assets (JS/CSS) with cache-first strategy
+  // These files have hashed names and are immutable
+  if (isAppShellRequest(url)) {
+    event.respondWith(
+      caches.open(APP_SHELL_CACHE).then((cache) => {
+        return cache.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          return fetch(event.request).then((networkResponse) => {
+            if (networkResponse.ok) {
+              cache.put(event.request, networkResponse.clone());
+            }
+            return networkResponse;
+          }).catch(() => {
+            // Return offline response for failed JS/CSS requests
+            return new Response('// Offline', { 
+              status: 503, 
+              headers: { 'Content-Type': 'application/javascript' } 
+            });
+          });
+        });
+      })
     );
     return;
   }
