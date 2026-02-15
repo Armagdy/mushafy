@@ -934,6 +934,9 @@ export const useAudioPlayer = ({
             // Not in cache - download and cache
             console.log(`⬇️ Downloading and caching MP3Quran audio for moshaf ${selectedMoshaf.id} surah ${surahNum}`);
             
+            // Show loading state while downloading (no progress counter for MP3Quran)
+            setIsPreloadingAyahs(true);
+            
             const audioUrl = getSurahAudioUrl(selectedMoshaf.server, surahNum);
             
             // Fetch timing data for this surah
@@ -957,6 +960,9 @@ export const useAudioPlayer = ({
               await cacheMp3QuranAudio(selectedMoshaf.id, surahNum, audioBlob, timings);
               console.log(`💾 Cached MP3Quran audio for moshaf ${selectedMoshaf.id} surah ${surahNum}`);
               
+              // Hide loading state - audio is ready
+              setIsPreloadingAyahs(false);
+              
               // Load the cached audio
               const blobUrl = URL.createObjectURL(audioBlob);
               audioElement.src = blobUrl;
@@ -968,7 +974,8 @@ export const useAudioPlayer = ({
                 console.error('Failed to load audio - surah may not exist for this reciter');
                 setIsPlaying(false);
                 setCurrentSurahAudio(null);
-                releaseWakeLock();
+                setIsPreloadingAyahs(false);
+                setPreloadProgress({ current: 0, total: 0 });
                 if (onSurahUnavailable) {
                   onSurahUnavailable('unavailable');
                 }
@@ -992,6 +999,7 @@ export const useAudioPlayer = ({
             } catch (error) {
               console.error('Error downloading MP3Quran audio:', error);
               setIsPlaying(false);
+              setIsPreloadingAyahs(false);
               releaseWakeLock();
               if (onSurahUnavailable) {
                 onSurahUnavailable('unavailable');
@@ -1015,9 +1023,10 @@ export const useAudioPlayer = ({
       } catch (error) {
         console.error('Error playing MP3Quran audio:', error);
         setIsPlaying(false);
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
       }
     } else if (audioSource === 'everyayah' && selectedReciter && audioContext) {
-      // EveryAyah mode: Concatenated audio via HTML Audio element
       if (selectedReciter.folder) {
         localStorage.setItem('quran-last-reciter', selectedReciter.folder);
       }

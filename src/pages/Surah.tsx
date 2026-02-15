@@ -602,8 +602,8 @@ const Surah = () => {
         onScroll={handleScroll}
       />
 
-      {/* Preloading indicator overlay */}
-      {isPreloadingAyahs && (
+      {/* Preloading indicator overlay - only for EveryAyah */}
+      {isPreloadingAyahs && audioSource === 'everyayah' && (
         <div className="fixed bottom-[120px] md:bottom-[140px] left-0 right-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-emerald-700/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-emerald-500/30">
             <p className="text-[#F2E3BB] text-sm md:text-base font-medium text-center">
