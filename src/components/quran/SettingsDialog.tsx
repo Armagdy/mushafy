@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Check, ChevronsUpDown } from "lucide-react";
+import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Check, ChevronsUpDown, WifiOff, StopCircle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMushaf, MushafType } from "@/contexts/MushafContext";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,8 @@ import { getAudioData } from "@/lib/quran-data-service";
 import { getMp3QuranReciters, getSurahAudioUrl, type Mp3QuranReciter, type Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { cacheAsset } from "@/lib/asset-cache";
 import { getPageImageFilename } from "@/lib/quran-mapping";
+import { useNetwork } from "@/hooks/useNetwork";
+import { useToast } from "@/hooks/use-toast";
 
 interface Reciter {
   folder: string;
@@ -53,6 +55,8 @@ export function SettingsDialog({
 }: SettingsDialogProps) {
   const { t, isRTL, language } = useLanguage();
   const { mushafType, setMushafType } = useMushaf();
+  const { isOnline } = useNetwork();
+  const { toast } = useToast();
   
   const [activeTab, setActiveTab] = useState<string>(() => {
     const saved = localStorage.getItem('quran-settings-tab');
@@ -84,6 +88,9 @@ export function SettingsDialog({
   const [mp3QuranReciters, setMp3QuranReciters] = useState<Mp3QuranReciter[]>([]);
   const [selectedMp3QuranReciter, setSelectedMp3QuranReciter] = useState<number | null>(null);
   const [selectedMoshaf, setSelectedMoshaf] = useState<Mp3QuranMoshaf | null>(null);
+  
+  // AbortController for cancelling downloads
+  const downloadAbortControllerRef = React.useRef<AbortController | null>(null);
   
   // Get the selected reciter object
   const selectedReciterObj = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
@@ -237,7 +244,30 @@ export function SettingsDialog({
     localStorage.setItem('quran-pages-to-load', String(pages));
   };
   
+  const handleCancelDownload = () => {
+    if (downloadAbortControllerRef.current) {
+      downloadAbortControllerRef.current.abort();
+      downloadAbortControllerRef.current = null;
+    }
+    setIsDownloading(false);
+    setDownloadProgress({ current: 0, total: 0 });
+  };
+  
   const handleDownload = async () => {
+    // Check network connectivity before downloading
+    if (!isOnline) {
+      toast({
+        title: t('networkOffline'),
+        description: t('networkOfflineMessage'),
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Create new AbortController for this download session
+    downloadAbortControllerRef.current = new AbortController();
+    const signal = downloadAbortControllerRef.current.signal;
+    
     setIsDownloading(true);
     
     try {
@@ -256,8 +286,9 @@ export function SettingsDialog({
         const category = `mushaf-${downloadMushafType}`;
         
         for (let page = downloadFromPage; page <= downloadToPage; page++) {
+          if (signal.aborted) break;
           const url = `${mushafPath}/${getPageImageFilename(page)}`;
-          await cacheAsset(url, category);
+          await cacheAsset(url, category, signal);
           setDownloadProgress({ current: page - downloadFromPage + 1, total });
         }
       } else if (downloadType === 'everyayah') {
@@ -270,10 +301,11 @@ export function SettingsDialog({
         const category = `audio-everyayah-${reciter.folder}`;
         
         for (let ayah = downloadFromAyah; ayah <= downloadToAyah; ayah++) {
+          if (signal.aborted) break;
           const surahStr = downloadFromSurah.toString().padStart(3, '0');
           const ayahStr = ayah.toString().padStart(3, '0');
           const url = `${reciter.baseUrl}/${surahStr}${ayahStr}.mp3`;
-          await cacheAsset(url, category);
+          await cacheAsset(url, category, signal);
           setDownloadProgress({ current: ayah - downloadFromAyah + 1, total });
         }
       } else if (downloadType === 'mp3quran') {
@@ -285,14 +317,25 @@ export function SettingsDialog({
         const category = `audio-mp3quran-${selectedMoshaf.id}`;
         
         for (let surahNum = downloadFromSurah; surahNum <= downloadToSurah; surahNum++) {
+          if (signal.aborted) break;
           const url = getSurahAudioUrl(selectedMoshaf.server, surahNum);
-          await cacheAsset(url, category);
+          await cacheAsset(url, category, signal);
           setDownloadProgress({ current: surahNum - downloadFromSurah + 1, total });
         }
       }
-    } catch (error) {
-      console.error('Download error:', error);
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log('Download cancelled by user');
+      } else {
+        console.error('Download error:', error);
+        toast({
+          title: t('downloadFailed'),
+          description: error.message || 'An error occurred',
+          variant: "destructive",
+        });
+      }
     } finally {
+      downloadAbortControllerRef.current = null;
       setIsDownloading(false);
       setDownloadProgress({ current: 0, total: 0 });
     }
@@ -461,6 +504,21 @@ export function SettingsDialog({
 
             {/* Download Tab */}
             <TabsContent value="download" className="space-y-4 mt-4">
+              {/* Network Status Warning */}
+              {!isOnline && (
+                <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg">
+                  <WifiOff className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm md:text-base font-medium text-amber-800 dark:text-amber-300">
+                      {t('networkOffline')}
+                    </span>
+                    <span className="text-xs md:text-sm text-amber-700 dark:text-amber-400">
+                      {t('networkOfflineMessage')}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
               {/* Download Type Selection */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
@@ -741,17 +799,35 @@ export function SettingsDialog({
                 </div>
               )}
               
-              {/* Download Button */}
-              <button
-                onClick={handleDownload}
-                disabled={!isDownloadEnabled}
-                className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 md:px-4 h-10 md:h-12 border border-emerald-600 shadow-md transition-all"
-              >
-                <HardDriveDownload className="w-5 h-5 text-[#F2E3BB]" />
-                <span className="text-[#F2E3BB] text-base md:text-xl font-bold">
-                  {isDownloading ? t('downloadProgress') : t('startDownload')}
-                </span>
-              </button>
+              {/* Download/Cancel Buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDownload}
+                  disabled={!isDownloadEnabled || !isOnline || isDownloading}
+                  className="flex-1 flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 md:px-4 h-10 md:h-12 border border-emerald-600 shadow-md transition-all"
+                >
+                  {!isOnline ? (
+                    <WifiOff className="w-5 h-5 text-[#F2E3BB]" />
+                  ) : (
+                    <HardDriveDownload className="w-5 h-5 text-[#F2E3BB]" />
+                  )}
+                  <span className="text-[#F2E3BB] text-base md:text-xl font-bold">
+                    {!isOnline ? t('networkRequired') : (isDownloading ? t('downloadProgress') : t('startDownload'))}
+                  </span>
+                </button>
+                
+                {isDownloading && (
+                  <button
+                    onClick={handleCancelDownload}
+                    className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-red-500 shadow-md transition-all"
+                  >
+                    <StopCircle className="w-5 h-5 text-white" />
+                    <span className="text-white text-base md:text-xl font-bold">
+                      {t('cancelDownload')}
+                    </span>
+                  </button>
+                )}
+              </div>
             </TabsContent>
 
             {/* Test Tab */}

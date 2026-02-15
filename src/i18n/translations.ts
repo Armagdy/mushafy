@@ -189,6 +189,10 @@ export const translations = {
     ayahAudio: 'تلاوة آية',
     cacheForOffline: 'تحميل للعمل بدون انترنت',
     cached: 'مخزن',
+    networkOffline: 'لا يوجد اتصال بالإنترنت',
+    networkOfflineMessage: 'يرجى الاتصال بالإنترنت لتحميل المحتوى',
+    networkRequired: 'يتطلب الاتصال بالإنترنت',
+    offlineMode: 'وضع عدم الاتصال',
   },
   en: {
     appName: 'Mushafy',
@@ -380,6 +384,10 @@ export const translations = {
     ayahAudio: 'Ayah Audio',
     cacheForOffline: 'Cache for offline use',
     cached: 'Cached',
+    networkOffline: 'No Internet Connection',
+    networkOfflineMessage: 'Please connect to the internet to download content',
+    networkRequired: 'Internet connection required',
+    offlineMode: 'Offline Mode',
   },
 };
 

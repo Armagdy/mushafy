@@ -3,6 +3,8 @@
  * Caches mushaf pages and other assets for offline PWA use
  */
 
+import { checkNetworkBeforeDownload } from '@/hooks/useNetwork';
+
 const DB_NAME = 'quran-asset-cache';
 const DB_VERSION = 1;
 const STORE_NAME = 'assets';
@@ -42,11 +44,15 @@ const openDB = (): Promise<IDBDatabase> => {
  */
 export const cacheAsset = async (
   url: string,
-  category: string
+  category: string,
+  signal?: AbortSignal
 ): Promise<boolean> => {
   try {
+    // Check network connectivity before downloading
+    checkNetworkBeforeDownload();
+    
     // Fetch the asset
-    const response = await fetch(url, { mode: 'cors' });
+    const response = await fetch(url, { mode: 'cors', signal });
     if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
     
     const blobData = await response.blob();
