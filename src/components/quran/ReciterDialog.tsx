@@ -1,14 +1,14 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { useState } from "react";
+import { Search, ChevronDown } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 import type { Mp3QuranReciter, Mp3QuranMoshaf } from "@/lib/mp3quran-service";
+import { surahs } from "@/data/surahs";
 
 interface ReciterDialogProps {
   open: boolean;
@@ -73,31 +73,69 @@ export function ReciterDialog({
   selectedMoshaf,
   onMp3QuranReciterChange,
   onMoshafChange,
+  currentSurahId,
+  currentPlayingAyah,
   onListen,
 }: ReciterDialogProps) {
   const { t, isRTL, language } = useLanguage();
-  const [openEveryAyahReciter, setOpenEveryAyahReciter] = useState(false);
-  const [openMp3QuranReciter, setOpenMp3QuranReciter] = useState(false);
+  const [everyAyahSearch, setEveryAyahSearch] = useState('');
+  const [mp3QuranSearch, setMp3QuranSearch] = useState('');
+  const [selectedSurahForPlayback, setSelectedSurahForPlayback] = useState(currentSurahId);
+  const [selectedAyahForPlayback, setSelectedAyahForPlayback] = useState(currentPlayingAyah?.ayah || 1);
+  
+  // Dropdown visibility state
+  const [showEveryAyahDropdown, setShowEveryAyahDropdown] = useState(false);
+  const [showMp3QuranDropdown, setShowMp3QuranDropdown] = useState(false);
+  const everyAyahRef = useRef<HTMLDivElement>(null);
+  const mp3QuranRef = useRef<HTMLDivElement>(null);
 
-  // Normalize Arabic text - convert all alif variants to plain alif
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (everyAyahRef.current && !everyAyahRef.current.contains(event.target as Node)) {
+        setShowEveryAyahDropdown(false);
+      }
+      if (mp3QuranRef.current && !mp3QuranRef.current.contains(event.target as Node)) {
+        setShowMp3QuranDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Update selected surah/ayah when current changes
+  useEffect(() => {
+    setSelectedSurahForPlayback(currentSurahId);
+    setSelectedAyahForPlayback(currentPlayingAyah?.ayah || 1);
+  }, [currentSurahId, currentPlayingAyah]);
+
+  // Get current surah info
+  const currentSurah = surahs.find(s => s.id === selectedSurahForPlayback) || surahs[0];
+  const ayahsCount = currentSurah.numberOfAyahs;
+
+  // Normalize Arabic text for search
   const normalizeArabic = (text: string): string => {
     return text
-      // Normalize alif variants (أ إ آ ٱ) to plain alif (ا)
+      // Normalize different forms of Alif
       .replace(/[أإآٱ]/g, 'ا')
-      // Remove tashkeel/diacritics
+      // Normalize Alif Maqsura to Ya
+      .replace(/ى/g, 'ي')
+      // Normalize Ta Marbuta to Ha
+      .replace(/ة/g, 'ه')
+      // Remove all diacritics (tashkeel)
       .replace(/[\u064B-\u065F\u0670]/g, '')
-      // Remove tatweel
+      // Remove tatweel (kashida)
       .replace(/\u0640/g, '')
       .toLowerCase();
   };
 
-  // Custom filter for Arabic text search
-  const arabicFilter = (value: string, search: string): number => {
-    if (!search || !search.trim()) return 1;
-    const normalizedValue = normalizeArabic(value.trim());
-    const normalizedSearch = normalizeArabic(search.trim());
-    // Check if the value contains the full search string
-    return normalizedValue.includes(normalizedSearch) ? 1 : 0;
+  // Filter function for Arabic/English text
+  const matchesSearch = (text: string, search: string): boolean => {
+    if (!search.trim()) return true;
+    const normalizedText = normalizeArabic(text);
+    const normalizedSearch = normalizeArabic(search);
+    return normalizedText.includes(normalizedSearch);
   };
 
   // Get Arabic name for MP3Quran reciter
@@ -106,10 +144,26 @@ export function ReciterDialog({
     return arReciter ? arReciter.name : reciter.name;
   };
 
-  // Get display name for selected MP3Quran reciter
-  const selectedMp3QuranReciterName = selectedMp3QuranReciter 
-    ? getMp3QuranReciterName(selectedMp3QuranReciter)
-    : t('selectReciter');
+  // Get display value for EveryAyah search input
+  const getEveryAyahDisplayValue = () => {
+    if (showEveryAyahDropdown) return everyAyahSearch;
+    if (filterReciterName && filterReciterName !== 'all') {
+      const reciter = uniqueReciterNames.find(r => r.nameAr === filterReciterName);
+      if (reciter) {
+        return language === 'ar' ? reciter.nameAr : reciter.name;
+      }
+    }
+    return '';
+  };
+
+  // Get display value for MP3Quran search input
+  const getMp3QuranDisplayValue = () => {
+    if (showMp3QuranDropdown) return mp3QuranSearch;
+    if (selectedMp3QuranReciter) {
+      return getMp3QuranReciterName(selectedMp3QuranReciter);
+    }
+    return '';
+  };
 
   // Translate moshaf name
   const translateMoshafName = (moshafName: string): string => {
@@ -163,96 +217,89 @@ export function ReciterDialog({
               </TabsTrigger>
             </TabsList>
 
+            {/* Tab Explanation Text */}
+            <div className="mt-3 mb-2 px-2 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700">
+              <p className={cn(
+                "text-sm md:text-base text-emerald-700 dark:text-emerald-300",
+                isRTL ? "text-right" : "text-left"
+              )}>
+                {audioSource === 'everyayah' ? t('everyAyahExplanation') : t('mp3QuranExplanation')}
+              </p>
+            </div>
+
             {/* EveryAyah Tab Content */}
             <TabsContent value="everyayah" className="space-y-2 sm:space-y-3 mt-3">
-          {/* Reciter Name Filter */}
-          <div className="flex flex-col gap-2">
+          {/* Reciter Name Search Box */}
+          <div className="flex flex-col gap-2" ref={everyAyahRef}>
             <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
               {t('reciterName')}
             </span>
-            <Popover open={openEveryAyahReciter} onOpenChange={setOpenEveryAyahReciter}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={openEveryAyahReciter}
-                  className="w-full justify-between text-base md:text-xl border-emerald-300 hover:!bg-emerald-50 hover:!text-emerald-900"
-                >
-                  {filterReciterName === 'all' 
-                    ? t('all') 
-                    : uniqueReciterNames.find(r => r.nameAr === filterReciterName)
-                      ? (language === 'ar' 
-                          ? uniqueReciterNames.find(r => r.nameAr === filterReciterName)!.nameAr 
-                          : uniqueReciterNames.find(r => r.nameAr === filterReciterName)!.name)
-                      : t('all')}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[300px] sm:w-[400px] p-0 bg-[#FBF9F4] dark:bg-emerald-950" align="start">
-                <Command className="bg-[#FBF9F4] dark:bg-emerald-950" filter={arabicFilter}>
-                  <CommandInput placeholder={t('searchReciter')} className="text-base md:text-lg" />
-                  <CommandList>
-                    <CommandEmpty>{t('noResults')}</CommandEmpty>
-                    <CommandGroup>
-                      <CommandItem
-                        key="all"
-                        value="all"
-                        onSelect={() => {
-                          onFilterReciterNameChange('all');
-                          setOpenEveryAyahReciter(false);
+            <div className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400 z-10" />
+                <Input
+                  placeholder={t('searchReciter')}
+                  value={getEveryAyahDisplayValue()}
+                  onChange={(e) => {
+                    setEveryAyahSearch(e.target.value);
+                    setShowEveryAyahDropdown(true);
+                  }}
+                  onFocus={() => {
+                    setEveryAyahSearch('');
+                    setShowEveryAyahDropdown(true);
+                  }}
+                  className="pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg bg-emerald-50 dark:bg-emerald-900/20"
+                />
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              
+              {/* Dropdown Results */}
+              {showEveryAyahDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-[#FBF9F4] dark:bg-emerald-950 border border-emerald-300 rounded-lg shadow-lg max-h-[250px] overflow-y-auto">
+                  {uniqueReciterNames
+                    .filter((reciter) => {
+                      const name = language === 'ar' ? reciter.nameAr : reciter.name;
+                      return matchesSearch(name, everyAyahSearch);
+                    })
+                    .slice()
+                    .sort((a, b) => {
+                      const nameA = language === 'ar' ? a.nameAr : a.name;
+                      const nameB = language === 'ar' ? b.nameAr : b.name;
+                      return nameA.localeCompare(nameB, language);
+                    })
+                    .map((reciter, index) => (
+                      <div
+                        key={reciter.nameAr}
+                        className="px-4 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-800 cursor-pointer border-b border-emerald-100 last:border-none"
+                        onClick={() => {
+                          onFilterReciterNameChange(reciter.nameAr);
+                          setShowEveryAyahDropdown(false);
                         }}
-                        className="text-base md:text-xl"
                       >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            filterReciterName === 'all' ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        {t('all')}
-                      </CommandItem>
-                      {uniqueReciterNames
-                        .slice()
-                        .sort((a, b) => {
-                          const nameA = language === 'ar' ? a.nameAr : a.name;
-                          const nameB = language === 'ar' ? b.nameAr : b.name;
-                          return nameA.localeCompare(nameB, language);
-                        })
-                        .map((reciter) => (
-                          <CommandItem
-                            key={reciter.nameAr}
-                            value={`${reciter.name}|${reciter.nameAr}`}
-                            onSelect={() => {
-                              onFilterReciterNameChange(reciter.nameAr);
-                              setOpenEveryAyahReciter(false);
-                            }}
-                            className="text-base md:text-xl"
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                filterReciterName === reciter.nameAr ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {language === 'ar' ? reciter.nameAr : reciter.name}
-                          </CommandItem>
-                        ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+                        <div className={cn("flex items-center gap-2 w-full text-base md:text-xl", language === 'ar' && "flex-row-reverse text-right")}>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">{index + 1}.</span>
+                          <span className="flex-1">{language === 'ar' ? reciter.nameAr : reciter.name}</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Show other options only after selection */}
+          {filterReciterName && filterReciterName !== 'all' && (
+            <>
           
-          {/* Reading Type Filter */}
-          <div className="flex flex-col gap-2">
-            <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
-              {t('readingType')}
-            </span>
-            <Select value={filterReading} onValueChange={onFilterReadingChange}>
-              <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
-                <SelectValue />
-              </SelectTrigger>
+              {/* Reading Type Filter */}
+              <div className="flex flex-col gap-2">
+                <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+                  {t('readingType')}
+                </span>
+                <Select value={filterReading} onValueChange={onFilterReadingChange}>
+                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                    <SelectValue />
+                  </SelectTrigger>
               <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
                 {filterReciterName === 'all' && <SelectItem value="all" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('all')}</SelectItem>}
                 {availableReadings.includes('hafs') && <SelectItem value="hafs" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('hafs')}</SelectItem>}
@@ -300,81 +347,142 @@ export function ReciterDialog({
             </Select>
           </div>
 
-          {/* Save Button for EveryAyah */}
-          <div className="pt-2 sm:pt-3 mt-2">
-            <Button
-              onClick={onListen}
-              disabled={!selectedReciter && filteredReciters.length === 0}
-              className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t('save')}
-            </Button>
+          {/* Separator */}
+          <div className="border-t border-emerald-200 dark:border-emerald-700 my-2"></div>
+
+          {/* Ayah and Surah Selection */}
+          <div className="grid grid-cols-2 gap-2">
+            {/* Ayah Selection */}
+            <div className="flex flex-col gap-2">
+              <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+                {t('chooseAyah')}
+              </span>
+              <Select value={selectedAyahForPlayback.toString()} onValueChange={(value) => setSelectedAyahForPlayback(Number(value))}>
+                <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
+                  <div className="max-h-[200px] overflow-y-auto">
+                    {Array.from({ length: ayahsCount }, (_, i) => i + 1).map((ayahNum) => (
+                      <SelectItem
+                        key={ayahNum}
+                        value={ayahNum.toString()}
+                        className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100"
+                      >
+                        {t('ayah')} {ayahNum}
+                      </SelectItem>
+                    ))}
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Surah Selection */}
+            <div className="flex flex-col gap-2">
+              <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+                {t('chooseSurah')}
+              </span>
+              <Select value={selectedSurahForPlayback.toString()} onValueChange={(value) => {
+                setSelectedSurahForPlayback(Number(value));
+                setSelectedAyahForPlayback(1);
+              }}>
+                <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
+                  <div className="max-h-[200px] overflow-y-auto">
+                    {surahs.map((surah) => (
+                      <SelectItem
+                        key={surah.id}
+                        value={surah.id.toString()}
+                        className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100"
+                      >
+                        {language === 'ar' ? `${surah.id}. ${surah.name}` : `${surah.id}. ${surah.englishName}`}
+                      </SelectItem>
+                    ))}
+                  </div>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+              {/* Save Button for EveryAyah */}
+              <div className="pt-2 sm:pt-3 mt-2">
+                <Button
+                  onClick={onListen}
+                  disabled={!selectedReciter && filteredReciters.length === 0}
+                  className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {t('save')}
+                </Button>
+              </div>
+            </>
+          )}
             </TabsContent>
 
             {/* MP3Quran Tab Content */}
             <TabsContent value="mp3quran" className="space-y-2 sm:space-y-3 mt-3">
-              {/* Reciter Selection */}
-              <div className="flex flex-col gap-2">
+              {/* Reciter Search Box */}
+              <div className="flex flex-col gap-2" ref={mp3QuranRef}>
                 <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
                   {t('reciterName')}
                 </span>
-                <Popover open={openMp3QuranReciter} onOpenChange={setOpenMp3QuranReciter}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={openMp3QuranReciter}
-                      className="w-full justify-between text-base md:text-xl border-emerald-300 hover:!bg-emerald-50 hover:!text-emerald-900"
-                    >
-                      {selectedMp3QuranReciterName}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[300px] sm:w-[400px] p-0 bg-[#FBF9F4] dark:bg-emerald-950" align="start">
-                    <Command className="bg-[#FBF9F4] dark:bg-emerald-950" filter={arabicFilter}>
-                      <CommandInput placeholder={t('searchReciter')} className="text-base md:text-lg" />
-                      <CommandList>
-                        <CommandEmpty>{t('noResults')}</CommandEmpty>
-                        <CommandGroup>
-                          {mp3QuranReciters
-                            .slice()
-                            .sort((a, b) => {
-                              const nameA = getMp3QuranReciterName(a);
-                              const nameB = getMp3QuranReciterName(b);
-                              return nameA.localeCompare(nameB, 'ar');
-                            })
-                            .map((reciter) => {
-                              const arName = getMp3QuranReciterName(reciter);
-                              return (
-                                <CommandItem
-                                  key={reciter.id}
-                                  value={arName}
-                                  onSelect={() => {
-                                    onMp3QuranReciterChange(reciter);
-                                    setOpenMp3QuranReciter(false);
-                                  }}
-                                  className="text-base md:text-xl"
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      selectedMp3QuranReciter?.id === reciter.id ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  {arName}
-                                </CommandItem>
-                              );
-                            })}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400 z-10" />
+                    <Input
+                      placeholder={t('searchReciter')}
+                      value={getMp3QuranDisplayValue()}
+                      onChange={(e) => {
+                        setMp3QuranSearch(e.target.value);
+                        setShowMp3QuranDropdown(true);
+                      }}
+                      onFocus={() => {
+                        setMp3QuranSearch('');
+                        setShowMp3QuranDropdown(true);
+                      }}
+                      className="pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg bg-emerald-50 dark:bg-emerald-900/20"
+                    />
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  
+                  {/* Dropdown Results */}
+                  {showMp3QuranDropdown && (
+                    <div className="absolute z-50 w-full mt-1 bg-[#FBF9F4] dark:bg-emerald-950 border border-emerald-300 rounded-lg shadow-lg max-h-[250px] overflow-y-auto">
+                      {mp3QuranReciters
+                        .filter((reciter) => matchesSearch(getMp3QuranReciterName(reciter), mp3QuranSearch))
+                        .slice()
+                        .sort((a, b) => {
+                          const nameA = getMp3QuranReciterName(a);
+                          const nameB = getMp3QuranReciterName(b);
+                          return nameA.localeCompare(nameB, 'ar');
+                        })
+                        .map((reciter, index) => (
+                          <div
+                            key={reciter.id}
+                            className="px-4 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-800 cursor-pointer border-b border-emerald-100 last:border-none"
+                            onClick={() => {
+                              onMp3QuranReciterChange(reciter);
+                              setShowMp3QuranDropdown(false);
+                            }}
+                          >
+                            <div className="flex items-center gap-2 w-full flex-row-reverse text-right text-base md:text-xl">
+                              <span className="text-emerald-600 dark:text-emerald-400 font-medium">{index + 1}.</span>
+                              <span className="flex-1">{getMp3QuranReciterName(reciter)}</span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
+              {/* Show other options only after selection */}
+              {selectedMp3QuranReciter && (
+                <>
+
               {/* Moshaf/Recitation Type Selection */}
-              {selectedMp3QuranReciter && selectedMp3QuranReciter.moshaf.length > 0 && (
+              {selectedMp3QuranReciter.moshaf.length > 0 && (
                 <div className="flex flex-col gap-2">
                   <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
                     {t('recitationType')}
@@ -406,6 +514,37 @@ export function ReciterDialog({
                 </div>
               )}
 
+              {/* Separator */}
+              <div className="border-t border-emerald-200 dark:border-emerald-700 my-2"></div>
+
+              {/* Surah Selection */}
+              <div className="flex flex-col gap-2">
+                <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+                  {t('chooseSurah')}
+                </span>
+                <Select value={selectedSurahForPlayback.toString()} onValueChange={(value) => {
+                  setSelectedSurahForPlayback(Number(value));
+                  setSelectedAyahForPlayback(1);
+                }}>
+                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {surahs.map((surah) => (
+                        <SelectItem
+                          key={surah.id}
+                          value={surah.id.toString()}
+                          className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100"
+                        >
+                          {language === 'ar' ? `${surah.id}. ${surah.name}` : `${surah.id}. ${surah.englishName}`}
+                        </SelectItem>
+                      ))}
+                    </div>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Save Button for MP3Quran */}
               <div className="pt-2 sm:pt-3 mt-2">
                 <Button
@@ -416,6 +555,8 @@ export function ReciterDialog({
                   {t('save')}
                 </Button>
               </div>
+                </>
+              )}
             </TabsContent>
           </Tabs>
         </div>

@@ -1996,6 +1996,16 @@ export const useAudioPlayer = ({
       .catch(err => console.error('Failed to load MP3Quran reciters:', err));
   }, []);
   
+  // Auto-select first moshaf when MP3Quran reciter is selected
+  useEffect(() => {
+    if (selectedMp3QuranReciter && selectedMp3QuranReciter.moshaf.length > 0) {
+      // If no moshaf is selected or the current moshaf doesn't belong to this reciter, select the first one
+      if (!selectedMoshaf || !selectedMp3QuranReciter.moshaf.find(m => m.id === selectedMoshaf.id)) {
+        setSelectedMoshaf(selectedMp3QuranReciter.moshaf[0]);
+      }
+    }
+  }, [selectedMp3QuranReciter]);
+  
   // Update audio element event listener when handleAudioEnded changes
   useEffect(() => {
     if (!audioElement) return;
