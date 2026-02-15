@@ -221,7 +221,7 @@ export function NavigationDialog({
   const highlightText = (text: string, searchWord: string, isArabic: boolean) => {
     if (!searchWord || !text) return text;
     
-    const normalizedSearch = isArabic ? normalizeArabic(searchWord.trim()) : searchWord.trim().toLowerCase();
+    const normalizedSearch = isArabic ? normalizeArabic(searchWord) : searchWord.toLowerCase();
     const normalizedText = isArabic ? normalizeArabic(text) : text.toLowerCase();
     
     // Find the position of the exact match in normalized text
@@ -276,13 +276,13 @@ export function NavigationDialog({
       console.log('=== WORD SEARCH DEBUG ===');
       console.log('Search Word:', searchWord);
       console.log('Ayah Data Length:', ayahData.length);
-      console.log('Normalized Search:', normalizeArabic(searchWord.trim()));
+      console.log('Normalized Search:', normalizeArabic(searchWord));
       
       // Use setTimeout to allow UI to update with loading state
       setTimeout(() => {
         // Search for the full text phrase
-        const normalizedSearchFull = normalizeArabic(searchWord.trim());
-        const searchFullLower = searchWord.trim().toLowerCase();
+        const normalizedSearchFull = normalizeArabic(searchWord);
+        const searchFullLower = searchWord.toLowerCase();
         const results: any[] = [];
         
         ayahData.forEach(surahData => {

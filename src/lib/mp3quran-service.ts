@@ -32,7 +32,24 @@ let recitersCacheAr: Mp3QuranReciter[] | null = null;
 const timingCache = new Map<string, AyahTiming[]>();
 
 /**
- * Fetch list of reciters from MP3Quran.net
+ * Load reciters from local JSON file (offline fallback)
+ */
+async function loadRecitersFromLocalFile(): Promise<Mp3QuranReciter[]> {
+  try {
+    const response = await fetch('/mp3quran_reciters.json');
+    if (!response.ok) {
+      throw new Error('Failed to load local reciters file');
+    }
+    const data = await response.json();
+    return data.reciters || [];
+  } catch (error) {
+    console.error('Error loading local reciters file:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch list of reciters from MP3Quran.net API (online) or local file (offline)
  */
 export async function getMp3QuranReciters(language: 'en' | 'ar' = 'en'): Promise<Mp3QuranReciter[]> {
   const cache = language === 'en' ? recitersCacheEn : recitersCacheAr;
@@ -42,8 +59,10 @@ export async function getMp3QuranReciters(language: 'en' | 'ar' = 'en'): Promise
   }
 
   try {
+    // Try fetching from API first (online - gets latest data)
     const response = await fetch(
-      `https://mp3quran.net/api/v3/reciters?language=${language}`
+      `https://mp3quran.net/api/v3/reciters?language=${language}`,
+      { signal: AbortSignal.timeout(5000) } // 5 second timeout
     );
     
     if (!response.ok) {
@@ -59,10 +78,28 @@ export async function getMp3QuranReciters(language: 'en' | 'ar' = 'en'): Promise
       recitersCacheAr = reciters;
     }
 
+    console.log('✅ Loaded reciters from API (online)');
     return reciters;
   } catch (error) {
-    console.error('Error fetching MP3Quran reciters:', error);
-    throw error;
+    // API failed (offline or network error) - fallback to local file
+    console.warn('Failed to fetch from API, loading from local file:', error);
+    
+    try {
+      const reciters = await loadRecitersFromLocalFile();
+      
+      // Cache based on language (note: local file is in English only)
+      if (language === 'en') {
+        recitersCacheEn = reciters;
+      } else {
+        recitersCacheAr = reciters;
+      }
+      
+      console.log('✅ Loaded reciters from local file (offline)');
+      return reciters;
+    } catch (localError) {
+      console.error('Failed to load reciters from local file:', localError);
+      throw new Error('Unable to load reciters from API or local file');
+    }
   }
 }
 
@@ -81,7 +118,8 @@ export async function getAyahTiming(
 
   try {
     const response = await fetch(
-      `https://www.mp3quran.net/api/v3/ayat_timing?surah=${surahNumber}&read=${moshafId}`
+      `https://www.mp3quran.net/api/v3/ayat_timing?surah=${surahNumber}&read=${moshafId}`,
+      { signal: AbortSignal.timeout(5000) } // 5 second timeout
     );
 
     if (!response.ok) {
@@ -93,8 +131,9 @@ export async function getAyahTiming(
 
     return timings;
   } catch (error) {
-    console.error('Error fetching ayah timing:', error);
-    throw error;
+    console.warn('Error fetching ayah timing (will play without precise tracking):', error);
+    // Return empty array instead of throwing - allows playback without timing
+    return [];
   }
 }
 

@@ -4,16 +4,18 @@
  */
 
 const DB_NAME = 'quran-audio-cache';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'audio-blobs';
 
 interface CachedAudio {
-  key: string; // Format: "reciterFolder-surahNum"
+  key: string; // Format: "reciterFolder-surahNum" or "mp3quran-moshafId-surahNum"
   blobData: Blob;
-  timestamps: number[];
+  timestamps: number[]; // For EveryAyah: start times in seconds; Not used for MP3Quran
   cachedAt: number;
   reciterFolder: string;
   surahNum: number;
+  audioType?: 'everyayah' | 'mp3quran'; // Type of cached audio
+  timingData?: any[]; // For MP3Quran: array of AyahTiming objects
 }
 
 /**
@@ -232,4 +234,92 @@ export const getCacheStats = async (): Promise<{
       reciters: [],
     };
   }
+};
+
+/**
+ * Store MP3Quran audio in cache with timing data
+ * Uses moshaf ID as the identifier instead of reciter folder
+ */
+export const cacheMp3QuranAudio = async (
+  moshafId: number,
+  surahNum: number,
+  blobData: Blob,
+  timingData: any[] // AyahTiming array
+): Promise<void> => {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    
+    const cachedAudio: CachedAudio = {
+      key: `mp3quran-${moshafId}-${surahNum}`,
+      blobData,
+      timestamps: [], // Not used for MP3Quran
+      cachedAt: Date.now(),
+      reciterFolder: `mp3quran-${moshafId}`, // Store as identifier
+      surahNum,
+      audioType: 'mp3quran',
+      timingData,
+    };
+    
+    store.put(cachedAudio);
+    
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    
+    db.close();
+  } catch (error) {
+    console.error('Error caching MP3Quran audio:', error);
+  }
+};
+
+/**
+ * Retrieve MP3Quran audio from cache
+ */
+export const getCachedMp3QuranAudio = async (
+  moshafId: number,
+  surahNum: number
+): Promise<{ blobData: Blob; timingData: any[] } | null> => {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    
+    const key = `mp3quran-${moshafId}-${surahNum}`;
+    const request = store.get(key);
+    
+    const result = await new Promise<CachedAudio | undefined>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    
+    db.close();
+    
+    if (result && result.audioType === 'mp3quran') {
+      console.log(`Cache HIT for MP3Quran moshaf ${moshafId} surah ${surahNum}`);
+      return {
+        blobData: result.blobData,
+        timingData: result.timingData || [],
+      };
+    }
+    
+    console.log(`Cache MISS for MP3Quran moshaf ${moshafId} surah ${surahNum}`);
+    return null;
+  } catch (error) {
+    console.error('Error retrieving cached MP3Quran audio:', error);
+    return null;
+  }
+};
+
+/**
+ * Check if MP3Quran audio is cached
+ */
+export const isMp3QuranAudioCached = async (
+  moshafId: number,
+  surahNum: number
+): Promise<boolean> => {
+  const cached = await getCachedMp3QuranAudio(moshafId, surahNum);
+  return cached !== null;
 };
