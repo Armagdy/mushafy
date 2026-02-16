@@ -67,6 +67,71 @@ export default function Test() {
     return text.ar; // Always show Arabic text for Quran verses
   };
 
+  // Normalize Arabic text by removing diacritics and normalizing character variations
+  const normalizeArabic = (text: string) => {
+    const normalized = text
+      .replace(/ٰ/g, 'ا') // Normalize superscript alif to regular alif
+      .replace(/[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g, '') // Remove diacritics
+      .replace(/[ٱأإآٲٳٵ]/g, 'ا') // Normalize alef variations
+      .replace(/[ىي]/g, 'ي') // Normalize yaa
+      .replace(/ة/g, 'ه') // Normalize taa marboota
+      .replace(/ؤ/g, 'و') // Normalize waw with hamza
+      .replace(/ئ/g, 'ي') // Normalize yaa with hamza
+      .toLowerCase();
+    
+    return normalized;
+  };
+
+  // Highlight matching phrase in text (for tikrar mode)
+  const highlightText = (text: string, searchPhrase: string) => {
+    if (!searchPhrase || !text) return text;
+    
+    const normalizedSearch = normalizeArabic(searchPhrase);
+    const normalizedText = normalizeArabic(text);
+    
+    // Find the position of the exact match in normalized text
+    const matchIndex = normalizedText.indexOf(normalizedSearch);
+    
+    if (matchIndex === -1) {
+      return text; // No match found
+    }
+    
+    // Calculate the actual position in the original text
+    let charCount = 0;
+    let actualStartIndex = 0;
+    let actualEndIndex = text.length;
+    
+    // Find start position
+    for (let i = 0; i < text.length && charCount < matchIndex; i++) {
+      const normalized = normalizeArabic(text[i]);
+      if (normalized) charCount += normalized.length;
+      actualStartIndex = i + 1;
+    }
+    
+    // Find end position
+    charCount = 0;
+    for (let i = actualStartIndex; i < text.length && charCount < normalizedSearch.length; i++) {
+      const normalized = normalizeArabic(text[i]);
+      if (normalized) charCount += normalized.length;
+      actualEndIndex = i + 1;
+    }
+    
+    // Split text into before, match, and after
+    const before = text.substring(0, actualStartIndex);
+    const match = text.substring(actualStartIndex, actualEndIndex);
+    const after = text.substring(actualEndIndex);
+    
+    return (
+      <>
+        {before}
+        <span className="bg-yellow-200 dark:bg-yellow-600 font-semibold rounded px-0.5">
+          {match}
+        </span>
+        {after}
+      </>
+    );
+  };
+
   // Get surahs in the range based on juz
   const getSurahsInJuzRange = useCallback((startJuz: number, endJuz: number): number[] => {
     const surahsInRange: Set<number> = new Set();
@@ -890,7 +955,7 @@ export default function Test() {
                           className="text-xl md:text-2xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 text-right"
                           style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
                         >
-                          {occ.fullText}
+                          {highlightText(occ.fullText, currentTikrar.phrase)}
                         </p>
                       </div>
                     ))}
