@@ -735,9 +735,9 @@ export default function Test() {
             </Button>
           </Card>
         ) : (currentQuestion || currentTikrar) ? (
-          <div className="space-y-6">
+          <div className="flex flex-col h-[calc(100vh-12rem)] md:h-auto md:space-y-6">
             {/* Question Counter */}
-            <div className="text-center">
+            <div className="text-center flex-shrink-0">
               <p className="text-base md:text-xl text-emerald-600 dark:text-emerald-400 font-medium">
                 {t('currentQuestion')}: {formatNumber(questionsCount)}
               </p>
@@ -745,81 +745,84 @@ export default function Test() {
 
             {/* Hifz Mode */}
             {testMode === 'hifz' && currentQuestion && (
-              <Card className="p-6 md:p-8 border-0 bg-white dark:bg-gray-800 shadow-md">
-                <div className="flex items-center justify-center gap-3 mb-6">
-                  <h2 className="text-xl md:text-2xl font-bold text-emerald-800 dark:text-emerald-400 text-center">
-                    {t('identifyAyah')}
-                  </h2>
-                  {currentQuestion.questionType && currentQuestion.questionType !== 'normal' && (
-                    <span className="px-3 py-1 rounded-full text-sm font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
-                      {t('difficultMode')}
-                    </span>
-                  )}
-                </div>
-                
-                {/* Partial Ayah (Question) */}
-                <div className={cn(
-                  "p-6 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800",
-                  "text-right"
-                )}>
-                  <p
-                    className="text-2xl md:text-3xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200"
-                    style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
-                  >
-                    {currentQuestion.partialText}
-                  </p>
-                </div>
-
-                {/* Hints */}
-                {!showAnswer && hintLevel > 0 && (
-                  <div className="mt-4 space-y-2">
-                    {/* For difficult questions: show type as first hint */}
-                    {hintLevel >= 1 && currentQuestion.questionType && currentQuestion.questionType !== 'normal' && (
-                      <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                        <p className="text-base md:text-lg font-semibold text-blue-700 dark:text-blue-300">
-                          {language === 'ar' ? 'تلميح' : 'Hint'} {formatNumber(1)}: {t('questionType')} - 
-                          {currentQuestion.questionType === 'middle' && (language === 'ar' ? ' مقطع من وسط الآية' : ' Middle-of-ayah excerpt')}
-                          {currentQuestion.questionType === 'end' && (language === 'ar' ? ' مقطع من نهاية الآية' : ' End-of-ayah excerpt')}
-                          {currentQuestion.questionType === 'cross-surah' && (language === 'ar' ? ' وصل بين السور' : ' Cross-surah continuation')}
-                        </p>
-                      </div>
-                    )}
-                    {/* Juz hint - show at level 2 for difficult, level 1 for normal */}
-                    {((currentQuestion.questionType !== 'normal' && hintLevel >= 2) || (currentQuestion.questionType === 'normal' && hintLevel >= 1)) && currentQuestion.juz && (
-                      <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
-                        <p className="text-base md:text-lg font-semibold text-purple-700 dark:text-purple-300">
-                          {language === 'ar' ? 'تلميح' : 'Hint'} {formatNumber(currentQuestion.questionType === 'normal' ? 1 : 2)}: {t('juz')} {formatNumber(currentQuestion.juz)}
-                        </p>
-                      </div>
-                    )}
-                    {/* Surah hint - show at level 3 for difficult, level 2 for normal */}
-                    {((currentQuestion.questionType !== 'normal' && hintLevel >= 3) || (currentQuestion.questionType === 'normal' && hintLevel >= 2)) && (
-                      <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                        <p className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">
-                          {language === 'ar' ? 'تلميح' : 'Hint'} {formatNumber(currentQuestion.questionType === 'normal' ? 2 : 3)}: {t('surahName')}: {getSurahName(currentQuestion.surahId)}
-                        </p>
-                      </div>
-                    )}
-                    {/* Full Ayah hint - show at level 4 for difficult, level 3 for normal */}
-                    {((currentQuestion.questionType !== 'normal' && hintLevel >= 4) || (currentQuestion.questionType === 'normal' && hintLevel >= 3)) && (
-                      <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                        <p className="text-base md:text-lg font-semibold text-amber-700 dark:text-amber-300 mb-2">
-                          {language === 'ar' ? 'تلميح' : 'Hint'} {formatNumber(currentQuestion.questionType === 'normal' ? 3 : 4)}: {t('fullAyah')}
-                        </p>
-                        <p
-                          className="text-xl md:text-2xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 text-right"
-                          style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
-                        >
-                          {currentQuestion.questionAyah.text}
-                        </p>
-                      </div>
+              <>
+                {/* Question Section - Fixed at Top */}
+                <Card className="p-6 md:p-8 border-0 bg-white dark:bg-gray-800 shadow-md flex-shrink-0">
+                  <div className="flex items-center justify-center gap-3 mb-6">
+                    <h2 className="text-xl md:text-2xl font-bold text-emerald-800 dark:text-emerald-400 text-center">
+                      {t('identifyAyah')}
+                    </h2>
+                    {currentQuestion.questionType && currentQuestion.questionType !== 'normal' && (
+                      <span className="px-3 py-1 rounded-full text-sm font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+                        {t('difficultMode')}
+                      </span>
                     )}
                   </div>
-                )}
+                  
+                  {/* Partial Ayah (Question) */}
+                  <div className={cn(
+                    "p-6 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800",
+                    "text-right"
+                  )}>
+                    <p
+                      className="text-2xl md:text-3xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200"
+                      style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
+                    >
+                      {currentQuestion.partialText}
+                    </p>
+                  </div>
 
-                {/* Answer Section */}
+                  {/* Hints */}
+                  {!showAnswer && hintLevel > 0 && (
+                    <div className="mt-4 space-y-2">
+                      {/* For difficult questions: show type as first hint */}
+                      {hintLevel >= 1 && currentQuestion.questionType && currentQuestion.questionType !== 'normal' && (
+                        <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                          <p className="text-base md:text-lg font-semibold text-blue-700 dark:text-blue-300">
+                            {language === 'ar' ? 'تلميح' : 'Hint'} {formatNumber(1)}: {t('questionType')} - 
+                            {currentQuestion.questionType === 'middle' && (language === 'ar' ? ' مقطع من وسط الآية' : ' Middle-of-ayah excerpt')}
+                            {currentQuestion.questionType === 'end' && (language === 'ar' ? ' مقطع من نهاية الآية' : ' End-of-ayah excerpt')}
+                            {currentQuestion.questionType === 'cross-surah' && (language === 'ar' ? ' وصل بين السور' : ' Cross-surah continuation')}
+                          </p>
+                        </div>
+                      )}
+                      {/* Juz hint - show at level 2 for difficult, level 1 for normal */}
+                      {((currentQuestion.questionType !== 'normal' && hintLevel >= 2) || (currentQuestion.questionType === 'normal' && hintLevel >= 1)) && currentQuestion.juz && (
+                        <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                          <p className="text-base md:text-lg font-semibold text-purple-700 dark:text-purple-300">
+                            {language === 'ar' ? 'تلميح' : 'Hint'} {formatNumber(currentQuestion.questionType === 'normal' ? 1 : 2)}: {t('juz')} {formatNumber(currentQuestion.juz)}
+                          </p>
+                        </div>
+                      )}
+                      {/* Surah hint - show at level 3 for difficult, level 2 for normal */}
+                      {((currentQuestion.questionType !== 'normal' && hintLevel >= 3) || (currentQuestion.questionType === 'normal' && hintLevel >= 2)) && (
+                        <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                          <p className="text-base md:text-lg font-semibold text-green-700 dark:text-green-300">
+                            {language === 'ar' ? 'تلميح' : 'Hint'} {formatNumber(currentQuestion.questionType === 'normal' ? 2 : 3)}: {t('surahName')}: {getSurahName(currentQuestion.surahId)}
+                          </p>
+                        </div>
+                      )}
+                      {/* Full Ayah hint - show at level 4 for difficult, level 3 for normal */}
+                      {((currentQuestion.questionType !== 'normal' && hintLevel >= 4) || (currentQuestion.questionType === 'normal' && hintLevel >= 3)) && (
+                        <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                          <p className="text-base md:text-lg font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                            {language === 'ar' ? 'تلميح' : 'Hint'} {formatNumber(currentQuestion.questionType === 'normal' ? 3 : 4)}: {t('fullAyah')}
+                          </p>
+                          <p
+                            className="text-xl md:text-2xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 text-right"
+                            style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
+                          >
+                            {currentQuestion.questionAyah.text}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Card>
+
+                {/* Answer Section - Scrollable */}
                 {showAnswer && (
-                  <div className="mt-6">
+                  <div className="mt-4 flex-1 overflow-y-auto md:max-h-[60vh] md:flex-none">
                     {/* Full Ayah + Following Ayahs */}
                     <div className={cn(
                       "p-6 rounded-lg bg-emerald-50 dark:bg-gray-700 border border-emerald-200 dark:border-emerald-800",
@@ -880,74 +883,77 @@ export default function Test() {
                     </div>
                   </div>
                 )}
-              </Card>
+              </>
             )}
 
             {/* Tikrar Mode */}
             {testMode === 'tikrar' && currentTikrar && (
-              <Card className="p-6 md:p-8 border-0 bg-white dark:bg-gray-800 shadow-md">
-                <div className="flex items-center justify-center gap-3 mb-6">
-                  <h2 className="text-xl md:text-2xl font-bold text-blue-800 dark:text-blue-400 text-center">
-                    {currentTikrar.questionType === 'similar-ending' 
-                      ? (language === 'ar' ? 'في أي آيات وردت هذه الخاتمة؟' : 'Which ayahs use this ending?')
-                      : t('tikrarQuestion')}
-                  </h2>
-                  {currentTikrar.questionType === 'similar-ending' && (
-                    <span className="px-3 py-1 rounded-full text-sm font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
-                      {language === 'ar' ? 'فواصل' : 'Endings'}
-                    </span>
-                  )}
-                </div>
-                
-                {/* Repeated Phrase or Similar Ending */}
-                <div className={cn(
-                  "p-6 rounded-lg bg-blue-50 dark:bg-gray-700",
-                  "text-right"
-                )}>
-                  <p
-                    className="text-2xl md:text-3xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 text-center"
-                    style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
-                  >
-                    {currentTikrar.phrase}
-                  </p>
-                  {currentTikrar.questionType === 'similar-ending' && (
-                    <p className="text-xs text-blue-500 dark:text-blue-400 text-center mt-2">
-                      {language === 'ar' ? '(خاتمة الآية)' : '(Ayah Ending)'}
-                    </p>
-                  )}
-                  <p className="text-sm text-blue-600 dark:text-blue-400 text-center mt-3">
-                    {t('appearsIn')} {formatNumber(currentTikrar.occurrences.length)} {t('occurrences')}
-                  </p>
-                </div>
-
-                {/* Hint Section - Show Surahs */}
-                {!showAnswer && hintLevel >= 1 && (
-                  <div className="mt-6 p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
-                    <p className="text-base md:text-lg font-semibold text-purple-700 dark:text-purple-300 mb-3">
-                      {language === 'ar' ? 'تلميح' : 'Hint'}: {t('surahNames')}
-                    </p>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {Array.from(new Set(currentTikrar.occurrences.map(o => o.surahId)))
-                        .sort((a, b) => a - b)
-                        .map((surahId) => (
-                          <span
-                            key={surahId}
-                            className="px-3 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-800/40 text-purple-800 dark:text-purple-200 font-medium text-base md:text-lg"
-                          >
-                            {getSurahName(surahId)}
-                          </span>
-                        ))}
-                    </div>
+              <>
+                {/* Question Section - Fixed at Top */}
+                <Card className="p-6 md:p-8 border-0 bg-white dark:bg-gray-800 shadow-md flex-shrink-0">
+                  <div className="flex items-center justify-center gap-3 mb-6">
+                    <h2 className="text-xl md:text-2xl font-bold text-blue-800 dark:text-blue-400 text-center">
+                      {currentTikrar.questionType === 'similar-ending' 
+                        ? (language === 'ar' ? 'في أي آيات وردت هذه الخاتمة؟' : 'Which ayahs use this ending?')
+                        : t('tikrarQuestion')}
+                    </h2>
+                    {currentTikrar.questionType === 'similar-ending' && (
+                      <span className="px-3 py-1 rounded-full text-sm font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+                        {language === 'ar' ? 'فواصل' : 'Endings'}
+                      </span>
+                    )}
                   </div>
-                )}
+                  
+                  {/* Repeated Phrase or Similar Ending */}
+                  <div className={cn(
+                    "p-6 rounded-lg bg-blue-50 dark:bg-gray-700",
+                    "text-right"
+                  )}>
+                    <p
+                      className="text-2xl md:text-3xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 text-center"
+                      style={{ fontFamily: "'Amiri', 'Traditional Arabic', serif" }}
+                    >
+                      {currentTikrar.phrase}
+                    </p>
+                    {currentTikrar.questionType === 'similar-ending' && (
+                      <p className="text-xs text-blue-500 dark:text-blue-400 text-center mt-2">
+                        {language === 'ar' ? '(خاتمة الآية)' : '(Ayah Ending)'}
+                      </p>
+                    )}
+                    <p className="text-sm text-blue-600 dark:text-blue-400 text-center mt-3">
+                      {t('appearsIn')} {formatNumber(currentTikrar.occurrences.length)} {t('occurrences')}
+                    </p>
+                  </div>
 
-                {/* Answer Section */}
+                  {/* Hint Section - Show Surahs */}
+                  {!showAnswer && hintLevel >= 1 && (
+                    <div className="mt-6 p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                      <p className="text-base md:text-lg font-semibold text-purple-700 dark:text-purple-300 mb-3">
+                        {language === 'ar' ? 'تلميح' : 'Hint'}: {t('surahNames')}
+                      </p>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {Array.from(new Set(currentTikrar.occurrences.map(o => o.surahId)))
+                          .sort((a, b) => a - b)
+                          .map((surahId) => (
+                            <span
+                              key={surahId}
+                              className="px-3 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-800/40 text-purple-800 dark:text-purple-200 font-medium text-base md:text-lg"
+                            >
+                              {getSurahName(surahId)}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+
+                {/* Answer Section - Scrollable */}
                 {showAnswer && (
-                  <div className="mt-6 space-y-3">
+                  <div className="mt-4 flex-1 overflow-y-auto space-y-3 px-1 md:max-h-[60vh] md:flex-none">
                     {currentTikrar.occurrences.map((occ, index) => (
                       <div
                         key={index}
-                        className="p-4 rounded-lg bg-emerald-50 dark:bg-gray-700 border border-emerald-200 dark:border-emerald-800"
+                        className="p-4 rounded-lg bg-emerald-50 dark:bg-gray-700 border border-emerald-200 dark:border-emerald-800 shadow-sm"
                       >
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-base md:text-lg font-bold text-emerald-700 dark:text-emerald-300">
@@ -967,11 +973,11 @@ export default function Test() {
                     ))}
                   </div>
                 )}
-              </Card>
+              </>
             )}
 
             {/* Action Buttons */}
-            <div className="flex gap-4 justify-center flex-wrap">
+            <div className="flex gap-4 justify-center flex-wrap mt-4 flex-shrink-0">
               {!showAnswer ? (
                 <>
                   {/* Show hint button for hifz mode or tikrar mode */}
