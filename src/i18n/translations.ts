@@ -201,6 +201,7 @@ export const translations = {
     networkRequired: 'يتطلب الاتصال بالإنترنت',
     offlineMode: 'وضع عدم الاتصال',
     loadingAyahs: 'تحميل الآيات جملة واحدة لاستماع افضل ',
+    loadingAudio: 'جاري تحميل الصوت...',
   },
   en: {
     appName: 'Mushafy',
@@ -403,6 +404,7 @@ export const translations = {
     networkRequired: 'Internet connection required',
     offlineMode: 'Offline Mode',
     loadingAyahs: 'Loading all ayahs at once for better listening experience',
+    loadingAudio: 'Loading audio...',
   },
 };
 

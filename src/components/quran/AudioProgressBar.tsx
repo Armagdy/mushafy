@@ -16,6 +16,7 @@ interface AudioProgressBarProps {
   onSeek: (time: number) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  audioElement?: HTMLAudioElement | null;
   audioSource?: 'everyayah' | 'mp3quran';
   ayahTimestamps?: number[];
   concatenatedSurah?: number | null;
@@ -43,6 +44,7 @@ export function AudioProgressBar({
   onSeek,
   onDragStart,
   onDragEnd,
+  audioElement = null,
   audioSource = 'everyayah',
   ayahTimestamps = [],
   concatenatedSurah = null,
@@ -65,6 +67,7 @@ export function AudioProgressBar({
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [dragProgress, setDragProgress] = useState<number | null>(null);
   const [wasPlayingBeforeDrag, setWasPlayingBeforeDrag] = useState(false);
+  const [bufferedPercentage, setBufferedPercentage] = useState(0);
   const dragEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Calculate progress percentage - use drag progress during dragging for instant feedback
@@ -242,6 +245,39 @@ export function AudioProgressBar({
     };
   }, []);
 
+  // Track buffered ranges (like YouTube)
+  useEffect(() => {
+    if (!audioElement || duration <= 0) return;
+
+    const updateBuffered = () => {
+      try {
+        const buffered = audioElement.buffered;
+        if (buffered.length > 0) {
+          // Get the end of the last buffered range
+          const bufferedEnd = buffered.end(buffered.length - 1);
+          const bufferedPercent = (bufferedEnd / duration) * 100;
+          setBufferedPercentage(Math.min(bufferedPercent, 100));
+        }
+      } catch (err) {
+        // Ignore errors when buffered ranges aren't available yet
+      }
+    };
+
+    // Update on progress events
+    audioElement.addEventListener('progress', updateBuffered);
+    audioElement.addEventListener('loadedmetadata', updateBuffered);
+    audioElement.addEventListener('canplay', updateBuffered);
+    
+    // Initial update
+    updateBuffered();
+
+    return () => {
+      audioElement.removeEventListener('progress', updateBuffered);
+      audioElement.removeEventListener('loadedmetadata', updateBuffered);
+      audioElement.removeEventListener('canplay', updateBuffered);
+    };
+  }, [audioElement, duration]);
+
   // Format time in mm:ss
   const formatTime = (time: number): string => {
     if (!isFinite(time)) return '0:00';
@@ -358,6 +394,14 @@ export function AudioProgressBar({
       >
         {/* Background track */}
         <div className="absolute inset-0 bg-emerald-950/50" />
+        
+        {/* Buffered indicator (like YouTube) */}
+        {bufferedPercentage > 0 && (
+          <div
+            className="absolute inset-y-0 left-0 bg-gray-400/30 transition-all duration-300"
+            style={{ width: `${bufferedPercentage}%` }}
+          />
+        )}
         
         {/* Section repeat markers (thicker, more prominent) */}
         {sectionMarkers.map((position, index) => (

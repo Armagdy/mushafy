@@ -602,12 +602,14 @@ const Surah = () => {
         onScroll={handleScroll}
       />
 
-      {/* Preloading indicator overlay - only for EveryAyah */}
-      {isPreloadingAyahs && audioSource === 'everyayah' && (
+      {/* Preloading indicator overlay */}
+      {isPreloadingAyahs && (
         <div className="fixed bottom-[120px] md:bottom-[140px] left-0 right-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-emerald-700/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-emerald-500/30">
             <p className="text-[#F2E3BB] text-sm md:text-base font-medium text-center">
-              {t('loadingAyahs')} {preloadProgress.total > 0 && `${formatNumber(Math.round((preloadProgress.current / preloadProgress.total) * 100))}%`}
+              {audioSource === 'everyayah' 
+                ? `${t('loadingAyahs')} ${preloadProgress.total > 0 ? `${formatNumber(Math.round((preloadProgress.current / preloadProgress.total) * 100))}%` : ''}`
+                : t('loadingAudio') || 'Loading audio...'}
             </p>
           </div>
         </div>
@@ -620,6 +622,7 @@ const Surah = () => {
             duration={duration}
             isPlaying={isPlaying}
             onSeek={seekToTime}
+          audioElement={audioElement}
           audioSource={audioSource}
           ayahTimestamps={ayahTimestamps}
           concatenatedSurah={concatenatedSurah}
