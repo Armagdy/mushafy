@@ -471,17 +471,19 @@ export default function Test() {
       const words = verse.text.split(/\s+/).filter(w => w.length > 0);
       if (words.length < 2) continue;
       
-      // Get last 2 words as ending
-      const ending = words.slice(-2).join(' ');
-      
-      if (!endingMap.has(ending)) {
-        endingMap.set(ending, []);
+      // Get last 2-3 words as ending
+      for (let len = 2; len <= Math.min(3, words.length); len++) {
+        const ending = words.slice(-len).join(' ');
+        
+        if (!endingMap.has(ending)) {
+          endingMap.set(ending, []);
+        }
+        endingMap.get(ending)!.push({
+          surahId: verse.surahId,
+          ayahNumber: verse.ayahNumber,
+          fullText: verse.text,
+        });
       }
-      endingMap.get(ending)!.push({
-        surahId: verse.surahId,
-        ayahNumber: verse.ayahNumber,
-        fullText: verse.text,
-      });
     }
     
     // Filter to endings that appear in multiple different ayahs (2+)
@@ -523,7 +525,7 @@ export default function Test() {
     const useDifficultMode = difficult && Math.random() < 0.7;
     
     if (useDifficultMode) {
-      // الفواصل المتشابهة - Find similar endings (2-word endings that repeat)
+      // الفواصل المتشابهة - Find similar endings (2-3 word endings that repeat)
       const similarEndings = findSimilarEndings(allVerses);
       if (similarEndings.length > 0) {
         // Filter to phrases not yet used and not overlapping with used phrases
@@ -561,13 +563,17 @@ export default function Test() {
     }
 
     // NORMAL MODE or fallback if difficult mode didn't find anything
-    // Build a map of multi-word phrases (2-4 words) that appear in multiple ayahs
+    // Build a map of multi-word phrases
+    // Default: 4 words (at least 4 words)
+    // Difficult: 2-3 words (at most 3 words)
     const phraseMap = new Map<string, TikrarOccurrence[]>();
+    const minWords = difficult ? 2 : 4;
+    const maxWords = difficult ? 3 : 4;
 
     for (const verse of allVerses) {
       const words = verse.text.split(/\s+/);
       const seenPhrases = new Set<string>(); // avoid counting same phrase twice in same ayah
-      for (let len = 2; len <= Math.min(4, words.length); len++) {
+      for (let len = minWords; len <= Math.min(maxWords, words.length); len++) {
         for (let i = 0; i <= words.length - len; i++) {
           const phrase = words.slice(i, i + len).join(' ');
           if (seenPhrases.has(phrase)) continue;
