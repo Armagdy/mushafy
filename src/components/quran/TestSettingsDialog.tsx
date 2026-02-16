@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { surahs } from "@/data/surahs";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ export interface TestRange {
   end: number;
   testMode: TestMode;
   difficult: boolean;
+  maxQuestions: number;
 }
 
 interface TestSettingsDialogProps {
@@ -38,6 +40,7 @@ export function TestSettingsDialog({
   const [endSurah, setEndSurah] = useState(114);
   const [startJuz, setStartJuz] = useState(1);
   const [endJuz, setEndJuz] = useState(30);
+  const [maxQuestions, setMaxQuestions] = useState(20);
 
   // Format number based on language
   const formatNumber = (num: number): string => {
@@ -54,6 +57,7 @@ export function TestSettingsDialog({
       end: rangeType === 'surah' ? endSurah : endJuz,
       testMode,
       difficult,
+      maxQuestions: maxQuestions > 0 ? maxQuestions : 20,
     };
     onStart(range);
     onOpenChange(false);
@@ -138,6 +142,19 @@ export function TestSettingsDialog({
                 difficult ? (isRTL ? "left-1" : "right-1") : (isRTL ? "right-1" : "left-1")
               )} />
             </div>
+          </div>
+
+          {/* Max Questions Input */}
+          <div className="space-y-2">
+            <Label className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">{t('maxQuestions')}</Label>
+            <Input
+              type="number"
+              min="1"
+              max="100"
+              value={maxQuestions}
+              onChange={(e) => setMaxQuestions(parseInt(e.target.value) || 20)}
+              className="text-base md:text-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500"
+            />
           </div>
 
           <Tabs value={rangeType} onValueChange={(v) => setRangeType(v as 'surah' | 'juz')}>

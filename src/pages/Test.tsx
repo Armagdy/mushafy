@@ -48,6 +48,7 @@ export default function Test() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [hintLevel, setHintLevel] = useState(0);
   const [questionsCount, setQuestionsCount] = useState(0);
+  const [maxQuestions, setMaxQuestions] = useState(20);
   const [usedHifzKeys, setUsedHifzKeys] = useState<Set<string>>(new Set());
   const [usedTikrarPhrases, setUsedTikrarPhrases] = useState<Set<string>>(new Set());
   const [usedTikrarAyahs, setUsedTikrarAyahs] = useState<Set<string>>(new Set());
@@ -648,6 +649,7 @@ export default function Test() {
     setTestRange(range);
     setTestMode(range.testMode);
     setDifficult(range.difficult);
+    setMaxQuestions(range.maxQuestions);
     setQuestionsCount(0);
     setCurrentQuestion(null);
     setCurrentTikrar(null);
@@ -659,6 +661,15 @@ export default function Test() {
 
   const handleNextQuestion = () => {
     setHintLevel(0);
+    
+    // Check if we've reached the max question limit
+    if (questionsCount >= maxQuestions) {
+      setAllTestsCompleted(true);
+      setCurrentQuestion(null);
+      setCurrentTikrar(null);
+      return;
+    }
+    
     if (testMode === 'tikrar') {
       generateTikrarQuestion();
     } else {
@@ -689,14 +700,14 @@ export default function Test() {
 
   // Auto-generate first question when test range is set and ayah data is loaded
   useEffect(() => {
-    if (testRange && ayahData.length > 0 && !currentQuestion && !currentTikrar) {
+    if (testRange && ayahData.length > 0 && !currentQuestion && !currentTikrar && !allTestsCompleted) {
       if (testMode === 'tikrar') {
         generateTikrarQuestion();
       } else {
         generateQuestion();
       }
     }
-  }, [testRange, ayahData, currentQuestion, currentTikrar, testMode, generateQuestion, generateTikrarQuestion]);
+  }, [testRange, ayahData, currentQuestion, currentTikrar, allTestsCompleted, testMode, generateQuestion, generateTikrarQuestion]);
 
   const getSurahName = (surahId: number) => {
     const surah = surahs.find(s => s.id === surahId);
@@ -739,7 +750,7 @@ export default function Test() {
             {/* Question Counter */}
             <div className="text-center flex-shrink-0">
               <p className="text-base md:text-xl text-emerald-600 dark:text-emerald-400 font-medium">
-                {t('currentQuestion')}: {formatNumber(questionsCount)}
+                {t('questionProgress').replace('{current}', formatNumber(questionsCount)).replace('{max}', formatNumber(maxQuestions))}
               </p>
             </div>
 
@@ -1024,10 +1035,10 @@ export default function Test() {
               {language === 'ar' ? 'أحسنت!' : 'Excellent!'}
             </h2>
             <p className="text-lg md:text-xl text-emerald-700 dark:text-emerald-400">
-              {language === 'ar' ? 'لقد أكملت جميع الأسئلة!' : 'Test Completed!'}
+              {t('testCompleted')}
             </p>
             <p className="text-base md:text-lg text-gray-600 dark:text-gray-400">
-              {language === 'ar' ? 'لقد أجبت على جميع الأسئلة المتاحة في هذا النطاق' : 'You have answered all available questions in this range'}
+              {t('testCompletedDesc').replace('{count}', formatNumber(questionsCount))}
             </p>
             <Button
               onClick={() => {
