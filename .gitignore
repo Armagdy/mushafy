@@ -30,3 +30,16 @@ TODO.txt
 pdf_to_jpg.py
 split_pdf.py
 REFACTORING_*.md
+
+# Capacitor
+.capacitor
+android/app/build/
+android/app/release/
+android/build/
+android/.gradle/
+android/local.properties
+*.keystore
+*.jks
+
+# Keep android source but ignore build artifacts
+!android/app/src/

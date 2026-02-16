@@ -468,6 +468,7 @@ This prevents confusion when user swipes to a new page and presses play.
 
 ### Commands
 ```bash
+# Web Development (PWA)
 npm run dev          # Vite dev server on [::]:8080 with HMR
 npm run build        # Production build → dist/
 npm run build:dev    # Dev build with source maps
@@ -475,7 +476,75 @@ npm run lint         # ESLint all files
 npm run test         # Vitest once
 npm run test:watch   # Vitest watch mode
 npm run preview      # Preview production build
+
+# Native Android App (Capacitor)
+npm run cap:sync     # Build web + sync to Android
+npm run cap:run      # Build + run on Android device
+npm run cap:open     # Open Android project in Android Studio
+npm run cap:update   # Update Capacitor dependencies
 ```
+
+## Native Android App (Capacitor)
+
+### Platform Support
+This app can be built as a **native Android app** using Capacitor, providing:
+- ✅ **Unlimited storage** (native filesystem vs browser quotas)
+- ✅ **Faster I/O** (native file operations)
+- ✅ **Better reliability** (persistent data)
+- ✅ **Google Play distribution**
+
+### Hybrid Storage Architecture
+**File:** [src/lib/native-storage.ts](src/lib/native-storage.ts)
+
+The app uses **automatic platform detection**:
+```typescript
+import { isNativePlatform, NativeStorage } from './lib/native-storage';
+
+if (isNativePlatform()) {
+  // Android/iOS → Uses native filesystem
+} else {
+  // Web → Uses IndexedDB fallback
+}
+```
+
+### Storage Service Usage
+```typescript
+import { NativeStorage } from '@/lib/native-storage';
+
+const storage = new NativeStorage('my-cache');
+await storage.init();
+
+// Store blob
+await storage.setItem('key', blob, { metadata: 'value' });
+
+// Retrieve blob
+const result = await storage.getItem('key');
+if (result) {
+  const blob = result.data;
+  const meta = result.metadata;
+}
+```
+
+### Updated Audio Cache
+[src/lib/audio-cache.ts](src/lib/audio-cache.ts) now uses hybrid storage:
+- **Android:** Audio cached in native filesystem (unlimited)
+- **Web:** Audio cached in IndexedDB (existing behavior)
+- **API unchanged:** All existing functions work the same
+
+### Configuration
+**File:** [capacitor.config.ts](capacitor.config.ts)
+```typescript
+const config: CapacitorConfig = {
+  appId: 'com.mushafy.quran',    // Android package name
+  appName: 'Mushafy Quran',       // App display name
+  webDir: 'dist',                 // Build output directory
+};
+```
+
+### Documentation
+- [CAPACITOR_SETUP.md](CAPACITOR_SETUP.md) — Complete setup guide
+- [CAPACITOR_QUICK_REF.md](CAPACITOR_QUICK_REF.md) — Quick command reference
+- [STORAGE_MIGRATION.md](STORAGE_MIGRATION.md) — Migration notes
 
 ### Vite Configuration
 - **Path alias:** `@` → `src/`
@@ -504,6 +573,9 @@ npm run preview      # Preview production build
 | Change theme colors | Edit HSL variables in [src/index.css](src/index.css) |
 | Access Quran page data | Use functions from [src/lib/quran-mapping.ts](src/lib/quran-mapping.ts) |
 | **Modify audio player** | **Read "Audio Player Architecture" section above - understand concatenation strategy before editing** |
+| **Add native storage** | **Use `NativeStorage` class from [src/lib/native-storage.ts](src/lib/native-storage.ts) - auto-detects platform** |
+| **Build Android app** | `npm run cap:sync` then `npm run cap:open` to launch Android Studio |
+| **Test on Android** | `npm run cap:run` (requires USB debugging enabled) |
 | **Document new feature** | **Update [README.md](README.md) with feature description, usage, and any configuration** |
 | **Style a button** | Use `bg-gradient-to-r from-emerald-700 to-emerald-600 text-white text-base md:text-xl` |
 | **Style an input** | Use `border-emerald-300 focus:border-emerald-500 text-base md:text-lg` |

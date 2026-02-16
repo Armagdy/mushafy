@@ -120,7 +120,45 @@ npm run test         # Run Vitest once
 npm run test:watch   # Run Vitest in watch mode
 npm run preview      # Preview production build
 npm run deploy       # Deploy to GitHub Pages (requires gh-pages package)
+
+# Capacitor (Native Android App)
+npm run cap:sync     # Sync web assets to native platform
+npm run cap:run      # Build and run on Android device
+npm run cap:open     # Open Android project in Android Studio
 ```
+
+## 📱 Native Android App (NEW!)
+
+This PWA can now be built as a **native Android app** using Capacitor, giving you:
+
+- ✅ **Unlimited storage** (no browser quotas)
+- ✅ **Native filesystem** (faster than IndexedDB)
+- ✅ **Google Play Store distribution**
+- ✅ **Better offline performance**
+- ✅ **Background audio support**
+
+### Quick Start
+
+```bash
+# Build web assets
+npm run build
+
+# Sync to Android project
+npm run cap:sync
+
+# Open in Android Studio
+npm run cap:open
+```
+
+📚 **Full documentation**: See [CAPACITOR_SETUP.md](./CAPACITOR_SETUP.md) for complete setup, configuration, and publishing guide.
+
+### Platform Detection
+
+The app automatically detects whether it's running as:
+- Native Android app → Uses native filesystem
+- Web browser → Falls back to IndexedDB
+
+No code changes needed - storage switches automatically!
 
 ## 🚀 Deployment
 

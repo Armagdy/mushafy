@@ -1,46 +1,39 @@
 /**
- * Audio Cache Service using IndexedDB
+ * Audio Cache Service using Hybrid Storage
+ * - Native filesystem on Android/iOS (unlimited storage)
+ * - IndexedDB fallback on web browsers
  * Caches concatenated surah audio to avoid re-downloading
  */
+
+import { NativeStorage, isNativePlatform, getPlatform } from './native-storage';
 
 const DB_NAME = 'quran-audio-cache';
 const DB_VERSION = 2;
 const STORE_NAME = 'audio-blobs';
 
+// Hybrid storage instance
+const audioStorage = new NativeStorage('quran-audio-cache');
+
+// Initialize storage on module load
+audioStorage.init().catch(console.error);
+
+// Legacy interface for backward compatibility
 interface CachedAudio {
-  key: string; // Format: "reciterFolder-surahNum" or "mp3quran-moshafId-surahNum"
+  key: string;
   blobData: Blob;
-  timestamps: number[]; // For EveryAyah: start times in seconds; Not used for MP3Quran
+  timestamps: number[];
   cachedAt: number;
   reciterFolder: string;
   surahNum: number;
-  audioType?: 'everyayah' | 'mp3quran'; // Type of cached audio
-  timingData?: any[]; // For MP3Quran: array of AyahTiming objects
+  audioType?: 'everyayah' | 'mp3quran';
+  timingData?: any[];
 }
 
-/**
- * Open IndexedDB connection
- */
-const openDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-    
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      
-      // Create object store if it doesn't exist
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'key' });
-        objectStore.createIndex('reciterFolder', 'reciterFolder', { unique: false });
-        objectStore.createIndex('surahNum', 'surahNum', { unique: false });
-        objectStore.createIndex('cachedAt', 'cachedAt', { unique: false });
-      }
-    };
-  });
-};
+// Legacy IndexedDB functions kept for potential migration needs
+// These are no longer used but kept for reference
+
+// Legacy IndexedDB functions kept for potential migration needs
+// These are no longer used but kept for reference
 
 /**
  * Generate cache key
@@ -51,6 +44,7 @@ const getCacheKey = (reciterFolder: string, surahNum: number): string => {
 
 /**
  * Store audio in cache
+ * Uses native filesystem on Android/iOS, IndexedDB on web
  */
 export const cacheAudio = async (
   reciterFolder: string,
@@ -59,27 +53,20 @@ export const cacheAudio = async (
   timestamps: number[]
 ): Promise<void> => {
   try {
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
+    await audioStorage.init();
     
-    const cachedAudio: CachedAudio = {
-      key: getCacheKey(reciterFolder, surahNum),
-      blobData,
-      timestamps,
-      cachedAt: Date.now(),
+    const key = getCacheKey(reciterFolder, surahNum);
+    const metadata = {
       reciterFolder,
       surahNum,
+      timestamps,
+      audioType: 'everyayah',
+      mimeType: blobData.type || 'audio/wav',
     };
     
-    store.put(cachedAudio);
+    await audioStorage.setItem(key, blobData, metadata);
     
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    db.close();
+    console.log(`✅ [${getPlatform()}] Cached audio: ${key}`);
   } catch (error) {
     console.error('Error caching audio:', error);
   }
@@ -87,35 +74,27 @@ export const cacheAudio = async (
 
 /**
  * Retrieve audio from cache
+ * Uses native filesystem on Android/iOS, IndexedDB on web
  */
 export const getCachedAudio = async (
   reciterFolder: string,
   surahNum: number
 ): Promise<{ blobData: Blob; timestamps: number[] } | null> => {
   try {
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
+    await audioStorage.init();
     
     const key = getCacheKey(reciterFolder, surahNum);
-    const request = store.get(key);
+    const result = await audioStorage.getItem(key);
     
-    const result = await new Promise<CachedAudio | undefined>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    
-    db.close();
-    
-    if (result) {
-      console.log(`Cache HIT for ${reciterFolder} surah ${surahNum}`);
+    if (result && result.data instanceof Blob) {
+      console.log(`✅ [${getPlatform()}] Cache HIT for ${reciterFolder} surah ${surahNum}`);
       return {
-        blobData: result.blobData,
-        timestamps: result.timestamps,
+        blobData: result.data,
+        timestamps: result.metadata?.timestamps || [],
       };
     }
     
-    console.log(`Cache MISS for ${reciterFolder} surah ${surahNum}`);
+    console.log(`❌ [${getPlatform()}] Cache MISS for ${reciterFolder} surah ${surahNum}`);
     return null;
   } catch (error) {
     console.error('Error retrieving cached audio:', error);
@@ -139,28 +118,16 @@ export const isAudioCached = async (
  */
 export const clearReciterCache = async (reciterFolder: string): Promise<void> => {
   try {
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const index = store.index('reciterFolder');
+    await audioStorage.init();
     
-    const request = index.openCursor(IDBKeyRange.only(reciterFolder));
+    const keys = await audioStorage.keys();
+    const reciterKeys = keys.filter(key => key.startsWith(reciterFolder));
     
-    request.onsuccess = (event) => {
-      const cursor = (event.target as IDBRequest).result;
-      if (cursor) {
-        cursor.delete();
-        cursor.continue();
-      }
-    };
+    for (const key of reciterKeys) {
+      await audioStorage.removeItem(key);
+    }
     
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    db.close();
-    console.log(`Cleared cache for reciter: ${reciterFolder}`);
+    console.log(`✅ [${getPlatform()}] Cleared cache for reciter: ${reciterFolder}`);
   } catch (error) {
     console.error('Error clearing reciter cache:', error);
   }
@@ -171,19 +138,10 @@ export const clearReciterCache = async (reciterFolder: string): Promise<void> =>
  */
 export const clearAllCache = async (): Promise<void> => {
   try {
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
+    await audioStorage.init();
+    await audioStorage.clear();
     
-    store.clear();
-    
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    db.close();
-    console.log('Cleared all audio cache');
+    console.log(`✅ [${getPlatform()}] Cleared all audio cache`);
   } catch (error) {
     console.error('Error clearing cache:', error);
   }
@@ -198,33 +156,31 @@ export const getCacheStats = async (): Promise<{
   reciters: string[];
 }> => {
   try {
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
+    await audioStorage.init();
     
-    const countRequest = store.count();
-    const allRequest = store.getAll();
+    const keys = await audioStorage.keys();
+    let estimatedSize = 0;
+    const recitersSet = new Set<string>();
     
-    const [count, all] = await Promise.all([
-      new Promise<number>((resolve, reject) => {
-        countRequest.onsuccess = () => resolve(countRequest.result);
-        countRequest.onerror = () => reject(countRequest.error);
-      }),
-      new Promise<CachedAudio[]>((resolve, reject) => {
-        allRequest.onsuccess = () => resolve(allRequest.result);
-        allRequest.onerror = () => reject(allRequest.error);
-      }),
-    ]);
+    // Get size and reciter info from each cached item
+    for (const key of keys) {
+      const item = await audioStorage.getItem(key);
+      if (item && item.data instanceof Blob) {
+        estimatedSize += item.data.size;
+        if (item.metadata?.reciterFolder) {
+          recitersSet.add(item.metadata.reciterFolder);
+        }
+      }
+    }
     
-    const estimatedSize = all.reduce((sum, item) => sum + item.blobData.size, 0);
-    const reciters = [...new Set(all.map(item => item.reciterFolder))];
+    const storageInfo = await audioStorage.getStorageInfo();
     
-    db.close();
+    console.log(`📊 [${getPlatform()}] Cache stats: ${keys.length} entries, ~${(estimatedSize / 1024 / 1024).toFixed(2)}MB`);
     
     return {
-      totalEntries: count,
+      totalEntries: keys.length,
       estimatedSize,
-      reciters,
+      reciters: Array.from(recitersSet),
     };
   } catch (error) {
     console.error('Error getting cache stats:', error);
@@ -247,29 +203,20 @@ export const cacheMp3QuranAudio = async (
   timingData: any[] // AyahTiming array
 ): Promise<void> => {
   try {
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
+    await audioStorage.init();
     
-    const cachedAudio: CachedAudio = {
-      key: `mp3quran-${moshafId}-${surahNum}`,
-      blobData,
-      timestamps: [], // Not used for MP3Quran
-      cachedAt: Date.now(),
-      reciterFolder: `mp3quran-${moshafId}`, // Store as identifier
+    const key = `mp3quran-${moshafId}-${surahNum}`;
+    const metadata = {
+      reciterFolder: `mp3quran-${moshafId}`,
       surahNum,
       audioType: 'mp3quran',
       timingData,
+      mimeType: blobData.type || 'audio/mpeg',
     };
     
-    store.put(cachedAudio);
+    await audioStorage.setItem(key, blobData, metadata);
     
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    db.close();
+    console.log(`✅ [${getPlatform()}] Cached MP3Quran audio: ${key}`);
   } catch (error) {
     console.error('Error caching MP3Quran audio:', error);
   }
@@ -283,29 +230,20 @@ export const getCachedMp3QuranAudio = async (
   surahNum: number
 ): Promise<{ blobData: Blob; timingData: any[] } | null> => {
   try {
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
+    await audioStorage.init();
     
     const key = `mp3quran-${moshafId}-${surahNum}`;
-    const request = store.get(key);
+    const result = await audioStorage.getItem(key);
     
-    const result = await new Promise<CachedAudio | undefined>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    
-    db.close();
-    
-    if (result && result.audioType === 'mp3quran') {
-      console.log(`Cache HIT for MP3Quran moshaf ${moshafId} surah ${surahNum}`);
+    if (result && result.data instanceof Blob && result.metadata?.audioType === 'mp3quran') {
+      console.log(`✅ [${getPlatform()}] Cache HIT for MP3Quran moshaf ${moshafId} surah ${surahNum}`);
       return {
-        blobData: result.blobData,
-        timingData: result.timingData || [],
+        blobData: result.data,
+        timingData: result.metadata?.timingData || [],
       };
     }
     
-    console.log(`Cache MISS for MP3Quran moshaf ${moshafId} surah ${surahNum}`);
+    console.log(`❌ [${getPlatform()}] Cache MISS for MP3Quran moshaf ${moshafId} surah ${surahNum}`);
     return null;
   } catch (error) {
     console.error('Error retrieving cached MP3Quran audio:', error);
