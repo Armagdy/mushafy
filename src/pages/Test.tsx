@@ -400,11 +400,11 @@ export default function Test() {
     // Check if this is the last ayah of the surah (cross-surah case)
     const isLastAyahOfSurah = selectedVerseIndex === selectedSurahVerses.length - 1;
     
-    if (isLastAyahOfSurah && difficult && selectedSurahId < 114) {
-      // Cross-surah: get first ayahs from next surah
+    if (isLastAyahOfSurah && selectedSurahId < 114) {
+      // Cross-surah: get first 2 ayahs from next surah
       const nextSurahData = ayahData.find(s => s.number === selectedSurahId + 1);
       if (nextSurahData?.verses) {
-        const nextSurahVerses = nextSurahData.verses.slice(0, 3);
+        const nextSurahVerses = nextSurahData.verses.slice(0, 2);
         followingAyahs = nextSurahVerses.map(a => ({
           text: getVerseText(a.text),
           numberInSurah: a.numberInSurah ?? a.number,
