@@ -943,16 +943,24 @@ export default function Test() {
                         {language === 'ar' ? 'تلميح' : 'Hint'}: {t('surahNames')}
                       </p>
                       <div className="flex flex-wrap gap-2 justify-center">
-                        {Array.from(new Set(currentTikrar.occurrences.map(o => o.surahId)))
-                          .sort((a, b) => a - b)
-                          .map((surahId) => (
-                            <span
-                              key={surahId}
-                              className="px-3 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-800/40 text-purple-800 dark:text-purple-200 font-medium text-base md:text-lg"
-                            >
-                              {getSurahName(surahId)}
-                            </span>
-                          ))}
+                        {(() => {
+                          // Count occurrences per surah
+                          const surahCounts = new Map<number, number>();
+                          currentTikrar.occurrences.forEach(o => {
+                            surahCounts.set(o.surahId, (surahCounts.get(o.surahId) || 0) + 1);
+                          });
+                          
+                          return Array.from(surahCounts.entries())
+                            .sort((a, b) => a[0] - b[0])
+                            .map(([surahId, count]) => (
+                              <span
+                                key={surahId}
+                                className="px-3 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-800/40 text-purple-800 dark:text-purple-200 font-medium text-base md:text-lg"
+                              >
+                                {getSurahName(surahId)}{count > 1 ? ` (${formatNumber(count)})` : ''}
+                              </span>
+                            ));
+                        })()}
                       </div>
                     </div>
                   )}

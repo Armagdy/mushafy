@@ -113,37 +113,6 @@ export function TestSettingsDialog({
             </p>
           </div>
 
-          {/* Difficult Mode Toggle */}
-          <div
-            className={cn(
-              "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors",
-              difficult
-                ? "border-orange-400 bg-orange-50 dark:bg-orange-900/20"
-                : "border-gray-200 bg-gray-50 dark:bg-gray-800"
-            )}
-            onClick={() => setDifficult(prev => !prev)}
-          >
-            <div className="space-y-0.5">
-              <p className={cn(
-                "text-base md:text-xl font-medium",
-                difficult ? "text-orange-700 dark:text-orange-300" : "text-gray-700 dark:text-gray-300"
-              )}>
-                {t('difficultMode')}
-              </p>
-              <p className="text-base md:text-xl text-gray-500 dark:text-gray-400">
-              </p>
-            </div>
-            <div className={cn(
-              "w-10 h-6 rounded-full transition-colors relative",
-              difficult ? "bg-orange-500" : "bg-gray-300 dark:bg-gray-600"
-            )}>
-              <div className={cn(
-                "w-4 h-4 bg-white rounded-full absolute top-1 transition-all",
-                difficult ? (isRTL ? "left-1" : "right-1") : (isRTL ? "right-1" : "left-1")
-              )} />
-            </div>
-          </div>
-
           {/* Max Questions Input */}
           <div className="space-y-2">
             <Label className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">{t('maxQuestions')}</Label>
@@ -245,6 +214,35 @@ export function TestSettingsDialog({
               </div>
             </TabsContent>
           </Tabs>
+
+          {/* Difficult Mode Toggle */}
+          <div
+            className={cn(
+              "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors",
+              difficult
+                ? "border-orange-400 bg-orange-50 dark:bg-orange-900/20"
+                : "border-gray-200 bg-gray-50 dark:bg-gray-800"
+            )}
+            onClick={() => setDifficult(prev => !prev)}
+          >
+            <div className="space-y-0.5">
+              <p className={cn(
+                "text-base md:text-xl font-medium",
+                difficult ? "text-orange-700 dark:text-orange-300" : "text-gray-700 dark:text-gray-300"
+              )}>
+                {t('difficultMode')}
+              </p>
+            </div>
+            <div className={cn(
+              "w-10 h-6 rounded-full transition-colors relative",
+              difficult ? "bg-orange-500" : "bg-gray-300 dark:bg-gray-600"
+            )}>
+              <div className={cn(
+                "w-4 h-4 bg-white rounded-full absolute top-1 transition-all",
+                difficult ? (isRTL ? "left-1" : "right-1") : (isRTL ? "right-1" : "left-1")
+              )} />
+            </div>
+          </div>
 
           <Button
             onClick={handleStart}
