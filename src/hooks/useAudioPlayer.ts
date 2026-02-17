@@ -2560,7 +2560,11 @@ export const useAudioPlayer = ({
               setIsPlaying(true);
               if (currentPlayingAyah) {
                 updateMediaSession(currentPlayingAyah.surah, currentPlayingAyah.ayah, true);
-                updateNativeMusicControls(currentPlayingAyah.surah, currentPlayingAyah.ayah, true).catch(console.error);
+                // Use updateIsPlaying instead of recreating notification to keep it visible
+                CapacitorMusicControls.updateIsPlaying({ 
+                  isPlaying: true, 
+                  elapsed: audioElement.currentTime 
+                }).catch(console.error);
               }
             }
             break;
@@ -2571,7 +2575,11 @@ export const useAudioPlayer = ({
               setIsPlaying(false);
               if (currentPlayingAyah) {
                 updateMediaSession(currentPlayingAyah.surah, currentPlayingAyah.ayah, false);
-                updateNativeMusicControls(currentPlayingAyah.surah, currentPlayingAyah.ayah, false).catch(console.error);
+                // Use updateIsPlaying instead of recreating notification to keep it visible
+                CapacitorMusicControls.updateIsPlaying({ 
+                  isPlaying: false, 
+                  elapsed: audioElement.currentTime 
+                }).catch(console.error);
               }
             }
             break;
