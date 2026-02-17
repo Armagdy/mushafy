@@ -1118,6 +1118,9 @@ export const useAudioPlayer = ({
           if (cachedData) {
             // Load from cache
             console.log(`✅ Using cached MP3Quran audio for moshaf ${selectedMoshaf.id} surah ${surahNum}`);
+            // Show loading spinner while browser loads/parses the audio blob
+            setIsPreloadingAyahs(true);
+            
             const blobUrl = URL.createObjectURL(cachedData.blobData);
             audioElement.src = blobUrl;
             setAyahTimings(cachedData.timingData);
@@ -1128,9 +1131,12 @@ export const useAudioPlayer = ({
               if (cachedData.timingData.length > 0) {
                 seekToAyah(audioElement, cachedData.timingData, ayahNum);
               }
-              audioElement.play().catch(err => {
+              audioElement.play().then(() => {
+                setIsPreloadingAyahs(false); // Hide spinner once playing
+              }).catch(err => {
                 console.error('Failed to play audio:', err);
                 setIsPlaying(false);
+                setIsPreloadingAyahs(false);
               });
             }, { once: true });
             
@@ -1233,12 +1239,16 @@ export const useAudioPlayer = ({
         // Don't set isPlaying yet - wait for concatenation to complete
         setIsPlaying(false);
         
-        // Concatenate all ayahs in this surah (this will show loading spinner)
+        // Show loading spinner immediately (before cache check which can be slow)
+        setIsPreloadingAyahs(true);
+        
+        // Concatenate all ayahs in this surah (checks cache first, then downloads if needed)
         const result = await concatenateAllSurahAyahs(surahNum);
         
         if (!result) {
           console.error('Failed to concatenate ayahs');
           setIsPlaying(false);
+          setIsPreloadingAyahs(false);
           releaseWakeLock();
           return;
         }
@@ -1268,6 +1278,7 @@ export const useAudioPlayer = ({
           audioElement.currentTime = startTime;
           audioElement.play().then(() => {
             setIsPlaying(true);
+            setIsPreloadingAyahs(false); // Hide spinner once playing
             if ('mediaSession' in navigator) {
               navigator.mediaSession.playbackState = 'playing';
             }
@@ -1278,6 +1289,7 @@ export const useAudioPlayer = ({
           }).catch(err => {
             console.error('Failed to play audio:', err);
             setIsPlaying(false);
+            setIsPreloadingAyahs(false);
             releaseWakeLock();
             isAyahNavigation.current = false;
           });
@@ -1617,12 +1629,16 @@ export const useAudioPlayer = ({
       updateMediaSession(startSurah, startAyah, true);
       requestWakeLock();
       
+      // Show loading spinner while browser loads the audio blob
+      setIsPreloadingAyahs(true);
+      
       audioElement.src = result.blobUrl;
       
       const handleLoadedMetadata = () => {
         audioElement.currentTime = 0;
         audioElement.play().then(() => {
           setIsPlaying(true);
+          setIsPreloadingAyahs(false); // Hide spinner once playing
           if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'playing';
           }
@@ -1632,6 +1648,7 @@ export const useAudioPlayer = ({
         }).catch(err => {
           console.error('Failed to play repeat audio:', err);
           setIsPlaying(false);
+          setIsPreloadingAyahs(false);
           setIsRepeatActive(false);
           setIsRepeatConcatenatedMode(false);
           releaseWakeLock();
@@ -1677,12 +1694,16 @@ export const useAudioPlayer = ({
       updateMediaSession(startSurah, 1, true);
       requestWakeLock();
       
+      // Show loading spinner while browser loads the audio blob
+      setIsPreloadingAyahs(true);
+      
       audioElement.src = result.blobUrl;
       
       const handleMp3QuranLoadedMetadata = () => {
         audioElement.currentTime = 0;
         audioElement.play().then(() => {
           setIsPlaying(true);
+          setIsPreloadingAyahs(false); // Hide spinner once playing
           if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'playing';
           }
@@ -1692,6 +1713,7 @@ export const useAudioPlayer = ({
         }).catch(err => {
           console.error('Failed to play MP3Quran repeat audio:', err);
           setIsPlaying(false);
+          setIsPreloadingAyahs(false);
           setIsRepeatActive(false);
           setIsRepeatConcatenatedMode(false);
           releaseWakeLock();
