@@ -61,12 +61,12 @@ export const cacheAudio = async (
       surahNum,
       timestamps,
       audioType: 'everyayah',
-      mimeType: blobData.type || 'audio/wav',
+      mimeType: blobData.type || 'audio/mpeg', // Support both audio/mpeg (MP3) and audio/wav
     };
     
     await audioStorage.setItem(key, blobData, metadata);
     
-    console.log(`✅ [${getPlatform()}] Cached audio: ${key}`);
+    console.log(`✅ [${getPlatform()}] Cached audio: ${key} (${blobData.type})`);
   } catch (error) {
     console.error('Error caching audio:', error);
   }

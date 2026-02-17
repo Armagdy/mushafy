@@ -432,10 +432,31 @@ export const useAudioPlayer = ({
     return new Blob([arrayBuffer], { type: 'audio/wav' });
   }, []);
   
-  // Concatenate all ayahs in a surah into a single audio buffer
+  // Get MP3 duration without decoding (lightweight)
+  const getMp3Duration = useCallback((blob: Blob): Promise<number> => {
+    return new Promise((resolve, reject) => {
+      const audio = new Audio();
+      const url = URL.createObjectURL(blob);
+      
+      audio.addEventListener('loadedmetadata', () => {
+        const duration = audio.duration;
+        URL.revokeObjectURL(url);
+        audio.src = '';
+        resolve(duration);
+      }, { once: true });
+      
+      audio.addEventListener('error', (e) => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Failed to load audio metadata'));
+      }, { once: true });
+      
+      audio.src = url;
+    });
+  }, []);
+  
+  // Concatenate all ayahs in a surah into a single MP3 file
   const concatenateAllSurahAyahs = useCallback(async (surahNum: number): Promise<{ blobUrl: string; timestamps: number[] } | null> => {
     if (!selectedReciter || audioSource !== 'everyayah') return null;
-    if (!audioContext) return null;
     
     const surahData = ayahData.find(s => s.number === surahNum);
     if (!surahData || !surahData.verses) return null;
@@ -460,7 +481,7 @@ export const useAudioPlayer = ({
       return { blobUrl, timestamps: cachedData.timestamps };
     }
     
-    // Not in cache - download and concatenate
+    // Not in cache - download and concatenate MP3s directly
     console.log(`⬇️ Downloading and caching audio for ${selectedReciter.folder} surah ${surahNum}`);
     
     // Create new AbortController for this operation
@@ -473,9 +494,10 @@ export const useAudioPlayer = ({
     const surahPadded = surahNum.toString().padStart(3, '0');
     
     try {
-      // Load all ayah audio buffers
-      const audioBuffers: AudioBuffer[] = [];
+      // Download all ayah MP3 blobs
+      const mp3Blobs: Blob[] = [];
       const timestamps: number[] = [0]; // Start time of each ayah
+      let currentTime = 0;
       
       for (let ayahNum = 1; ayahNum <= totalAyahs; ayahNum++) {
         const ayahPadded = ayahNum.toString().padStart(3, '0');
@@ -490,19 +512,20 @@ export const useAudioPlayer = ({
             return null;
           }
           
-          // Fetch audio file with abort signal
+          // Fetch MP3 file with abort signal
           const response = await fetch(audioUrl, { signal });
           if (!response.ok) throw new Error(`Failed to fetch: ${audioUrl}`);
           
-          const arrayBuffer = await response.arrayBuffer();
-          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          const mp3Blob = await response.blob();
+          mp3Blobs.push(mp3Blob);
           
-          audioBuffers.push(audioBuffer);
+          // Get duration using lightweight metadata loading (no full decode)
+          const duration = await getMp3Duration(mp3Blob);
+          currentTime += duration;
           
           // Calculate timestamp for next ayah
           if (ayahNum < totalAyahs) {
-            const totalDuration = timestamps[timestamps.length - 1] + audioBuffer.duration;
-            timestamps.push(totalDuration);
+            timestamps.push(currentTime);
           }
           
           setPreloadProgress({ current: ayahNum, total: totalAyahs });
@@ -529,84 +552,18 @@ export const useAudioPlayer = ({
         return null;
       }
       
-      // Calculate total duration and create concatenated buffer
-      const totalDuration = audioBuffers.reduce((sum, buffer) => sum + buffer.duration, 0);
+      console.log(`🎵 Concatenating ${mp3Blobs.length} MP3 files (total: ${currentTime.toFixed(1)}s)`);
       
-      // Keep original sample rate for best audio quality
-      // Downsampling to 22050Hz was causing significant quality loss
-      const targetSampleRate = audioBuffers[0].sampleRate;
+      // Concatenate MP3 blobs directly (simple and fast!)
+      const concatenatedMp3 = new Blob(mp3Blobs, { type: 'audio/mpeg' });
+      const fileSizeMB = (concatenatedMp3.size / (1024 * 1024)).toFixed(1);
+      console.log(`✅ MP3 concatenated: ${fileSizeMB} MB`);
       
-      // Force mono (1 channel) to save memory while preserving quality
-      const numberOfChannels = 1;
-      const totalLength = Math.ceil((totalDuration * targetSampleRate));
+      const blobUrl = URL.createObjectURL(concatenatedMp3);
       
-      console.log(`🎵 Creating concatenated buffer: ${totalDuration.toFixed(1)}s, ${targetSampleRate}Hz, mono`);
-      
-      // Check estimated memory usage (rough estimate: 4 bytes per sample)
-      const estimatedBytes = totalLength * numberOfChannels * 4;
-      const estimatedMB = estimatedBytes / (1024 * 1024);
-      console.log(`💾 Estimated memory: ${estimatedMB.toFixed(1)} MB`);
-      
-      // Warn if size is very large (over 100MB)
-      if (estimatedMB > 100) {
-        console.warn('⚠️ Large audio buffer - this may fail on low-memory devices');
-      }
-      
-      let concatenated: AudioBuffer;
+      // Cache the concatenated MP3 for future use
       try {
-        concatenated = audioContext.createBuffer(
-          numberOfChannels,
-          totalLength,
-          targetSampleRate
-        );
-      } catch (memError) {
-        console.error('❌ Out of memory creating audio buffer:', memError);
-        setIsPreloadingAyahs(false);
-        setPreloadProgress({ current: 0, total: 0 });
-        throw new Error('Out of memory - surah too large for concatenation');
-      }
-      
-      // Copy all buffers into the concatenated buffer (mono conversion, no downsampling)
-      const targetData = concatenated.getChannelData(0);
-      let offset = 0;
-      
-      for (let i = 0; i < audioBuffers.length; i++) {
-        const buffer = audioBuffers[i];
-        const sourceLength = buffer.length;
-        
-        // Mix to mono without downsampling - preserves original quality
-        for (let j = 0; j < sourceLength && offset + j < totalLength; j++) {
-          let sample = 0;
-          
-          // Average all channels for mono conversion
-          for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
-            sample += buffer.getChannelData(ch)[j];
-          }
-          sample /= buffer.numberOfChannels;
-          
-          targetData[offset + j] = sample;
-        }
-        
-        offset += sourceLength;
-      }
-      
-      // Convert buffer to WAV blob and create URL
-      let wavBlob: Blob;
-      try {
-        wavBlob = audioBufferToWav(concatenated);
-        console.log(`✅ WAV blob created: ${(wavBlob.size / (1024 * 1024)).toFixed(1)} MB`);
-      } catch (convError) {
-        console.error('❌ Error converting to WAV:', convError);
-        setIsPreloadingAyahs(false);
-        setPreloadProgress({ current: 0, total: 0 });
-        throw new Error('Failed to convert audio - file too large');
-      }
-      
-      const blobUrl = URL.createObjectURL(wavBlob);
-      
-      // Cache the blob for future use
-      try {
-        await cacheAudio(selectedReciter.folder, surahNum, wavBlob, timestamps);
+        await cacheAudio(selectedReciter.folder, surahNum, concatenatedMp3, timestamps);
         console.log(`💾 Cached audio for ${selectedReciter.folder} surah ${surahNum}`);
       } catch (cacheError) {
         console.warn('⚠️ Failed to cache audio (storage full?):', cacheError);
@@ -624,11 +581,6 @@ export const useAudioPlayer = ({
       setIsPreloadingAyahs(false);
       setPreloadProgress({ current: 0, total: 0 });
       
-      // Force garbage collection hint (if supported)
-      if (typeof (window as any).gc === 'function') {
-        (window as any).gc();
-      }
-      
       return { blobUrl, timestamps };
     } catch (error) {
       console.error('❌ Error concatenating ayahs:', error);
@@ -644,14 +596,9 @@ export const useAudioPlayer = ({
       setConcatenatedSurah(null);
       setAyahTimestamps([]);
       
-      // Show user-friendly error
-      if (error instanceof Error && (error.message.includes('memory') || error.message.includes('large'))) {
-        alert('This surah is too large to preload on your device. Please use MP3Quran mode for longer surahs.');
-      }
-      
       return null;
     }
-  }, [selectedReciter, ayahData, audioSource, audioContext, audioBufferToWav, concatenatedBlobUrl]);
+  }, [selectedReciter, ayahData, audioSource, concatenatedBlobUrl, getMp3Duration]);
   
   // Concatenate repeat section with ayah repeats and passage repeats baked in
   const concatenateRepeatAyahs = useCallback(async (
