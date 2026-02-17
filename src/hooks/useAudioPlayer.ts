@@ -6,7 +6,7 @@ import { getMp3QuranReciters, getAyahTiming, getSurahAudioUrl, getCurrentAyahFro
 import { surahs } from '@/data/surahs';
 import { cacheAudio, getCachedAudio, cacheMp3QuranAudio, getCachedMp3QuranAudio } from '@/lib/audio-cache';
 import { debugMediaSession } from '@/lib/media-session-debug';
-import { CapacitorMusicControls } from 'capacitor-music-controls-plugin';
+import QuranMediaSession from '@/lib/quran-media-session';
 import { Capacitor } from '@capacitor/core';
 
 interface CurrentAyah {
@@ -79,6 +79,9 @@ export const useAudioPlayer = ({
   
   // AbortController to cancel ongoing preloading operations
   const preloadAbortControllerRef = useRef<AbortController | null>(null);
+  
+  // Track last time we updated native controls position (for throttling)
+  const lastPositionUpdateRef = useRef<number>(0);
   
   // Reciter state
   const [reciters, setReciters] = useState<Reciter[]>([]);
@@ -266,7 +269,7 @@ export const useAudioPlayer = ({
     }
     
     try {
-      console.log('Updating native music controls...', { surahNum, ayahNum, playing });
+      console.log('[QuranMediaSession] Updating native music controls...', { surahNum, ayahNum, playing });
       
       // Clean reciter name by removing style indicators
       const cleanName = (name: string): string => {
@@ -307,33 +310,25 @@ export const useAudioPlayer = ({
         artist = `${surahName} - آية ${ayahNum}`;
       }
       
-      console.log('Native controls metadata:', { track, artist, album: surahEnglishName });
+      console.log('[QuranMediaSession] Metadata:', { track, artist, album: surahEnglishName });
       
-      // Create or update the native music controls notification
-      // IMPORTANT: All string fields must be provided (not null/undefined) or plugin crashes
-      const result = await CapacitorMusicControls.create({
+      // Update metadata
+      await QuranMediaSession.updateMetadata({
         track: track || 'Quran Recitation',
         artist: artist || 'Reciter',
-        album: surahEnglishName || 'Quran',
-        cover: `${window.location.origin}${import.meta.env.BASE_URL}icon-512.png`,
-        isPlaying: playing,
-        dismissable: false, // Keep notification visible
-        hasPrev: true,
-        hasNext: true,
-        hasClose: false,
-        // Android-specific fields (provide empty strings to avoid null crashes)
-        ticker: `${artist || 'Quran'} - ${track || 'Playing'}`,
-        playIcon: 'media_play',
-        pauseIcon: 'media_pause',
-        prevIcon: 'media_prev',
-        nextIcon: 'media_next',
-        closeIcon: 'media_close',
-        notificationIcon: 'notification',
+        album: surahEnglishName || 'Quran'
       });
       
-      console.log('✅ Native music controls updated successfully:', result);
+      // Update playback state
+      await QuranMediaSession.updatePlaybackState({
+        isPlaying: playing,
+        position: audioElement.currentTime || 0,
+        duration: audioElement.duration || 0
+      });
+      
+      console.log('✅ [QuranMediaSession] Native music controls updated successfully');
     } catch (error: any) {
-      console.error('❌ Failed to update native music controls:', error);
+      console.error('❌ [QuranMediaSession] Failed to update native music controls:', error);
       console.error('Error details:', {
         message: error?.message,
         stack: error?.stack,
@@ -2162,6 +2157,23 @@ export const useAudioPlayer = ({
           // Ignore if setPositionState is not supported or throws error
         }
       }
+      
+      // Update native music controls position (throttled to once per second)
+      if (Capacitor.isNativePlatform() && currentPlayingAyah) {
+        const now = Date.now();
+        if (now - lastPositionUpdateRef.current >= 1000) {
+          lastPositionUpdateRef.current = now;
+          const positionUpdate = {
+            isPlaying: !audioElement.paused, 
+            position: audioElement.currentTime,
+            duration: audioElement.duration || 0
+          };
+          console.log('⏱️ [QuranMediaSession] Position update:', JSON.stringify(positionUpdate));
+          QuranMediaSession.updatePlaybackState(positionUpdate).catch((error) => {
+            console.error('❌ [QuranMediaSession] Position update failed:', error);
+          });
+        }
+      }
     };
     
     const handleLoadedMetadata = () => {
@@ -2180,8 +2192,11 @@ export const useAudioPlayer = ({
       }
       // Update native music controls on play
       if (Capacitor.isNativePlatform() && currentPlayingAyah) {
-        CapacitorMusicControls.updateIsPlaying({ isPlaying: true, elapsed: audioElement.currentTime })
-          .catch(console.error);
+        QuranMediaSession.updatePlaybackState({ 
+          isPlaying: true, 
+          position: audioElement.currentTime,
+          duration: audioElement.duration || 0
+        }).catch(console.error);
       }
     };
     
@@ -2192,8 +2207,11 @@ export const useAudioPlayer = ({
       }
       // Update native music controls on pause
       if (Capacitor.isNativePlatform() && currentPlayingAyah) {
-        CapacitorMusicControls.updateIsPlaying({ isPlaying: false, elapsed: audioElement.currentTime })
-          .catch(console.error);
+        QuranMediaSession.updatePlaybackState({ 
+          isPlaying: false, 
+          position: audioElement.currentTime,
+          duration: audioElement.duration || 0
+        }).catch(console.error);
       }
     };
     
@@ -2204,8 +2222,11 @@ export const useAudioPlayer = ({
       }
       // Update native music controls on end
       if (Capacitor.isNativePlatform() && currentPlayingAyah) {
-        CapacitorMusicControls.updateIsPlaying({ isPlaying: false, elapsed: 0 })
-          .catch(console.error);
+        QuranMediaSession.updatePlaybackState({ 
+          isPlaying: false, 
+          position: 0,
+          duration: audioElement.duration || 0
+        }).catch(console.error);
       }
     };
     
@@ -2539,52 +2560,51 @@ export const useAudioPlayer = ({
     };
   }, [testMediaSession]);
   
-  // Set up native music controls event listeners (Android & iOS)
+  // Set up native music controls event listeners (Android MediaSession)
   useEffect(() => {
     // Only run on native platforms
     if (!Capacitor.isNativePlatform()) {
-      console.log('Skipping native music controls setup (not on native platform)');
+      console.log('[QuranMediaSession] Skipping setup (not on native platform)');
       return;
     }
     
-    console.log('Setting up native music controls listeners...');
+    console.log('[QuranMediaSession] Setting up native music controls listeners...');
     
-    const handleControlsEvent = (info: { message: string; position?: number }) => {
+    const handleMediaSessionEvent = (event: { action: string; data?: { position?: number } }) => {
       try {
-        console.log('Native music controls event:', info.message);
+        console.log('🎵 [QuranMediaSession] Event received:', JSON.stringify(event));
         
-        switch (info.message) {
-          case 'music-controls-play':
+        switch (event.action) {
+          case 'play':
+            console.log('▶️ [QuranMediaSession] PLAY button pressed');
             if (audioElement && audioElement.paused) {
               audioElement.play();
               setIsPlaying(true);
               if (currentPlayingAyah) {
                 updateMediaSession(currentPlayingAyah.surah, currentPlayingAyah.ayah, true);
-                // Use updateIsPlaying instead of recreating notification to keep it visible
-                CapacitorMusicControls.updateIsPlaying({ 
-                  isPlaying: true, 
-                  elapsed: audioElement.currentTime 
-                }).catch(console.error);
               }
+              console.log('✅ [QuranMediaSession] Play command executed');
+            } else {
+              console.warn('⚠️ [QuranMediaSession] Cannot play - audioElement missing or already playing');
             }
             break;
             
-          case 'music-controls-pause':
+          case 'pause':
+            console.log('⏸️ [QuranMediaSession] PAUSE button pressed');
             if (audioElement && !audioElement.paused) {
               audioElement.pause();
               setIsPlaying(false);
               if (currentPlayingAyah) {
                 updateMediaSession(currentPlayingAyah.surah, currentPlayingAyah.ayah, false);
-                // Use updateIsPlaying instead of recreating notification to keep it visible
-                CapacitorMusicControls.updateIsPlaying({ 
-                  isPlaying: false, 
-                  elapsed: audioElement.currentTime 
-                }).catch(console.error);
               }
+              console.log('✅ [QuranMediaSession] Pause command executed');
+            } else {
+              console.warn('⚠️ [QuranMediaSession] Cannot pause - audioElement missing or already paused');
             }
             break;
             
-          case 'music-controls-next':
+          case 'next':
+            console.log('⏭️ [QuranMediaSession] NEXT button pressed');
             if (currentPlayingAyah) {
               const nextAyah = getNextAyah(currentPlayingAyah.surah, currentPlayingAyah.ayah);
               if (nextAyah) {
@@ -2593,63 +2613,79 @@ export const useAudioPlayer = ({
             }
             break;
           
-        case 'music-controls-previous':
-          if (currentPlayingAyah) {
-            // Go to previous ayah
-            const prevAyah = currentPlayingAyah.ayah > 1
-              ? { surah: currentPlayingAyah.surah, ayah: currentPlayingAyah.ayah - 1 }
-              : currentPlayingAyah.surah > 1
-                ? { surah: currentPlayingAyah.surah - 1, ayah: surahs.find(s => s.id === currentPlayingAyah.surah - 1)?.numberOfAyahs || 1 }
-                : null;
-                
-            if (prevAyah) {
-              playAyah(prevAyah.surah, prevAyah.ayah);
+          case 'previous':
+            console.log('⏮️ [QuranMediaSession] PREVIOUS button pressed');
+            if (currentPlayingAyah) {
+              // Go to previous ayah
+              const prevAyah = currentPlayingAyah.ayah > 1
+                ? { surah: currentPlayingAyah.surah, ayah: currentPlayingAyah.ayah - 1 }
+                : currentPlayingAyah.surah > 1
+                  ? { surah: currentPlayingAyah.surah - 1, ayah: surahs.find(s => s.id === currentPlayingAyah.surah - 1)?.numberOfAyahs || 1 }
+                  : null;
+                  
+              if (prevAyah) {
+                playAyah(prevAyah.surah, prevAyah.ayah);
+              }
             }
-          }
-          break;
+            break;
           
-        case 'music-controls-destroy':
-          // User dismissed the notification
-          if (audioElement) {
-            audioElement.pause();
-            setIsPlaying(false);
-            setCurrentPlayingAyah(null);
-          }
-          break;
+          case 'seek':
+            // User dragged the progress bar to seek to a new position
+            const seekPosition = event.data?.position;
+            console.log('⏩ [QuranMediaSession] SEEK EVENT - position:', seekPosition, 'audioElement exists:', !!audioElement);
+            if (audioElement && seekPosition !== undefined) {
+              console.log(`⏩ [QuranMediaSession] Seeking from ${audioElement.currentTime}s to ${seekPosition}s`);
+              audioElement.currentTime = seekPosition;
+              // Update the notification with new position
+              QuranMediaSession.updatePlaybackState({ 
+                isPlaying: !audioElement.paused, 
+                position: seekPosition,
+                duration: audioElement.duration || 0
+              }).then(() => {
+                console.log('✅ [QuranMediaSession] Position updated after seek');
+              }).catch((error) => {
+                console.error('❌ [QuranMediaSession] Failed to update position after seek:', error);
+              });
+            } else {
+              console.warn('⚠️ [QuranMediaSession] Cannot seek - audioElement or position missing');
+            }
+            break;
           
-        default:
-          console.log('Unhandled music controls event:', info.message);
-          break;
-      }
+          case 'stop':
+            console.log('⏹️ [QuranMediaSession] STOP button pressed');
+            if (audioElement) {
+              audioElement.pause();
+              setIsPlaying(false);
+              setCurrentPlayingAyah(null);
+              QuranMediaSession.destroy().catch(console.error);
+            }
+            break;
+          
+          default:
+            console.warn('⚠️ [QuranMediaSession] Unhandled event:', event.action, 'Full event:', JSON.stringify(event));
+            break;
+        }
       } catch (error: any) {
-        console.error('❌ Error handling native music controls event:', error);
-        console.error('Event that caused error:', info);
+        console.error('❌ [QuranMediaSession] Error handling event:', error);
+        console.error('Event that caused error:', event);
       }
     };
     
-    // Set up listeners
-    let iosListenerHandle: any = null;
+    // Set up listener
+    console.log('🔧 [QuranMediaSession] Setting up listener...');
     
-    // iOS listener
-    CapacitorMusicControls.addListener('controlsNotification', handleControlsEvent)
-      .then((handle) => {
-        iosListenerHandle = handle;
-      });
+    const listenerPromise = QuranMediaSession.addListener('mediaSessionEvent', handleMediaSessionEvent);
     
-    // Android listener (due to Capacitor Android 13 bug)
-    const androidListener = (event: any) => {
-      const info = { message: event.message, position: event.position || 0 };
-      handleControlsEvent(info);
-    };
-    document.addEventListener('controlsNotification', androidListener);
+    listenerPromise.then((handle) => {
+      console.log('✅ [QuranMediaSession] Listener registered successfully');
+    }).catch((error) => {
+      console.error('❌ [QuranMediaSession] Failed to register listener:', error);
+    });
     
     return () => {
       // Clean up listeners
-      if (iosListenerHandle) {
-        iosListenerHandle.remove();
-      }
-      document.removeEventListener('controlsNotification', androidListener);
-      console.log('Native music controls listeners removed');
+      QuranMediaSession.removeAllListeners().catch(console.error);
+      console.log('[QuranMediaSession] Listeners removed');
     };
   }, [audioElement, currentPlayingAyah, updateMediaSession, updateNativeMusicControls, getNextAyah, playAyah]);
   

@@ -17,44 +17,11 @@ public class MainActivity extends BridgeActivity {
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(QuranMediaSessionPlugin.class);
         super.onCreate(savedInstanceState);
-        
-        // Create notification channel for media playback (Android 8.0+)
-        createMediaNotificationChannel();
-        
-        // Enable transparent navigation bar and draw behind it
-        getWindow().setFlags(
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-        );
-        
-        // Keep audio playing in background
-        // This ensures the WebView doesn't pause audio when the app goes to background
-        WebView webView = getBridge().getWebView();
-        if (webView != null) {
-            webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
-            webView.getSettings().setJavaScriptEnabled(true);
-            webView.getSettings().setDomStorageEnabled(true);
-            // CRITICAL: Allow media to play in background
-            webView.getSettings().setAllowFileAccess(true);
-            webView.getSettings().setAllowContentAccess(true);
-            
-            // Prevent WebView from pausing on background
-            webView.setKeepScreenOn(false); // Don't keep screen on, but keep audio playing
-        }
-        
-        // Request notification permission for Android 13+ (API 33+)
-        // This is required to show media controls in notifications
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
-                != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                    NOTIFICATION_PERMISSION_REQUEST_CODE);
-            }
-        }
     }
-    
+
+
     /**
      * Create notification channel for media playback controls.
      * Required for Android 8.0 (API 26) and above.
