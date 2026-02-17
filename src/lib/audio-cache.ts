@@ -114,6 +114,118 @@ export const isAudioCached = async (
 };
 
 /**
+ * ============================================================================
+ * INDIVIDUAL AYAH CACHING (For EveryAyah reciters)
+ * ============================================================================
+ * Cache individual ayahs instead of concatenated blobs to save storage space.
+ * The concatenated blob is created on-the-fly during playback and kept in
+ * memory until user stops playback.
+ */
+
+/**
+ * Generate cache key for individual ayah
+ */
+const getAyahCacheKey = (reciterFolder: string, surahNum: number, ayahNum: number): string => {
+  return `ayah-${reciterFolder}-${surahNum}-${ayahNum}`;
+};
+
+/**
+ * Cache individual ayah MP3
+ */
+export const cacheIndividualAyah = async (
+  reciterFolder: string,
+  surahNum: number,
+  ayahNum: number,
+  blobData: Blob
+): Promise<void> => {
+  try {
+    await audioStorage.init();
+    
+    const key = getAyahCacheKey(reciterFolder, surahNum, ayahNum);
+    const metadata = {
+      reciterFolder,
+      surahNum,
+      ayahNum,
+      audioType: 'everyayah-individual',
+      mimeType: blobData.type || 'audio/mpeg',
+    };
+    
+    await audioStorage.setItem(key, blobData, metadata);
+    
+    console.log(`✅ [${getPlatform()}] Cached individual ayah: ${key}`);
+  } catch (error) {
+    console.error('Error caching individual ayah:', error);
+  }
+};
+
+/**
+ * Retrieve individual ayah from cache
+ */
+export const getCachedIndividualAyah = async (
+  reciterFolder: string,
+  surahNum: number,
+  ayahNum: number
+): Promise<Blob | null> => {
+  try {
+    await audioStorage.init();
+    
+    const key = getAyahCacheKey(reciterFolder, surahNum, ayahNum);
+    const result = await audioStorage.getItem(key);
+    
+    if (result && result.data instanceof Blob) {
+      return result.data;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error retrieving cached individual ayah:', error);
+    return null;
+  }
+};
+
+/**
+ * Get all cached ayahs for a surah
+ * Returns a map of ayah number to Blob
+ */
+export const getAllCachedAyahsForSurah = async (
+  reciterFolder: string,
+  surahNum: number,
+  totalAyahs: number
+): Promise<Map<number, Blob>> => {
+  const cachedAyahs = new Map<number, Blob>();
+  
+  try {
+    await audioStorage.init();
+    
+    // Check each ayah
+    for (let ayahNum = 1; ayahNum <= totalAyahs; ayahNum++) {
+      const blob = await getCachedIndividualAyah(reciterFolder, surahNum, ayahNum);
+      if (blob) {
+        cachedAyahs.set(ayahNum, blob);
+      }
+    }
+    
+    console.log(`📊 [${getPlatform()}] Found ${cachedAyahs.size}/${totalAyahs} cached ayahs for ${reciterFolder} surah ${surahNum}`);
+  } catch (error) {
+    console.error('Error getting cached ayahs for surah:', error);
+  }
+  
+  return cachedAyahs;
+};
+
+/**
+ * Check if all ayahs for a surah are cached
+ */
+export const areAllAyahsCached = async (
+  reciterFolder: string,
+  surahNum: number,
+  totalAyahs: number
+): Promise<boolean> => {
+  const cachedAyahs = await getAllCachedAyahsForSurah(reciterFolder, surahNum, totalAyahs);
+  return cachedAyahs.size === totalAyahs;
+};
+
+/**
  * Clear all cached audio for a specific reciter
  */
 export const clearReciterCache = async (reciterFolder: string): Promise<void> => {

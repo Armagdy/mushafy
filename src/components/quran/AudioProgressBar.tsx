@@ -107,7 +107,8 @@ export function AudioProgressBar({
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
+    // Note: Using CSS touch-action: none (touch-none class) instead of preventDefault
+    // to avoid "passive event listener" errors
     
     // Clear any pending dragProgress timeout
     if (dragEndTimeoutRef.current) {
@@ -138,7 +139,8 @@ export function AudioProgressBar({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    e.preventDefault();
+    // Note: Using CSS touch-action: none (touch-none class) instead of preventDefault
+    // to avoid "passive event listener" errors
     if (!progressBarRef.current) return;
     
     if (e.touches.length > 0) {

@@ -4,7 +4,7 @@ import { ASSETS_BASE_URL } from '@/config/assets';
 import { getAudioData } from '@/lib/quran-data-service';
 import { getMp3QuranReciters, getAyahTiming, getSurahAudioUrl, getCurrentAyahFromTime, seekToAyah, type Mp3QuranReciter, type Mp3QuranMoshaf, type AyahTiming } from '@/lib/mp3quran-service';
 import { surahs } from '@/data/surahs';
-import { cacheAudio, getCachedAudio, cacheMp3QuranAudio, getCachedMp3QuranAudio } from '@/lib/audio-cache';
+import { cacheAudio, getCachedAudio, cacheMp3QuranAudio, getCachedMp3QuranAudio, cacheIndividualAyah, getCachedIndividualAyah, getAllCachedAyahsForSurah } from '@/lib/audio-cache';
 import { debugMediaSession } from '@/lib/media-session-debug';
 import QuranMediaSession from '@/lib/quran-media-session';
 import { Capacitor } from '@capacitor/core';
@@ -82,6 +82,12 @@ export const useAudioPlayer = ({
   
   // Track last time we updated native controls position (for throttling)
   const lastPositionUpdateRef = useRef<number>(0);
+  
+  // Track if user is actively seeking (dragging progress bar)
+  const isSeekingRef = useRef<boolean>(false);
+  
+  // Throttle timeupdate processing (for performance on large surahs)
+  const lastTimeUpdateRef = useRef<number>(0);
   
   // Reciter state
   const [reciters, setReciters] = useState<Reciter[]>([]);
@@ -455,6 +461,7 @@ export const useAudioPlayer = ({
   }, []);
   
   // Concatenate all ayahs in a surah into a single MP3 file
+  // Strategy: Cache individual ayahs, build concatenated blob on-the-fly
   const concatenateAllSurahAyahs = useCallback(async (surahNum: number): Promise<{ blobUrl: string; timestamps: number[] } | null> => {
     if (!selectedReciter || audioSource !== 'everyayah') return null;
     
@@ -463,84 +470,95 @@ export const useAudioPlayer = ({
     
     const totalAyahs = surahData.verses.length;
     
-    // Check cache first
-    const cachedData = await getCachedAudio(selectedReciter.folder, surahNum);
-    if (cachedData) {
-      console.log(`✅ Using cached audio for ${selectedReciter.folder} surah ${surahNum}`);
-      const blobUrl = URL.createObjectURL(cachedData.blobData);
-      
-      // Revoke old blob URL if exists
-      if (concatenatedBlobUrl) {
-        URL.revokeObjectURL(concatenatedBlobUrl);
-      }
-      
-      setConcatenatedBlobUrl(blobUrl);
-      setConcatenatedSurah(surahNum);
-      setAyahTimestamps(cachedData.timestamps);
-      
-      return { blobUrl, timestamps: cachedData.timestamps };
-    }
+    // Check if we already have all individual ayahs cached
+    const cachedAyahs = await getAllCachedAyahsForSurah(selectedReciter.folder, surahNum, totalAyahs);
+    const cachedCount = cachedAyahs.size;
+    const missingAyahs = totalAyahs - cachedCount;
     
-    // Not in cache - download and concatenate MP3s directly
-    console.log(`⬇️ Downloading and caching audio for ${selectedReciter.folder} surah ${surahNum}`);
+    if (missingAyahs > 0) {
+      console.log(`⬇️ Need to download ${missingAyahs} ayahs for ${selectedReciter.folder} surah ${surahNum}`);
+    } else {
+      console.log(`✅ All ${totalAyahs} ayahs already cached for ${selectedReciter.folder} surah ${surahNum}`);
+    }
     
     // Create new AbortController for this operation
     preloadAbortControllerRef.current = new AbortController();
     const signal = preloadAbortControllerRef.current.signal;
     
     setIsPreloadingAyahs(true);
-    setPreloadProgress({ current: 0, total: totalAyahs });
+    setPreloadProgress({ current: cachedCount, total: totalAyahs });
     
     const surahPadded = surahNum.toString().padStart(3, '0');
     
     try {
-      // Download all ayah MP3 blobs
+      // Download missing ayahs and cache them individually
       const mp3Blobs: Blob[] = [];
       const timestamps: number[] = [0]; // Start time of each ayah
       let currentTime = 0;
+      let downloadedCount = cachedCount;
       
       for (let ayahNum = 1; ayahNum <= totalAyahs; ayahNum++) {
-        const ayahPadded = ayahNum.toString().padStart(3, '0');
-        const audioUrl = `${selectedReciter.baseUrl}/${surahPadded}${ayahPadded}.mp3`;
-        
-        try {
-          // Check if aborted before fetch
-          if (signal.aborted) {
-            console.log('⛔ Preload aborted before fetch');
-            setIsPreloadingAyahs(false);
-            setPreloadProgress({ current: 0, total: 0 });
-            return null;
-          }
-          
-          // Fetch MP3 file with abort signal
-          const response = await fetch(audioUrl, { signal });
-          if (!response.ok) throw new Error(`Failed to fetch: ${audioUrl}`);
-          
-          const mp3Blob = await response.blob();
-          mp3Blobs.push(mp3Blob);
-          
-          // Get duration using lightweight metadata loading (no full decode)
-          const duration = await getMp3Duration(mp3Blob);
-          currentTime += duration;
-          
-          // Calculate timestamp for next ayah
-          if (ayahNum < totalAyahs) {
-            timestamps.push(currentTime);
-          }
-          
-          setPreloadProgress({ current: ayahNum, total: totalAyahs });
-        } catch (error) {
-          // Check if this was an abort
-          if (error instanceof Error && error.name === 'AbortError') {
-            console.log('⛔ Preload aborted during fetch');
-            setIsPreloadingAyahs(false);
-            setPreloadProgress({ current: 0, total: 0 });
-            return null;
-          }
-          console.error(`Failed to load ayah ${surahNum}:${ayahNum}:`, error);
+        // Check if aborted
+        if (signal.aborted) {
+          console.log('⛔ Preload aborted');
           setIsPreloadingAyahs(false);
           setPreloadProgress({ current: 0, total: 0 });
           return null;
+        }
+        
+        let mp3Blob: Blob;
+        
+        // Check if this ayah is already cached
+        if (cachedAyahs.has(ayahNum)) {
+          mp3Blob = cachedAyahs.get(ayahNum)!;
+          console.log(`✓ Using cached ayah ${surahNum}:${ayahNum}`);
+        } else {
+          // Download this ayah
+          const ayahPadded = ayahNum.toString().padStart(3, '0');
+          const audioUrl = `${selectedReciter.baseUrl}/${surahPadded}${ayahPadded}.mp3`;
+          
+          try {
+            const response = await fetch(audioUrl, { signal });
+            if (!response.ok) throw new Error(`Failed to fetch: ${audioUrl}`);
+            
+            mp3Blob = await response.blob();
+            
+            // Cache this individual ayah for future use
+            try {
+              await cacheIndividualAyah(selectedReciter.folder, surahNum, ayahNum, mp3Blob);
+              console.log(`💾 Cached individual ayah ${surahNum}:${ayahNum}`);
+            } catch (cacheError) {
+              console.warn(`⚠️ Failed to cache ayah ${surahNum}:${ayahNum}:`, cacheError);
+              // Continue anyway - we can still use the blob
+            }
+            
+            downloadedCount++;
+            setPreloadProgress({ current: downloadedCount, total: totalAyahs });
+          } catch (error) {
+            // Check if this was an abort
+            if (error instanceof Error && error.name === 'AbortError') {
+              console.log('⛔ Preload aborted during fetch');
+              setIsPreloadingAyahs(false);
+              setPreloadProgress({ current: 0, total: 0 });
+              return null;
+            }
+            console.error(`Failed to load ayah ${surahNum}:${ayahNum}:`, error);
+            setIsPreloadingAyahs(false);
+            setPreloadProgress({ current: 0, total: 0 });
+            return null;
+          }
+        }
+        
+        // Add blob to concatenation array
+        mp3Blobs.push(mp3Blob);
+        
+        // Get duration using lightweight metadata loading (no full decode)
+        const duration = await getMp3Duration(mp3Blob);
+        currentTime += duration;
+        
+        // Calculate timestamp for next ayah
+        if (ayahNum < totalAyahs) {
+          timestamps.push(currentTime);
         }
       }
       
@@ -552,27 +570,22 @@ export const useAudioPlayer = ({
         return null;
       }
       
-      console.log(`🎵 Concatenating ${mp3Blobs.length} MP3 files (total: ${currentTime.toFixed(1)}s)`);
+      console.log(`🎵 Building concatenated blob from ${mp3Blobs.length} ayahs (total: ${currentTime.toFixed(1)}s)`);
       
       // Concatenate MP3 blobs directly (simple and fast!)
       const concatenatedMp3 = new Blob(mp3Blobs, { type: 'audio/mpeg' });
       const fileSizeMB = (concatenatedMp3.size / (1024 * 1024)).toFixed(1);
-      console.log(`✅ MP3 concatenated: ${fileSizeMB} MB`);
+      console.log(`✅ Blob created in memory: ${fileSizeMB} MB (NOT cached - will be kept until stop)`);
       
       const blobUrl = URL.createObjectURL(concatenatedMp3);
       
-      // Cache the concatenated MP3 for future use
-      try {
-        await cacheAudio(selectedReciter.folder, surahNum, concatenatedMp3, timestamps);
-        console.log(`💾 Cached audio for ${selectedReciter.folder} surah ${surahNum}`);
-      } catch (cacheError) {
-        console.warn('⚠️ Failed to cache audio (storage full?):', cacheError);
-        // Continue anyway - we can still use the blob URL
-      }
+      // DON'T cache the concatenated blob - keep it in memory only
+      // Individual ayahs are already cached
       
-      // Revoke old blob URL if exists
-      if (concatenatedBlobUrl) {
+      // Revoke old blob URL if exists (from previous playback)
+      if (concatenatedBlobUrl && concatenatedBlobUrl !== blobUrl) {
         URL.revokeObjectURL(concatenatedBlobUrl);
+        console.log('🗑️ Revoked previous blob URL');
       }
       
       setConcatenatedBlobUrl(blobUrl);
@@ -664,29 +677,56 @@ export const useAudioPlayer = ({
           return null;
         }
         
-        const surahPadded = surah.toString().padStart(3, '0');
-        const ayahPadded = ayah.toString().padStart(3, '0');
-        const audioUrl = `${selectedReciter.baseUrl}/${surahPadded}${ayahPadded}.mp3`;
+        // Try to get from individual ayah cache first
+        let mp3Blob = await getCachedIndividualAyah(selectedReciter.folder, surah, ayah);
         
-        try {
-          const response = await fetch(audioUrl, { signal });
-          if (!response.ok) throw new Error(`Failed to fetch: ${audioUrl}`);
+        if (mp3Blob) {
+          console.log(`✓ Using cached ayah ${surah}:${ayah} for repeat`);
+        } else {
+          // Download ayah
+          const surahPadded = surah.toString().padStart(3, '0');
+          const ayahPadded = ayah.toString().padStart(3, '0');
+          const audioUrl = `${selectedReciter.baseUrl}/${surahPadded}${ayahPadded}.mp3`;
           
-          const arrayBuffer = await response.arrayBuffer();
+          try {
+            const response = await fetch(audioUrl, { signal });
+            if (!response.ok) throw new Error(`Failed to fetch: ${audioUrl}`);
+            
+            mp3Blob = await response.blob();
+            
+            // Cache this individual ayah for future use
+            try {
+              await cacheIndividualAyah(selectedReciter.folder, surah, ayah, mp3Blob);
+              console.log(`💾 Cached individual ayah ${surah}:${ayah} (from repeat)`);
+            } catch (cacheError) {
+              console.warn(`⚠️ Failed to cache ayah ${surah}:${ayah}:`, cacheError);
+              // Continue anyway
+            }
+          } catch (error) {
+            // Check if this was an abort
+            if (error instanceof Error && error.name === 'AbortError') {
+              console.log('⛔ Repeat preload aborted during fetch');
+              setIsPreloadingAyahs(false);
+              setPreloadProgress({ current: 0, total: 0 });
+              return null;
+            }
+            console.error(`Failed to load ayah ${surah}:${ayah}:`, error);
+            setIsPreloadingAyahs(false);
+            setPreloadProgress({ current: 0, total: 0 });
+            return null;
+          }
+        }
+        
+        // Decode the MP3 blob to AudioBuffer
+        try {
+          const arrayBuffer = await mp3Blob.arrayBuffer();
           const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
           audioBufferCache.set(key, audioBuffer);
           
           downloadProgress++;
           setPreloadProgress({ current: downloadProgress, total: totalSegments });
-        } catch (error) {
-          // Check if this was an abort
-          if (error instanceof Error && error.name === 'AbortError') {
-            console.log('⛔ Repeat preload aborted during fetch');
-            setIsPreloadingAyahs(false);
-            setPreloadProgress({ current: 0, total: 0 });
-            return null;
-          }
-          console.error(`Failed to load ayah ${surah}:${ayah}:`, error);
+        } catch (decodeError) {
+          console.error(`Failed to decode ayah ${surah}:${ayah}:`, decodeError);
           setIsPreloadingAyahs(false);
           setPreloadProgress({ current: 0, total: 0 });
           return null;
@@ -1084,6 +1124,14 @@ export const useAudioPlayer = ({
   // Update current ayah based on playback time for concatenated audio (HTML Audio element)
   const updateCurrentAyahFromTime = useCallback((surahNum: number) => {
     if (!audioElement || ayahTimestamps.length === 0) return;
+    
+    // Skip during active seeking to prevent flashing
+    if (isSeekingRef.current) return;
+    
+    // Throttle updates for performance (especially on large surahs)
+    const now = Date.now();
+    if (now - lastTimeUpdateRef.current < 250) return; // Max 4 updates per second
+    lastTimeUpdateRef.current = now;
     
     const currentTime = audioElement.currentTime;
     
@@ -1514,6 +1562,7 @@ export const useAudioPlayer = ({
       setConcatenatedBlobUrl(null);
       setConcatenatedSurah(null);
       setAyahTimestamps([]);
+      console.log('🗑️ Cleaned up concatenated blob URL (individual ayahs remain cached)');
     }
     
     // Clear repeat concatenated audio state
@@ -1537,13 +1586,19 @@ export const useAudioPlayer = ({
     
     console.log('=== SEEKING TO TIME ===');
     console.log('Seeking to:', time, 'seconds');
+    console.log('Current time before seek:', audioElement.currentTime);
     console.log('Audio source:', audioSource);
+    console.log('Audio element src:', audioElement.src?.substring(0, 50) + '...');
+    console.log('Blob URL (concatenated):', concatenatedBlobUrl?.substring(0, 50) + '...');
+    console.log('Audio readyState:', audioElement.readyState);
     
     // Prevent navigation during manual seek
     isAyahNavigation.current = true;
     
-    // Set the audio time
+    // Set the audio time (this will trigger native 'seeking' and 'seeked' events)
     audioElement.currentTime = Math.max(0, Math.min(time, duration));
+    
+    console.log('Current time after seek:', audioElement.currentTime);
     
     // Update current ayah based on the seeked time
     if (audioSource === 'everyayah' && concatenatedSurah && ayahTimestamps.length > 0) {
@@ -1593,7 +1648,8 @@ export const useAudioPlayer = ({
       }
     }
     
-    // Reset flag after a short delay
+    // Reset navigation flag after a short delay
+    // (seeking flag is managed by native events below)
     setTimeout(() => {
       isAyahNavigation.current = false;
     }, 500);
@@ -2177,12 +2233,27 @@ export const useAudioPlayer = ({
       }
     };
     
+    // Handle seeking events
+    const handleSeeking = () => {
+      isSeekingRef.current = true;
+      console.log('Seeking started');
+    };
+    
+    const handleSeeked = () => {
+      // Clear seeking flag immediately when seek completes
+      // This allows playback to resume without delay
+      isSeekingRef.current = false;
+      console.log('Seeking completed');
+    };
+    
     audioElement.addEventListener('timeupdate', handleTimeUpdate);
     audioElement.addEventListener('loadedmetadata', handleLoadedMetadata);
     audioElement.addEventListener('durationchange', handleDurationChange);
     audioElement.addEventListener('play', handlePlay);
     audioElement.addEventListener('pause', handlePause);
     audioElement.addEventListener('ended', handleEnded);
+    audioElement.addEventListener('seeking', handleSeeking);
+    audioElement.addEventListener('seeked', handleSeeked);
     
     return () => {
       audioElement.removeEventListener('timeupdate', handleTimeUpdate);
@@ -2191,6 +2262,8 @@ export const useAudioPlayer = ({
       audioElement.removeEventListener('play', handlePlay);
       audioElement.removeEventListener('pause', handlePause);
       audioElement.removeEventListener('ended', handleEnded);
+      audioElement.removeEventListener('seeking', handleSeeking);
+      audioElement.removeEventListener('seeked', handleSeeked);
     };
   }, [audioElement, isPlaying]);
   

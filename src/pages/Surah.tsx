@@ -652,25 +652,12 @@ const Surah = () => {
           onDragEnd={() => {
             if (wasPlayingBeforeDrag.current && audioElement) {
               console.log('Resuming audio after drag');
-              // Small delay to ensure seek completes before resuming
-              setTimeout(() => {
-                if (audioElement.readyState >= 2) { // HAVE_CURRENT_DATA or better
-                  audioElement.play().then(() => {
-                    console.log('Playback resumed successfully');
-                  }).catch(err => {
-                    console.error('Failed to resume playback:', err);
-                  });
-                } else {
-                  // If not ready, wait for canplay event
-                  const handleCanPlay = () => {
-                    audioElement.play().catch(err => {
-                      console.error('Failed to resume playback after canplay:', err);
-                    });
-                    audioElement.removeEventListener('canplay', handleCanPlay);
-                  };
-                  audioElement.addEventListener('canplay', handleCanPlay);
-                }
-              }, 50);
+              // Resume immediately - blob is already loaded, just seek in it
+              audioElement.play().then(() => {
+                console.log('Playback resumed successfully');
+              }).catch(err => {
+                console.error('Failed to resume playback:', err);
+              });
             }
             wasPlayingBeforeDrag.current = false;
           }}
