@@ -289,12 +289,11 @@ export const useAudioPlayer = ({
   
   // Convert AudioBuffer to WAV blob
   const audioBufferToWav = useCallback((buffer: AudioBuffer): Blob => {
-    const numberOfChannels = buffer.numberOfChannels;
+    // Convert to mono to save memory (especially important on Android WebView)
+    const numberOfChannels = 1; // Force mono
     const length = buffer.length * numberOfChannels * 2;
     const arrayBuffer = new ArrayBuffer(44 + length);
     const view = new DataView(arrayBuffer);
-    const channels: Float32Array[] = [];
-    let offset = 0;
     let pos = 0;
     
     // Write WAV header
@@ -326,19 +325,24 @@ export const useAudioPlayer = ({
     setUint32(0x61746164); // "data"
     setUint32(length);
     
-    // Write audio data
-    for (let i = 0; i < numberOfChannels; i++) {
-      channels.push(buffer.getChannelData(i));
+    // Write audio data (convert to mono by averaging channels)
+    const originalChannels: Float32Array[] = [];
+    for (let i = 0; i < buffer.numberOfChannels; i++) {
+      originalChannels.push(buffer.getChannelData(i));
     }
     
-    // Interleave channels
-    while (offset < buffer.length) {
-      for (let i = 0; i < numberOfChannels; i++) {
-        const sample = Math.max(-1, Math.min(1, channels[i][offset]));
-        view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-        pos += 2;
+    for (let i = 0; i < buffer.length; i++) {
+      // Average all channels to create mono
+      let sample = 0;
+      for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+        sample += originalChannels[ch][i];
       }
-      offset++;
+      sample /= buffer.numberOfChannels;
+      
+      // Clamp and write
+      sample = Math.max(-1, Math.min(1, sample));
+      view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      pos += 2;
     }
     
     return new Blob([arrayBuffer], { type: 'audio/wav' });
@@ -443,35 +447,90 @@ export const useAudioPlayer = ({
       
       // Calculate total duration and create concatenated buffer
       const totalDuration = audioBuffers.reduce((sum, buffer) => sum + buffer.duration, 0);
-      const numberOfChannels = audioBuffers[0].numberOfChannels;
-      const sampleRate = audioBuffers[0].sampleRate;
-      const totalLength = Math.ceil(totalDuration * sampleRate);
       
-      const concatenated = audioContext.createBuffer(
-        numberOfChannels,
-        totalLength,
-        sampleRate
-      );
+      // Use lower sample rate for memory efficiency on Android
+      // 22050 Hz is sufficient for speech and saves 50% memory
+      const targetSampleRate = Math.min(audioBuffers[0].sampleRate, 22050);
+      const downsampleRatio = audioBuffers[0].sampleRate / targetSampleRate;
       
-      // Copy all buffers into the concatenated buffer
+      // Force mono (1 channel) to save memory
+      const numberOfChannels = 1;
+      const totalLength = Math.ceil((totalDuration * targetSampleRate));
+      
+      console.log(`🎵 Creating concatenated buffer: ${totalDuration.toFixed(1)}s, ${targetSampleRate}Hz, mono`);
+      
+      // Check estimated memory usage (rough estimate: 4 bytes per sample)
+      const estimatedBytes = totalLength * numberOfChannels * 4;
+      const estimatedMB = estimatedBytes / (1024 * 1024);
+      console.log(`💾 Estimated memory: ${estimatedMB.toFixed(1)} MB`);
+      
+      // Warn if size is very large (over 100MB)
+      if (estimatedMB > 100) {
+        console.warn('⚠️ Large audio buffer - this may fail on low-memory devices');
+      }
+      
+      let concatenated: AudioBuffer;
+      try {
+        concatenated = audioContext.createBuffer(
+          numberOfChannels,
+          totalLength,
+          targetSampleRate
+        );
+      } catch (memError) {
+        console.error('❌ Out of memory creating audio buffer:', memError);
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        throw new Error('Out of memory - surah too large for concatenation');
+      }
+      
+      // Copy all buffers into the concatenated buffer (with downsampling and mono conversion)
+      const targetData = concatenated.getChannelData(0);
       let offset = 0;
+      
       for (let i = 0; i < audioBuffers.length; i++) {
         const buffer = audioBuffers[i];
-        for (let channel = 0; channel < numberOfChannels; channel++) {
-          const sourceData = buffer.getChannelData(channel);
-          const targetData = concatenated.getChannelData(channel);
-          targetData.set(sourceData, offset);
+        const sourceLength = buffer.length;
+        const targetLength = Math.ceil(sourceLength / downsampleRatio);
+        
+        // Mix to mono and downsample
+        for (let j = 0; j < targetLength && offset + j < totalLength; j++) {
+          const sourceIndex = Math.floor(j * downsampleRatio);
+          let sample = 0;
+          
+          // Average all channels
+          for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+            sample += buffer.getChannelData(ch)[sourceIndex];
+          }
+          sample /= buffer.numberOfChannels;
+          
+          targetData[offset + j] = sample;
         }
-        offset += buffer.length;
+        
+        offset += targetLength;
       }
       
       // Convert buffer to WAV blob and create URL
-      const wavBlob = audioBufferToWav(concatenated);
+      let wavBlob: Blob;
+      try {
+        wavBlob = audioBufferToWav(concatenated);
+        console.log(`✅ WAV blob created: ${(wavBlob.size / (1024 * 1024)).toFixed(1)} MB`);
+      } catch (convError) {
+        console.error('❌ Error converting to WAV:', convError);
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        throw new Error('Failed to convert audio - file too large');
+      }
+      
       const blobUrl = URL.createObjectURL(wavBlob);
       
       // Cache the blob for future use
-      await cacheAudio(selectedReciter.folder, surahNum, wavBlob, timestamps);
-      console.log(`💾 Cached audio for ${selectedReciter.folder} surah ${surahNum}`);
+      try {
+        await cacheAudio(selectedReciter.folder, surahNum, wavBlob, timestamps);
+        console.log(`💾 Cached audio for ${selectedReciter.folder} surah ${surahNum}`);
+      } catch (cacheError) {
+        console.warn('⚠️ Failed to cache audio (storage full?):', cacheError);
+        // Continue anyway - we can still use the blob URL
+      }
       
       // Revoke old blob URL if exists
       if (concatenatedBlobUrl) {
@@ -484,11 +543,31 @@ export const useAudioPlayer = ({
       setIsPreloadingAyahs(false);
       setPreloadProgress({ current: 0, total: 0 });
       
+      // Force garbage collection hint (if supported)
+      if (typeof (window as any).gc === 'function') {
+        (window as any).gc();
+      }
+      
       return { blobUrl, timestamps };
     } catch (error) {
-      console.error('Error concatenating ayahs:', error);
+      console.error('❌ Error concatenating ayahs:', error);
+      
+      // Clean up on error
+      if (concatenatedBlobUrl) {
+        URL.revokeObjectURL(concatenatedBlobUrl);
+        setConcatenatedBlobUrl(null);
+      }
+      
       setIsPreloadingAyahs(false);
       setPreloadProgress({ current: 0, total: 0 });
+      setConcatenatedSurah(null);
+      setAyahTimestamps([]);
+      
+      // Show user-friendly error
+      if (error instanceof Error && (error.message.includes('memory') || error.message.includes('large'))) {
+        alert('This surah is too large to preload on your device. Please use MP3Quran mode for longer surahs.');
+      }
+      
       return null;
     }
   }, [selectedReciter, ayahData, audioSource, audioContext, audioBufferToWav, concatenatedBlobUrl]);
@@ -633,30 +712,78 @@ export const useAudioPlayer = ({
       
       // Calculate total duration and create concatenated buffer
       const totalDuration = audioBufferSequence.reduce((sum, buffer) => sum + buffer.duration, 0);
-      const numberOfChannels = audioBufferSequence[0].numberOfChannels;
-      const sampleRate = audioBufferSequence[0].sampleRate;
-      const totalLength = Math.ceil(totalDuration * sampleRate);
       
-      const concatenated = audioContext.createBuffer(
-        numberOfChannels,
-        totalLength,
-        sampleRate
-      );
+      // Use lower sample rate for memory efficiency on Android
+      const targetSampleRate = Math.min(audioBufferSequence[0].sampleRate, 22050);
+      const downsampleRatio = audioBufferSequence[0].sampleRate / targetSampleRate;
       
-      // Copy all buffers into the concatenated buffer
+      // Force mono (1 channel) to save memory
+      const numberOfChannels = 1;
+      const totalLength = Math.ceil(totalDuration * targetSampleRate);
+      
+      console.log(`🎵 Creating repeat buffer: ${totalDuration.toFixed(1)}s, ${targetSampleRate}Hz, mono, ${timestamps.length} segments`);
+      
+      // Check estimated memory usage
+      const estimatedBytes = totalLength * numberOfChannels * 4;
+      const estimatedMB = estimatedBytes / (1024 * 1024);
+      console.log(`💾 Estimated memory: ${estimatedMB.toFixed(1)} MB`);
+      
+      if (estimatedMB > 100) {
+        console.warn('⚠️ Large repeat buffer - may fail on low-memory devices');
+      }
+      
+      let concatenated: AudioBuffer;
+      try {
+        concatenated = audioContext.createBuffer(
+          numberOfChannels,
+          totalLength,
+          targetSampleRate
+        );
+      } catch (memError) {
+        console.error('❌ Out of memory creating repeat buffer:', memError);
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        throw new Error('Out of memory - repeat too large');
+      }
+      
+      // Copy all buffers into the concatenated buffer (with downsampling and mono conversion)
+      const targetData = concatenated.getChannelData(0);
       let offset = 0;
+      
       for (let i = 0; i < audioBufferSequence.length; i++) {
         const buffer = audioBufferSequence[i];
-        for (let channel = 0; channel < numberOfChannels; channel++) {
-          const sourceData = buffer.getChannelData(channel);
-          const targetData = concatenated.getChannelData(channel);
-          targetData.set(sourceData, offset);
+        const sourceLength = buffer.length;
+        const targetLength = Math.ceil(sourceLength / downsampleRatio);
+        
+        // Mix to mono and downsample
+        for (let j = 0; j < targetLength && offset + j < totalLength; j++) {
+          const sourceIndex = Math.floor(j * downsampleRatio);
+          let sample = 0;
+          
+          // Average all channels
+          for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+            sample += buffer.getChannelData(ch)[sourceIndex];
+          }
+          sample /= buffer.numberOfChannels;
+          
+          targetData[offset + j] = sample;
         }
-        offset += buffer.length;
+        
+        offset += targetLength;
       }
       
       // Convert buffer to WAV blob and create URL
-      const wavBlob = audioBufferToWav(concatenated);
+      let wavBlob: Blob;
+      try {
+        wavBlob = audioBufferToWav(concatenated);
+        console.log(`✅ Repeat WAV blob: ${(wavBlob.size / (1024 * 1024)).toFixed(1)} MB`);
+      } catch (convError) {
+        console.error('❌ Error converting repeat to WAV:', convError);
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        throw new Error('Failed to convert repeat audio');
+      }
+      
       const blobUrl = URL.createObjectURL(wavBlob);
       
       // Revoke old repeat blob URL if exists
@@ -669,13 +796,32 @@ export const useAudioPlayer = ({
       setIsPreloadingAyahs(false);
       setPreloadProgress({ current: 0, total: 0 });
       
+      // Force garbage collection hint
+      if (typeof (window as any).gc === 'function') {
+        (window as any).gc();
+      }
+      
       console.log(`✅ Created repeat audio: ${ayahsInRange.length} ayahs × ${ayahRepeatCount} repeats × ${passageRepeatCount} passages = ${timestamps.length} segments`);
       
       return { blobUrl, timestamps };
     } catch (error) {
-      console.error('Error concatenating repeat ayahs:', error);
+      console.error('❌ Error concatenating repeat ayahs:', error);
+      
+      // Clean up on error
+      if (repeatBlobUrl) {
+        URL.revokeObjectURL(repeatBlobUrl);
+        setRepeatBlobUrl(null);
+      }
+      
       setIsPreloadingAyahs(false);
       setPreloadProgress({ current: 0, total: 0 });
+      setRepeatAyahTimestamps([]);
+      
+      // Show user-friendly error
+      if (error instanceof Error && (error.message.includes('memory') || error.message.includes('large'))) {
+        alert('Repeat range is too large for your device. Please reduce the passage count or ayah count.');
+      }
+      
       return null;
     }
   }, [selectedReciter, ayahData, audioSource, audioContext, audioBufferToWav, repeatBlobUrl]);
@@ -799,30 +945,78 @@ export const useAudioPlayer = ({
       
       // Calculate total duration and create concatenated buffer
       const totalDuration = audioBufferSequence.reduce((sum, buffer) => sum + buffer.duration, 0);
-      const numberOfChannels = audioBufferSequence[0].numberOfChannels;
-      const sampleRate = audioBufferSequence[0].sampleRate;
-      const totalLength = Math.ceil(totalDuration * sampleRate);
       
-      const concatenated = audioContext.createBuffer(
-        numberOfChannels,
-        totalLength,
-        sampleRate
-      );
+      // Use lower sample rate for memory efficiency on Android
+      const targetSampleRate = Math.min(audioBufferSequence[0].sampleRate, 22050);
+      const downsampleRatio = audioBufferSequence[0].sampleRate / targetSampleRate;
       
-      // Copy all buffers into the concatenated buffer
+      // Force mono (1 channel) to save memory
+      const numberOfChannels = 1;
+      const totalLength = Math.ceil(totalDuration * targetSampleRate);
+      
+      console.log(`🎵 Creating MP3Quran repeat buffer: ${totalDuration.toFixed(1)}s, ${targetSampleRate}Hz, mono`);
+      
+      // Check estimated memory usage
+      const estimatedBytes = totalLength * numberOfChannels * 4;
+      const estimatedMB = estimatedBytes / (1024 * 1024);
+      console.log(`💾 Estimated memory: ${estimatedMB.toFixed(1)} MB`);
+      
+      if (estimatedMB > 100) {
+        console.warn('⚠️ Large MP3Quran repeat buffer - may fail on low-memory devices');
+      }
+      
+      let concatenated: AudioBuffer;
+      try {
+        concatenated = audioContext.createBuffer(
+          numberOfChannels,
+          totalLength,
+          targetSampleRate
+        );
+      } catch (memError) {
+        console.error('❌ Out of memory creating MP3Quran repeat buffer:', memError);
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        throw new Error('Out of memory - MP3Quran repeat too large');
+      }
+      
+      // Copy all buffers into the concatenated buffer (with downsampling and mono conversion)
+      const targetData = concatenated.getChannelData(0);
       let offset = 0;
+      
       for (let i = 0; i < audioBufferSequence.length; i++) {
         const buffer = audioBufferSequence[i];
-        for (let channel = 0; channel < numberOfChannels; channel++) {
-          const sourceData = buffer.getChannelData(channel);
-          const targetData = concatenated.getChannelData(channel);
-          targetData.set(sourceData, offset);
+        const sourceLength = buffer.length;
+        const targetLength = Math.ceil(sourceLength / downsampleRatio);
+        
+        // Mix to mono and downsample
+        for (let j = 0; j < targetLength && offset + j < totalLength; j++) {
+          const sourceIndex = Math.floor(j * downsampleRatio);
+          let sample = 0;
+          
+          // Average all channels
+          for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+            sample += buffer.getChannelData(ch)[sourceIndex];
+          }
+          sample /= buffer.numberOfChannels;
+          
+          targetData[offset + j] = sample;
         }
-        offset += buffer.length;
+        
+        offset += targetLength;
       }
       
       // Convert buffer to WAV blob and create URL
-      const wavBlob = audioBufferToWav(concatenated);
+      let wavBlob: Blob;
+      try {
+        wavBlob = audioBufferToWav(concatenated);
+        console.log(`✅ MP3Quran repeat WAV blob: ${(wavBlob.size / (1024 * 1024)).toFixed(1)} MB`);
+      } catch (convError) {
+        console.error('❌ Error converting MP3Quran repeat to WAV:', convError);
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        throw new Error('Failed to convert MP3Quran repeat audio');
+      }
+      
       const blobUrl = URL.createObjectURL(wavBlob);
       
       // Revoke old repeat blob URL if exists
@@ -834,13 +1028,31 @@ export const useAudioPlayer = ({
       setIsPreloadingAyahs(false);
       setPreloadProgress({ current: 0, total: 0 });
       
+      // Force garbage collection hint
+      if (typeof (window as any).gc === 'function') {
+        (window as any).gc();
+      }
+      
       console.log(`✅ Created MP3Quran repeat audio: ${surahsInRange.length} surahs × ${passageRepeatCount} passages = ${timestamps.length} segments`);
       
       return { blobUrl, timestamps };
     } catch (error) {
-      console.error('Error concatenating MP3Quran repeat:', error);
+      console.error('❌ Error concatenating MP3Quran repeat:', error);
+      
+      // Clean up on error
+      if (repeatBlobUrl) {
+        URL.revokeObjectURL(repeatBlobUrl);
+        setRepeatBlobUrl(null);
+      }
+      
       setIsPreloadingAyahs(false);
       setPreloadProgress({ current: 0, total: 0 });
+      
+      // Show user-friendly error
+      if (error instanceof Error && (error.message.includes('memory') || error.message.includes('large'))) {
+        alert('MP3Quran repeat range is too large for your device. Please reduce the passage count.');
+      }
+      
       return null;
     }
   }, [selectedMoshaf, audioSource, audioContext, audioBufferToWav, repeatBlobUrl]);
