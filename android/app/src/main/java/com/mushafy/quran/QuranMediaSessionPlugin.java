@@ -1,6 +1,7 @@
 package com.mushafy.quran;
 
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -49,6 +50,9 @@ public class QuranMediaSessionPlugin extends Plugin {
     private void initializeMediaSession() {
         Context context = getContext();
         notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        
+        // Create notification channel for Android 8.0+
+        createNotificationChannel();
         
         // Create MediaSession
         mediaSession = new MediaSessionCompat(context, TAG);
@@ -302,6 +306,29 @@ public class QuranMediaSessionPlugin extends Plugin {
     private void hideNotification() {
         if (notificationManager != null) {
             notificationManager.cancel(NOTIFICATION_ID);
+        }
+    }
+    
+    /**
+     * Create notification channel for Android 8.0+ (API 26+)
+     * Required for notifications to appear on modern Android versions
+     */
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "Quran Audio Player",
+                NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("Controls for Quran audio playback");
+            channel.setShowBadge(false);
+            channel.setSound(null, null); // Silent channel (audio plays separately)
+            channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(channel);
+                Log.d(TAG, "✅ Notification channel created: " + NOTIFICATION_CHANNEL_ID);
+            }
         }
     }
 }
