@@ -232,14 +232,88 @@ export function ReciterDialog({
   const translateMoshafName = (moshafName: string): string => {
     const nameLower = moshafName.toLowerCase();
     
-    // Special case for specific patterns
+    // Special case for specific patterns (these already include the style in the name)
     if (nameLower.includes("almusshaf al mo'lim - almusshaf al mo'lim")) {
       return t('muallim');
     } else if (nameLower.includes("almusshaf al mojawwad - almusshaf al mojawwad")) {
       return t('mujawwad');
     }
     
-    // Check for common recitation types
+    // Extract rewayat (reading style) from the name
+    // Pattern: "Rewayat [Name] - [Style]"
+    const rewayatMatch = moshafName.match(/Rewayat\s+(.+?)\s+-\s+(.+)/i);
+    
+    if (rewayatMatch) {
+      const rewayatName = rewayatMatch[1].trim(); // e.g., "Hafs A'n Assem", "Warsh A'n Nafi'"
+      const styleName = rewayatMatch[2].trim().toLowerCase(); // e.g., "Murattal", "Mujawwad"
+      
+      // Simplify common rewayat names for brevity
+      let simplifiedRewayat = rewayatName;
+      
+      // Extract just the main name (before "A'n" or "An")
+      const mainNameMatch = rewayatName.match(/^(.+?)\s+(?:A'n|An)\s+/i);
+      if (mainNameMatch) {
+        simplifiedRewayat = mainNameMatch[1].trim(); // e.g., "Hafs", "Warsh", "Qalon"
+      }
+      
+      // Translate the rewayat name using a mapping
+      const translateRewayat = (rewayat: string): string => {
+        const rewayatLower = rewayat.toLowerCase().replace(/['\s-]/g, '');
+        
+        // Map common rewayat names to translation keys
+        const rewayatMap: Record<string, string> = {
+          'hafs': 'hafs',
+          'warsh': 'warsh',
+          'qalon': 'qalon',
+          'aldori': 'aldori',
+          'aldorai': 'aldorai',
+          'shobah': 'shobah',
+          'khalaf': 'khalaf',
+          'khallad': 'khallad',
+          'albizi': 'albizi',
+          'qunbol': 'qunbol',
+          'ibnthakwan': 'ibnThakwan',
+          'ibnamer': 'ibnAmer',
+          'ibnkatheer': 'ibnKatheer',
+          'alkisai': 'alkisai',
+          'hamzah': 'hamzah',
+          'asim': 'asim',
+          'assem': 'assem',
+          'nafi': 'nafi',
+          'abiamr': 'abiAmr',
+        };
+        
+        const key = rewayatMap[rewayatLower];
+        if (key) {
+          return t(key as any);
+        }
+        
+        // If no translation found, return original
+        return rewayat;
+      };
+      
+      const translatedRewayat = translateRewayat(simplifiedRewayat);
+      
+      // Translate the style
+      let translatedStyle = '';
+      if (styleName.includes('murattal') || styleName.includes('مرتل')) {
+        translatedStyle = t('murattal');
+      } else if (styleName.includes('mujawwad') || styleName.includes('mojawwad') || styleName.includes('مجود')) {
+        translatedStyle = t('mujawwad');
+      } else if (styleName.includes("mo'lim") || styleName.includes('muallim') || styleName.includes('معلم') || styleName.includes('teacher')) {
+        translatedStyle = t('muallim');
+      } else {
+        translatedStyle = styleName;
+      }
+      
+      // Return combined name: "Murattal - Hafs" or just the rewayat name if no style translation
+      if (translatedStyle && translatedStyle !== styleName) {
+        return `${translatedStyle} - ${translatedRewayat}`;
+      }
+      return translatedRewayat;
+    }
+    
+    // Check for common recitation types (fallback if no rewayat pattern)
     if (nameLower.includes('murattal') || nameLower.includes('مرتل')) {
       return t('murattal');
     } else if (nameLower.includes('mujawwad') || nameLower.includes('مجود')) {
