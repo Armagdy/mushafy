@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Emerald color palette matching Tailwind CSS -->
+    <color name="colorPrimary">#047857</color>        <!-- emerald-700 -->
+    <color name="colorPrimaryDark">#065f46</color>    <!-- emerald-800 -->
+    <color name="colorAccent">#10b981</color>         <!-- emerald-500 -->
+    
+    <!-- App colors -->
+    <color name="emerald_800">#065f46</color>         <!-- Bottom bar gradient start -->
+    <color name="emerald_600">#059669</color>         <!-- Bottom bar gradient end -->
+    <color name="cream">#F2E3BB</color>               <!-- Text color on emerald -->
+    <color name="background_cream">#FBF9F4</color>    <!-- Page background -->
+</resources>

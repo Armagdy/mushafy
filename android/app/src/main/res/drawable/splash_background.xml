@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Dark green background #0E4E38 -->
+    <item>
+        <color android:color="#0E4E38"/>
+    </item>
+    
+    <!-- Centered mushafy logo -->
+    <item>
+        <bitmap
+            android:src="@drawable/splash"
+            android:gravity="center" />
+    </item>
+</layer-list>
