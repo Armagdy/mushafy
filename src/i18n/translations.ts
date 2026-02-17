@@ -147,6 +147,8 @@ export const translations = {
     questionsAnswered: 'الأسئلة المجابة',
     configure: 'إعداد',
     questionCount: 'عدد الأسئلة',
+    maxQuestions: 'الحد الأقصى للأسئلة',
+    questionProgress: 'السؤال {current} من {max}',
     randomQuestion: 'سؤال عشوائي',
     surahName: 'اسم السورة',
     surahNames: 'أسماء السور',
@@ -197,6 +199,7 @@ export const translations = {
     networkRequired: 'يتطلب الاتصال بالإنترنت',
     offlineMode: 'وضع عدم الاتصال',
     loadingAyahs: 'تحميل الآيات جملة واحدة لأفضل استماع',
+    loadingAudio: 'جاري تحميل الصوت...',
   },
   en: {
     appName: 'Mushafy',
@@ -345,6 +348,8 @@ export const translations = {
     questionsAnswered: 'Questions Answered',
     configure: 'Configure',
     questionCount: 'Number of Questions',
+    maxQuestions: 'Maximum Questions',
+    questionProgress: 'Question {current} of {max}',
     randomQuestion: 'Random Question',
     surahName: 'Surah Name',
     surahNames: 'Surah Names',
@@ -395,6 +400,7 @@ export const translations = {
     networkRequired: 'Internet connection required',
     offlineMode: 'Offline Mode',
     loadingAyahs: 'Loading all ayahs at once for better listening experience',
+    loadingAudio: 'Loading audio...',
   },
 };
 
