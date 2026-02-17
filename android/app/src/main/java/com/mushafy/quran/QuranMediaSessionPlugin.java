@@ -136,6 +136,28 @@ public class QuranMediaSessionPlugin extends Plugin {
         notifyListeners("mediaSessionEvent", ret);
     }
     
+    /**
+     * Load mushafy.png from assets as album art.
+     * This creates a large bitmap for the notification background.
+     */
+    private Bitmap loadAlbumArtFromAssets() {
+        try {
+            android.content.res.AssetManager assetManager = getContext().getAssets();
+            java.io.InputStream is = assetManager.open("public/mushafy.png");
+            Bitmap bitmap = BitmapFactory.decodeStream(is);
+            is.close();
+            
+            if (bitmap != null) {
+                // Scale to reasonable size (512x512) for notification
+                int size = 512;
+                return Bitmap.createScaledBitmap(bitmap, size, size, true);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to load album art from assets", e);
+        }
+        return null;
+    }
+    
     @PluginMethod
     public void updateMetadata(PluginCall call) {
         currentTrack = call.getString("track", "");
@@ -150,14 +172,15 @@ public class QuranMediaSessionPlugin extends Plugin {
             .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, currentAlbum)
             .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration);
         
-        // Add app icon as album art
+        // Add mushafy.png as album art (large background image)
         try {
-            Bitmap icon = BitmapFactory.decodeResource(getContext().getResources(), R.mipmap.ic_launcher);
-            if (icon != null) {
-                metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, icon);
+            Bitmap albumArt = loadAlbumArtFromAssets();
+            if (albumArt != null) {
+                metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, albumArt);
+                Log.d(TAG, "Album art loaded: " + albumArt.getWidth() + "x" + albumArt.getHeight());
             }
         } catch (Exception e) {
-            Log.w(TAG, "Could not load app icon", e);
+            Log.w(TAG, "Could not load album art", e);
         }
         
         mediaSession.setMetadata(metadataBuilder.build());
@@ -225,12 +248,24 @@ public class QuranMediaSessionPlugin extends Plugin {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
         
+        // Load mushafy.png as large icon (full background image)
+        Bitmap largeIcon = null;
+        try {
+            largeIcon = loadAlbumArtFromAssets();
+            if (largeIcon != null) {
+                Log.d(TAG, "Large icon loaded: " + largeIcon.getWidth() + "x" + largeIcon.getHeight());
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not load large icon", e);
+        }
+        
         // Build notification with MediaStyle
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
             .setContentTitle(currentTrack)
             .setContentText(currentArtist)
             .setSubText(currentAlbum)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setLargeIcon(largeIcon) // This shows as the background image
             .setContentIntent(contentIntent)
             .setDeleteIntent(MediaButtonReceiver.buildMediaButtonPendingIntent(context, PlaybackStateCompat.ACTION_STOP))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
