@@ -4,4 +4,9 @@
     <string name="title_activity_main">Mushafy Quran</string>
     <string name="package_name">com.mushafy.quran</string>
     <string name="custom_url_scheme">com.mushafy.quran</string>
+    
+    <!-- Media notification channel -->
+    <string name="media_notification_channel_id">quran_audio_playback</string>
+    <string name="media_notification_channel_name">Quran Audio Playback</string>
+    <string name="media_notification_channel_description">Controls for Quran audio playback</string>
 </resources>
