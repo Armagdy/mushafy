@@ -17,8 +17,10 @@ interface AyahSelectorDialogProps {
   viewMode: 'single' | 'double';
   isMobile: boolean;
   isAyahNavigationRef: React.MutableRefObject<boolean>;
+  audioSource: 'everyayah' | 'mp3quran';
   onPlayAyah: (surahNum: number, ayahNum: number) => void;
   onSetCurrentPlayingAyah: (ayah: { surah: number; ayah: number }) => void;
+  onSeekToAyahPosition: (surahNum: number, ayahNum: number) => void;
   onViewTafseer?: (surahNum: number, ayahNum: number, surahName: string) => void;
   onStopAudio?: () => void;
 }
@@ -34,8 +36,10 @@ export function AyahSelectorDialog({
   viewMode,
   isMobile,
   isAyahNavigationRef,
+  audioSource,
   onPlayAyah,
   onSetCurrentPlayingAyah,
+  onSeekToAyahPosition,
   onViewTafseer,
   onStopAudio,
 }: AyahSelectorDialogProps) {
@@ -46,10 +50,19 @@ export function AyahSelectorDialog({
   const handleAyahClick = (surahNum: number, ayahNum: number, versePage: number) => {
     console.log('=== NAVIGATING FROM AYAH SELECTOR ===');
     console.log('Ayah clicked:', surahNum, ayahNum, 'page:', versePage);
-    // Stop any currently playing audio (for EveryAyah reciter)
-    if (onStopAudio) {
-      onStopAudio();
+    console.log('Audio source:', audioSource);
+    
+    if (audioSource === 'mp3quran') {
+      // MP3Quran mode: Seek to ayah position to update progress bar
+      // This will update the visual position without playing
+      onSeekToAyahPosition(surahNum, ayahNum);
+    } else {
+      // EveryAyah mode: Stop audio playback
+      if (onStopAudio) {
+        onStopAudio();
+      }
     }
+    
     // Set flag to prevent auto-switch to first ayah
     isAyahNavigationRef.current = true;
     console.log('Set isAyahNavigation flag to true');

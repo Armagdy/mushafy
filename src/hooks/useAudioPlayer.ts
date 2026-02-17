@@ -1192,7 +1192,15 @@ export const useAudioPlayer = ({
       
       try {
         // Check if we need to load a new surah or if we're already playing it
-        if (currentSurahAudio !== surahNum) {
+        // For MP3Quran, we check: different surah OR no valid audio source loaded
+        const hasValidSource = audioElement.src && 
+                               audioElement.src !== '' && 
+                               audioElement.src !== 'about:blank' &&
+                               (audioElement.src.startsWith('http') || audioElement.src.startsWith('blob:'));
+        const needsReload = currentSurahAudio !== surahNum || !hasValidSource;
+        
+        if (needsReload) {
+          console.log(`🔄 Loading MP3Quran audio for surah ${surahNum}...`);
           // Check cache first
           const cachedData = await getCachedMp3QuranAudio(selectedMoshaf.id, surahNum);
           
@@ -1210,12 +1218,21 @@ export const useAudioPlayer = ({
             // Wait for audio to be ready, then seek to ayah
             audioElement.addEventListener('loadedmetadata', () => {
               if (cachedData.timingData.length > 0) {
-                seekToAyah(audioElement, cachedData.timingData, ayahNum);
+                const seekSuccess = seekToAyah(audioElement, cachedData.timingData, ayahNum);
+                if (seekSuccess) {
+                  // Update currentTime state immediately for instant progress bar update
+                  setCurrentTime(audioElement.currentTime);
+                }
               }
               audioElement.play().then(() => {
                 setIsPreloadingAyahs(false); // Hide spinner once playing
               }).catch(err => {
                 console.error('Failed to play audio:', err);
+                console.error('Error details:', {
+                  name: err.name,
+                  message: err.message,
+                  code: (err as any).code
+                });
                 setIsPlaying(false);
                 setIsPreloadingAyahs(false);
               });
@@ -1258,7 +1275,11 @@ export const useAudioPlayer = ({
             // Seek to ayah position when metadata loads
             audioElement.addEventListener('loadedmetadata', () => {
               if (timings.length > 0) {
-                seekToAyah(audioElement, timings, ayahNum);
+                const seekSuccess = seekToAyah(audioElement, timings, ayahNum);
+                if (seekSuccess) {
+                  // Update currentTime state immediately for instant progress bar update
+                  setCurrentTime(audioElement.currentTime);
+                }
               }
             }, { once: true });
             
@@ -1283,12 +1304,22 @@ export const useAudioPlayer = ({
           // Persist selected moshaf
           localStorage.setItem('quran-last-mp3quran-moshaf', selectedMoshaf.id.toString());
         } else {
-          // Same surah, just seek to the ayah
+          // Same surah AND audio source is still loaded - just seek to the ayah
+          console.log('✅ Audio already loaded, seeking to ayah', ayahNum);
           if (ayahTimings.length > 0) {
-            seekToAyah(audioElement, ayahTimings, ayahNum);
+            const seekSuccess = seekToAyah(audioElement, ayahTimings, ayahNum);
+            if (seekSuccess) {
+              // Update currentTime state immediately for instant progress bar update
+              setCurrentTime(audioElement.currentTime);
+            }
           }
           audioElement.play().catch(err => {
             console.error('Failed to play audio:', err);
+            console.error('Error details:', {
+              name: err.name,
+              message: err.message,
+              code: (err as any).code
+            });
             setIsPlaying(false);
           });
         }
@@ -1538,10 +1569,18 @@ export const useAudioPlayer = ({
     if (audioElement) {
       // Stop HTML Audio Element
       audioElement.pause();
-      audioElement.currentTime = 0;
-      // Clear the audio source to fully stop playback
-      audioElement.src = '';
-      console.log('Audio element stopped and cleared');
+      
+      // For EveryAyah: Clear everything and reset to 0
+      // For MP3Quran: Keep the source and preserve time/duration state for smooth visual continuity
+      if (audioSource === 'everyayah') {
+        audioElement.currentTime = 0;
+        audioElement.src = '';
+        console.log('Audio element stopped and cleared (EveryAyah)');
+      } else {
+        // For MP3Quran: Don't reset currentTime to 0 - it will be set when seeking to new ayah
+        // This prevents progress bar from flickering back to 0% and then jumping to correct position
+        console.log('Audio element paused (MP3Quran - source and state preserved)');
+      }
     }
     
     setIsPlaying(false);
@@ -1552,9 +1591,13 @@ export const useAudioPlayer = ({
     setCurrentRepeatSurah(0);
     setCurrentRepeatAyahCount(0);
     
-    // Clear MP3Quran state
-    setCurrentSurahAudio(null);
-    setAyahTimings([]);
+    // For MP3Quran: preserve timing data so ayah picker remains enabled
+    // For EveryAyah: clear everything since concatenated audio is being cleared below
+    if (audioSource === 'everyayah') {
+      setCurrentSurahAudio(null);
+      setAyahTimings([]);
+    }
+    // Note: MP3Quran timing data is preserved to keep ayah picker functional
     
     // Clear concatenated ayah state
     if (concatenatedBlobUrl) {
@@ -1597,6 +1640,9 @@ export const useAudioPlayer = ({
     
     // Set the audio time (this will trigger native 'seeking' and 'seeked' events)
     audioElement.currentTime = Math.max(0, Math.min(time, duration));
+    
+    // Update currentTime state immediately for instant progress bar update
+    setCurrentTime(audioElement.currentTime);
     
     console.log('Current time after seek:', audioElement.currentTime);
     
@@ -1668,6 +1714,53 @@ export const useAudioPlayer = ({
     navigate, 
     isAyahNavigation
   ]);
+
+  // Seek to specific ayah position (for MP3Quran mode) without playing
+  const seekToAyahPosition = useCallback((surahNum: number, ayahNum: number) => {
+    console.log('=== SEEKING TO AYAH POSITION ===');
+    console.log('Target ayah:', surahNum, ':', ayahNum);
+    console.log('Audio source:', audioSource);
+    console.log('Has timing data:', ayahTimings.length > 0);
+    
+    // Only works for MP3Quran with timing data
+    if (audioSource !== 'mp3quran' || ayahTimings.length === 0) {
+      console.warn('seekToAyahPosition only works for MP3Quran with timing data');
+      return;
+    }
+    
+    if (!audioElement) {
+      console.warn('No audio element available');
+      return;
+    }
+    
+    // Find the start time for this ayah
+    const ayahTiming = ayahTimings.find(t => t.ayah === ayahNum);
+    if (!ayahTiming) {
+      console.warn('No timing data found for ayah', ayahNum);
+      return;
+    }
+    
+    // Convert milliseconds to seconds
+    const startTime = ayahTiming.start_time / 1000;
+    console.log('Seeking to time:', startTime, 'seconds');
+    console.log('Current audio src:', audioElement.src?.substring(0, 50) + '...');
+    
+    // Prevent navigation during seek
+    isAyahNavigation.current = true;
+    
+    // Set the audio time
+    audioElement.currentTime = startTime;
+    
+    // Update currentTime state immediately for instant progress bar update
+    setCurrentTime(audioElement.currentTime);
+    
+    console.log('✅ Seeked to ayah', ayahNum, 'at time', startTime);
+    
+    // Reset navigation flag after a short delay
+    setTimeout(() => {
+      isAyahNavigation.current = false;
+    }, 500);
+  }, [audioElement, audioSource, ayahTimings, isAyahNavigation]);
   
   // Start repeat mode
   const startRepeat = useCallback(async () => {
@@ -2548,10 +2641,25 @@ export const useAudioPlayer = ({
     }
   }, [reciters, filterReciterName, filterReading, filterStyle, filterQuality, selectedReciter]);
   
-  // Persist audio source selection
+  // Persist audio source selection and clear state when switching sources
   useEffect(() => {
     localStorage.setItem('quran-audio-source', audioSource);
+    
+    // Clear timing data when switching away from MP3Quran
+    if (audioSource === 'everyayah') {
+      setCurrentSurahAudio(null);
+      setAyahTimings([]);
+    }
   }, [audioSource]);
+  
+  // Clear timing data when MP3Quran moshaf/reciter changes
+  useEffect(() => {
+    if (audioSource === 'mp3quran') {
+      // Reset state to force reload when user plays audio with new moshaf
+      setCurrentSurahAudio(null);
+      setAyahTimings([]);
+    }
+  }, [selectedMoshaf?.id, audioSource]);
   
   // Expose debug function
   const testMediaSession = useCallback(() => {
@@ -2740,6 +2848,7 @@ export const useAudioPlayer = ({
     setSelectedMp3QuranReciter,
     selectedMoshaf,
     setSelectedMoshaf,
+    hasAyahTimings: ayahTimings.length > 0,
     
     // Filter state
     filterReciterName,
@@ -2788,6 +2897,7 @@ export const useAudioPlayer = ({
     togglePlayPause,
     stopAudio,
     seekToTime,
+    seekToAyahPosition,
     startRepeat,
     preloadNextAyah,
     

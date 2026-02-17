@@ -168,6 +168,7 @@ const Surah = () => {
     setSelectedMp3QuranReciter,
     selectedMoshaf,
     setSelectedMoshaf,
+    hasAyahTimings,
     isRepeatActive,
     setIsRepeatActive,
     repeatPassageCount,
@@ -192,6 +193,7 @@ const Surah = () => {
     togglePlayPause,
     stopAudio,
     seekToTime,
+    seekToAyahPosition,
     startRepeat,
     preloadNextAyah,
     ayahTimestamps,
@@ -678,6 +680,7 @@ const Surah = () => {
           isPreloadingAyahs={isPreloadingAyahs}
           preloadProgress={preloadProgress}
           audioSource={audioSource}
+          hasAyahTimings={hasAyahTimings}
           currentSurahName={
             // For MP3Quran mode, prioritize currentSurahAudio to show the surah being played
             // This ensures the surah name doesn't change when user navigates pages manually
@@ -890,8 +893,10 @@ const Surah = () => {
         viewMode={viewMode}
         isMobile={isMobile}
         isAyahNavigationRef={isAyahNavigation}
+        audioSource={audioSource}
         onPlayAyah={playAyah}
         onSetCurrentPlayingAyah={setCurrentPlayingAyah}
+        onSeekToAyahPosition={seekToAyahPosition}
         onViewTafseer={(surahNum, ayahNum, surahName) => {
           setTafseerSurahNumber(surahNum);
           setTafseerAyahNumber(ayahNum);

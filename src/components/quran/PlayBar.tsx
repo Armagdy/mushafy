@@ -14,6 +14,7 @@ interface PlayBarProps {
   preloadProgress?: { current: number; total: number };
   audioSource?: 'everyayah' | 'mp3quran';
   currentSurahName?: string;
+  hasAyahTimings?: boolean;
   formatNumber: (num: number | string) => string;
   onAyahSelectorClick: () => void;
   onRepeatClick: () => void;
@@ -33,6 +34,7 @@ export function PlayBar({
   preloadProgress = { current: 0, total: 0 },
   audioSource = 'everyayah',
   currentSurahName,
+  hasAyahTimings = false,
   formatNumber,
   onAyahSelectorClick,
   onRepeatClick,
@@ -89,9 +91,9 @@ export function PlayBar({
           <div className="flex items-center gap-1.5 md:gap-3">
             <button
               onClick={onAyahSelectorClick}
-              disabled={audioSource === 'mp3quran'}
+              disabled={audioSource === 'mp3quran' && !hasAyahTimings}
               className="flex items-center justify-center bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-[#F2E3BB]/30 shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-800/50"
-              title={audioSource === 'mp3quran' ? t('ayahSelectionNotAvailable') : ''}
+              title={(audioSource === 'mp3quran' && !hasAyahTimings) ? t('ayahSelectionNotAvailable') : ''}
             >
               <span className="text-[#F2E3BB] text-base md:text-xl font-bold" style={{ fontFamily: "'Amiri', serif" }}>
                 {currentPlayingAyah ? formatNumber(currentPlayingAyah.ayah) : '--'}
