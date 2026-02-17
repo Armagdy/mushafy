@@ -1,5 +1,7 @@
 // MP3Quran.net API service for continuous surah audio with ayah timing
 
+import { NativeStorage, isNativePlatform } from './native-storage';
+
 export interface Mp3QuranReciter {
   id: number;
   name: string;
@@ -31,6 +33,63 @@ let recitersCacheEn: Mp3QuranReciter[] | null = null;
 let recitersCacheAr: Mp3QuranReciter[] | null = null;
 const timingCache = new Map<string, AyahTiming[]>();
 
+// Native storage for persistent offline access
+const recitersStorage = new NativeStorage('quran-reciters-storage');
+let storageInitialized = false;
+
+/**
+ * Initialize storage (lazy initialization)
+ */
+async function initStorage(): Promise<void> {
+  if (!storageInitialized) {
+    await recitersStorage.init();
+    storageInitialized = true;
+    console.log(`✅ Reciters storage initialized (${isNativePlatform() ? 'Native' : 'IndexedDB'})`);
+  }
+}
+
+/**
+ * Save reciters to persistent storage
+ */
+async function saveRecitersToStorage(language: 'en' | 'ar', reciters: Mp3QuranReciter[]): Promise<void> {
+  try {
+    await initStorage();
+    const key = `mp3quran-reciters-${language}`;
+    const jsonString = JSON.stringify(reciters);
+    await recitersStorage.setItem(key, jsonString, {
+      language,
+      cachedAt: Date.now(),
+      platform: isNativePlatform() ? 'native' : 'web'
+    });
+    console.log(`✅ Saved ${language} reciters to storage (${reciters.length} reciters)`);
+  } catch (error) {
+    console.error('Failed to save reciters to storage:', error);
+  }
+}
+
+/**
+ * Load reciters from persistent storage
+ */
+async function loadRecitersFromStorage(language: 'en' | 'ar'): Promise<Mp3QuranReciter[] | null> {
+  try {
+    await initStorage();
+    const key = `mp3quran-reciters-${language}`;
+    const result = await recitersStorage.getItem(key);
+    
+    if (result) {
+      const jsonString = typeof result.data === 'string' 
+        ? result.data 
+        : await (result.data as Blob).text();
+      const reciters = JSON.parse(jsonString) as Mp3QuranReciter[];
+      console.log(`✅ Loaded ${language} reciters from storage (${reciters.length} reciters, cached at ${new Date(result.timestamp).toLocaleString()})`);
+      return reciters;
+    }
+  } catch (error) {
+    console.error('Failed to load reciters from storage:', error);
+  }
+  return null;
+}
+
 /**
  * Load reciters from local JSON file (offline fallback)
  */
@@ -50,16 +109,34 @@ async function loadRecitersFromLocalFile(): Promise<Mp3QuranReciter[]> {
 
 /**
  * Fetch list of reciters from MP3Quran.net API (online) or local file (offline)
+ * Priority: Memory Cache → Native Storage → API → Local JSON File
  */
 export async function getMp3QuranReciters(language: 'en' | 'ar' = 'en'): Promise<Mp3QuranReciter[]> {
+  // 1. Check memory cache
   const cache = language === 'en' ? recitersCacheEn : recitersCacheAr;
-  
   if (cache) {
+    console.log(`✅ Loaded ${language} reciters from memory cache`);
     return cache;
   }
 
+  // 2. Try loading from persistent storage (native/IndexedDB)
   try {
-    // Try fetching from API first (online - gets latest data)
+    const storedReciters = await loadRecitersFromStorage(language);
+    if (storedReciters && storedReciters.length > 0) {
+      // Update memory cache
+      if (language === 'en') {
+        recitersCacheEn = storedReciters;
+      } else {
+        recitersCacheAr = storedReciters;
+      }
+      return storedReciters;
+    }
+  } catch (error) {
+    console.warn('Failed to load from storage, continuing to API:', error);
+  }
+
+  // 3. Try fetching from API (online - gets latest data)
+  try {
     const response = await fetch(
       `https://mp3quran.net/api/v3/reciters?language=${language}`,
       { signal: AbortSignal.timeout(5000) } // 5 second timeout
@@ -72,34 +149,41 @@ export async function getMp3QuranReciters(language: 'en' | 'ar' = 'en'): Promise
     const data = await response.json();
     const reciters = data.reciters || data;
 
+    // Update memory cache
     if (language === 'en') {
       recitersCacheEn = reciters;
     } else {
       recitersCacheAr = reciters;
     }
 
-    console.log('✅ Loaded reciters from API (online)');
+    // Save to persistent storage for offline access
+    await saveRecitersToStorage(language, reciters);
+
+    console.log(`✅ Loaded ${language} reciters from API (online)`);
     return reciters;
   } catch (error) {
-    // API failed (offline or network error) - fallback to local file
-    console.warn('Failed to fetch from API, loading from local file:', error);
+    console.warn('Failed to fetch from API, trying local file:', error);
+  }
+
+  // 4. Fallback to local JSON file (offline)
+  try {
+    const reciters = await loadRecitersFromLocalFile();
     
-    try {
-      const reciters = await loadRecitersFromLocalFile();
-      
-      // Cache based on language (note: local file is in English only)
-      if (language === 'en') {
-        recitersCacheEn = reciters;
-      } else {
-        recitersCacheAr = reciters;
-      }
-      
-      console.log('✅ Loaded reciters from local file (offline)');
-      return reciters;
-    } catch (localError) {
-      console.error('Failed to load reciters from local file:', localError);
-      throw new Error('Unable to load reciters from API or local file');
+    // Update memory cache (note: local file is in English only)
+    if (language === 'en') {
+      recitersCacheEn = reciters;
+    } else {
+      recitersCacheAr = reciters;
     }
+    
+    // Save to persistent storage for future offline access
+    await saveRecitersToStorage(language, reciters);
+    
+    console.log(`✅ Loaded ${language} reciters from local file (offline)`);
+    return reciters;
+  } catch (localError) {
+    console.error('Failed to load reciters from local file:', localError);
+    throw new Error('Unable to load reciters from API, storage, or local file. Please check your internet connection.');
   }
 }
 

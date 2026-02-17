@@ -4,12 +4,16 @@ import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
+import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -17,8 +21,49 @@ public class MainActivity extends BridgeActivity {
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Setup edge-to-edge BEFORE super.onCreate
+        setupEdgeToEdge();
+        
         registerPlugin(QuranMediaSessionPlugin.class);
         super.onCreate(savedInstanceState);
+    }
+    
+    @Override
+    public void onStart() {
+        super.onStart();
+        // Re-apply edge-to-edge in case it was reset
+        setupEdgeToEdge();
+    }
+    
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Re-apply edge-to-edge when theme changes (light/dark mode)
+        // Use a slight delay to ensure the system has settled after theme change
+        getWindow().getDecorView().post(new Runnable() {
+            @Override
+            public void run() {
+                setupEdgeToEdge();
+            }
+        });
+    }
+    
+    private void setupEdgeToEdge() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ (API 30+)
+            Window window = getWindow();
+            WindowCompat.setDecorFitsSystemWindows(window, false);
+            window.setStatusBarColor(android.graphics.Color.TRANSPARENT);
+            window.setNavigationBarColor(android.graphics.Color.TRANSPARENT);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            // Android 5.0+ (API 21+)
+            Window window = getWindow();
+            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS | 
+                             WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            window.setStatusBarColor(android.graphics.Color.TRANSPARENT);
+            window.setNavigationBarColor(android.graphics.Color.TRANSPARENT);
+        }
     }
 
 
@@ -57,5 +102,7 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         // Resume normally when app comes back to foreground
+        // Re-apply edge-to-edge in case theme changed while app was paused
+        setupEdgeToEdge();
     }
 }

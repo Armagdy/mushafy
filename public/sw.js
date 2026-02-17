@@ -12,7 +12,8 @@ const CORE_ASSETS = [
   './mushafy.jpeg',
   './assets/quran-meta-data.json',
   './assets/ayah-meta-data.json',
-  './assets/audio.json'
+  './assets/audio.json',
+  './mp3quran_reciters.json'
 ];
 
 // Install event - cache core assets
