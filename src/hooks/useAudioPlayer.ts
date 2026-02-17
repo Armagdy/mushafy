@@ -2891,6 +2891,7 @@ export const useAudioPlayer = ({
     
     // MP3Quran current surah (for tracking which surah is playing)
     currentSurahAudio,
+    ayahTimings,
     
     // Audio control functions
     playAyah,

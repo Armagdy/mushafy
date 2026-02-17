@@ -198,7 +198,8 @@ const Surah = () => {
     preloadNextAyah,
     ayahTimestamps,
     concatenatedSurah,
-    currentSurahAudio
+    currentSurahAudio,
+    ayahTimings
   } = useAudioPlayer({
     currentPageNum,
     currentSurahId,
@@ -631,6 +632,8 @@ const Surah = () => {
           audioSource={audioSource}
           ayahTimestamps={ayahTimestamps}
           concatenatedSurah={concatenatedSurah}
+          mp3QuranAyahTimings={ayahTimings}
+          currentSurahAudio={currentSurahAudio}
           formatNumber={formatNumber}
           isRepeatActive={isRepeatActive}
           isRepeatConcatenatedMode={isRepeatConcatenatedMode}

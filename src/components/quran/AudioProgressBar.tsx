@@ -1,5 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { getCurrentAyahFromTime } from '@/lib/mp3quran-service';
+import type { AyahTiming } from '@/lib/mp3quran-service';
 
 interface RepeatTimestamp {
   surah: number;
@@ -20,6 +22,8 @@ interface AudioProgressBarProps {
   audioSource?: 'everyayah' | 'mp3quran';
   ayahTimestamps?: number[];
   concatenatedSurah?: number | null;
+  mp3QuranAyahTimings?: AyahTiming[];
+  currentSurahAudio?: number | null;
   formatNumber?: (num: number | string) => string;
   // Repeat mode props
   isRepeatActive?: boolean;
@@ -48,6 +52,8 @@ export function AudioProgressBar({
   audioSource = 'everyayah',
   ayahTimestamps = [],
   concatenatedSurah = null,
+  mp3QuranAyahTimings = [],
+  currentSurahAudio = null,
   formatNumber = (n) => n.toString(),
   isRepeatActive = false,
   isRepeatConcatenatedMode = false,
@@ -290,19 +296,33 @@ export function AudioProgressBar({
 
   // Get ayah number from time (for EveryAyah mode)
   const getAyahFromTime = (time: number): number | null => {
-    if (audioSource !== 'everyayah' || !concatenatedSurah || ayahTimestamps.length === 0) {
-      return null;
-    }
-
-    let ayahNum = 1;
-    for (let i = 0; i < ayahTimestamps.length; i++) {
-      if (time >= ayahTimestamps[i]) {
-        ayahNum = i + 1;
-      } else {
-        break;
+    if (audioSource === 'everyayah' && concatenatedSurah && ayahTimestamps.length > 0) {
+      let ayahNum = 1;
+      for (let i = 0; i < ayahTimestamps.length; i++) {
+        if (time >= ayahTimestamps[i]) {
+          ayahNum = i + 1;
+        } else {
+          break;
+        }
       }
+      return ayahNum;
     }
-    return ayahNum;
+    
+    if (audioSource === 'mp3quran' && currentSurahAudio && mp3QuranAyahTimings.length > 0) {
+      return getCurrentAyahFromTime(mp3QuranAyahTimings, time);
+    }
+    
+    return null;
+  };
+
+  const getSurahFromTime = (time: number): number | null => {
+    if (audioSource === 'everyayah' && concatenatedSurah) {
+      return concatenatedSurah;
+    }
+    if (audioSource === 'mp3quran' && currentSurahAudio) {
+      return currentSurahAudio;
+    }
+    return null;
   };
 
   // Get repeat segment info from time (for repeat concatenated mode)
@@ -491,11 +511,15 @@ export function AudioProgressBar({
             ) : (
               // Normal mode tooltip
               <>
-                {audioSource === 'everyayah' && concatenatedSurah && getAyahFromTime(hoverTime) !== null && (
-                  <span className="font-semibold">
-                    {surahNames[concatenatedSurah] || `Surah ${concatenatedSurah}`} - {ayahLabel} {formatNumber(getAyahFromTime(hoverTime)!)}
-                  </span>
-                )}
+                {(() => {
+                  const ayahNum = getAyahFromTime(hoverTime);
+                  const surahNum = getSurahFromTime(hoverTime);
+                  return ayahNum !== null && surahNum !== null ? (
+                    <span className="font-semibold">
+                      {surahNames[surahNum] || `Surah ${surahNum}`} - {ayahLabel} {formatNumber(ayahNum)}
+                    </span>
+                  ) : null;
+                })()}
                 <span>{formatTime(hoverTime)}</span>
               </>
             )}
