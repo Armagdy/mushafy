@@ -63,7 +63,7 @@ export const useAudioPlayer = ({
   
   // Audio source selection
   const [audioSource, setAudioSource] = useState<AudioSource>(() => {
-    return (localStorage.getItem('quran-audio-source') as AudioSource) || 'everyayah';
+    return (localStorage.getItem('quran-audio-source') as AudioSource) || 'mp3quran';
   });
   
   // MP3Quran state
@@ -2511,8 +2511,8 @@ export const useAudioPlayer = ({
           }
         }
         
-        // Default: Find Maher Al Muaiqly (id: 102) with Murattal
-        const defaultReciter = recitersEn.find(r => r.id === 102);
+        // Default: Find Mohammed Siddiq Al-Minshawi (id: 112) with Hafs (moshaf_type: 11)
+        const defaultReciter = recitersEn.find(r => r.id === 112);
         if (defaultReciter && defaultReciter.moshaf.length > 0) {
           const defaultMoshaf = defaultReciter.moshaf.find(m => m.moshaf_type === 11) || defaultReciter.moshaf[0];
           setSelectedMp3QuranReciter(defaultReciter);
