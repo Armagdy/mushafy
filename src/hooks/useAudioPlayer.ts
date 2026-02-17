@@ -317,7 +317,7 @@ export const useAudioPlayer = ({
         album: surahEnglishName || 'Quran',
         cover: `${window.location.origin}${import.meta.env.BASE_URL}icon-512.png`,
         isPlaying: playing,
-        dismissable: false,
+        dismissable: false, // Keep notification visible
         hasPrev: true,
         hasNext: true,
         hasClose: false,
@@ -2178,6 +2178,11 @@ export const useAudioPlayer = ({
         navigator.mediaSession.playbackState = 'playing';
         console.log('🎵 Media Session: playing');
       }
+      // Update native music controls on play
+      if (Capacitor.isNativePlatform() && currentPlayingAyah) {
+        CapacitorMusicControls.updateIsPlaying({ isPlaying: true, elapsed: audioElement.currentTime })
+          .catch(console.error);
+      }
     };
     
     const handlePause = () => {
@@ -2185,12 +2190,22 @@ export const useAudioPlayer = ({
         navigator.mediaSession.playbackState = 'paused';
         console.log('⏸️ Media Session: paused');
       }
+      // Update native music controls on pause
+      if (Capacitor.isNativePlatform() && currentPlayingAyah) {
+        CapacitorMusicControls.updateIsPlaying({ isPlaying: false, elapsed: audioElement.currentTime })
+          .catch(console.error);
+      }
     };
     
     const handleEnded = () => {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'none';
         console.log('🎵 Media Session: ended');
+      }
+      // Update native music controls on end
+      if (Capacitor.isNativePlatform() && currentPlayingAyah) {
+        CapacitorMusicControls.updateIsPlaying({ isPlaying: false, elapsed: 0 })
+          .catch(console.error);
       }
     };
     

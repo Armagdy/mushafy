@@ -64,11 +64,13 @@ public class MainActivity extends BridgeActivity {
             String channelId = getString(R.string.media_notification_channel_id);
             CharSequence channelName = getString(R.string.media_notification_channel_name);
             String channelDescription = getString(R.string.media_notification_channel_description);
-            int importance = NotificationManager.IMPORTANCE_LOW; // Don't make sound, just show controls
+            int importance = NotificationManager.IMPORTANCE_DEFAULT; // Show on lock screen
             
             NotificationChannel channel = new NotificationChannel(channelId, channelName, importance);
             channel.setDescription(channelDescription);
             channel.setShowBadge(false); // Don't show badge on app icon
+            channel.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC); // Show on lock screen
+            channel.setSound(null, null); // No sound for media controls
             
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
             if (notificationManager != null) {
