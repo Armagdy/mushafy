@@ -46,6 +46,7 @@ interface ReciterDialogProps {
   currentPlayingAyah: { surah: number; ayah: number } | null;
   currentSurahId: number;
   onListen: () => void;
+  onNavigateToSurah: (surahId: number) => Promise<void>;
 }
 
 export function ReciterDialog({
@@ -76,6 +77,7 @@ export function ReciterDialog({
   currentSurahId,
   currentPlayingAyah,
   onListen,
+  onNavigateToSurah,
 }: ReciterDialogProps) {
   const { t, isRTL, language } = useLanguage();
   const [everyAyahSearch, setEveryAyahSearch] = useState('');
@@ -296,14 +298,14 @@ export function ReciterDialog({
                 <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
                   {t('readingType')}
                 </span>
-                <Select value={filterReading} onValueChange={onFilterReadingChange}>
-                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                <Select value={filterReading} onValueChange={onFilterReadingChange} modal={false}>
+                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
                     <SelectValue />
                   </SelectTrigger>
-              <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                {filterReciterName === 'all' && <SelectItem value="all" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('all')}</SelectItem>}
-                {availableReadings.includes('hafs') && <SelectItem value="hafs" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('hafs')}</SelectItem>}
-                {availableReadings.includes('warsh') && <SelectItem value="warsh" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('warsh')}</SelectItem>}
+              <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
+                {filterReciterName === 'all' && <SelectItem value="all" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('all')}</SelectItem>}
+                {availableReadings.includes('hafs') && <SelectItem value="hafs" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('hafs')}</SelectItem>}
+                {availableReadings.includes('warsh') && <SelectItem value="warsh" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('warsh')}</SelectItem>}
               </SelectContent>
             </Select>
           </div>
@@ -313,14 +315,14 @@ export function ReciterDialog({
             <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
               {t('recitationStyle')}
             </span>
-            <Select value={filterStyle} onValueChange={onFilterStyleChange}>
-              <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+            <Select value={filterStyle} onValueChange={onFilterStyleChange} modal={false}>
+              <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                {filterReciterName === 'all' && <SelectItem value="all" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('all')}</SelectItem>}
-                {availableStyles.includes('murattal') && <SelectItem value="murattal" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('murattal')}</SelectItem>}
-                {availableStyles.includes('mujawwad') && <SelectItem value="mujawwad" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mujawwad')}</SelectItem>}
+              <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
+                {filterReciterName === 'all' && <SelectItem value="all" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('all')}</SelectItem>}
+                {availableStyles.includes('murattal') && <SelectItem value="murattal" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('murattal')}</SelectItem>}
+                {availableStyles.includes('mujawwad') && <SelectItem value="mujawwad" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('mujawwad')}</SelectItem>}
               </SelectContent>
             </Select>
           </div>
@@ -330,19 +332,19 @@ export function ReciterDialog({
             <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
               {t('quality')}
             </span>
-            <Select value={filterQuality} onValueChange={onFilterQualityChange}>
-              <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+            <Select value={filterQuality} onValueChange={onFilterQualityChange} modal={false}>
+              <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                {filterReciterName === 'all' && <SelectItem value="all" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('all')}</SelectItem>}
-                {availableQualities.includes('192kbps') && <SelectItem value="192kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">192kbps</SelectItem>}
-                {availableQualities.includes('128kbps') && <SelectItem value="128kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">128kbps</SelectItem>}
-                {availableQualities.includes('64kbps') && <SelectItem value="64kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">64kbps</SelectItem>}
-                {availableQualities.includes('48kbps') && <SelectItem value="48kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">48kbps</SelectItem>}
-                {availableQualities.includes('40kbps') && <SelectItem value="40kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">40kbps</SelectItem>}
-                {availableQualities.includes('32kbps') && <SelectItem value="32kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">32kbps</SelectItem>}
-                {availableQualities.includes('16kbps') && <SelectItem value="16kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">16kbps</SelectItem>}
+              <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
+                {filterReciterName === 'all' && <SelectItem value="all" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('all')}</SelectItem>}
+                {availableQualities.includes('192kbps') && <SelectItem value="192kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">192kbps</SelectItem>}
+                {availableQualities.includes('128kbps') && <SelectItem value="128kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">128kbps</SelectItem>}
+                {availableQualities.includes('64kbps') && <SelectItem value="64kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">64kbps</SelectItem>}
+                {availableQualities.includes('48kbps') && <SelectItem value="48kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">48kbps</SelectItem>}
+                {availableQualities.includes('40kbps') && <SelectItem value="40kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">40kbps</SelectItem>}
+                {availableQualities.includes('32kbps') && <SelectItem value="32kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">32kbps</SelectItem>}
+                {availableQualities.includes('16kbps') && <SelectItem value="16kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">16kbps</SelectItem>}
               </SelectContent>
             </Select>
           </div>
@@ -409,7 +411,10 @@ export function ReciterDialog({
               {/* Save Button for EveryAyah */}
               <div className="pt-2 sm:pt-3 mt-2">
                 <Button
-                  onClick={onListen}
+                  onClick={async () => {
+                    onListen();
+                    await onNavigateToSurah(selectedSurahForPlayback);
+                  }}
                   disabled={!selectedReciter && filteredReciters.length === 0}
                   className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -495,16 +500,17 @@ export function ReciterDialog({
                         onMoshafChange(moshaf);
                       }
                     }}
+                    modal={false}
                   >
-                    <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                    <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
+                    <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
                       {selectedMp3QuranReciter.moshaf.map((moshaf) => (
                         <SelectItem
                           key={moshaf.id}
                           value={moshaf.id.toString()}
-                          className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100"
+                          className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation"
                         >
                           {translateMoshafName(moshaf.name)} ({moshaf.surah_total} {t('surahs')})
                         </SelectItem>
@@ -525,17 +531,17 @@ export function ReciterDialog({
                 <Select value={selectedSurahForPlayback.toString()} onValueChange={(value) => {
                   setSelectedSurahForPlayback(Number(value));
                   setSelectedAyahForPlayback(1);
-                }}>
-                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
+                }} modal={false}>
+                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
+                  <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
                     <div className="max-h-[200px] overflow-y-auto">
                       {surahs.map((surah) => (
                         <SelectItem
                           key={surah.id}
                           value={surah.id.toString()}
-                          className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100"
+                          className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation"
                         >
                           {language === 'ar' ? `${surah.id}. ${surah.name}` : `${surah.id}. ${surah.englishName}`}
                         </SelectItem>
@@ -548,7 +554,10 @@ export function ReciterDialog({
               {/* Save Button for MP3Quran */}
               <div className="pt-2 sm:pt-3 mt-2">
                 <Button
-                  onClick={onListen}
+                  onClick={async () => {
+                    onListen();
+                    await onNavigateToSurah(selectedSurahForPlayback);
+                  }}
                   disabled={!selectedMp3QuranReciter || !selectedMoshaf}
                   className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
                 >

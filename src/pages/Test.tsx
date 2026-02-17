@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useQuranData } from '@/hooks/useQuranData';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { TestSettingsDialog, TestRange, TestMode } from '@/components/quran/TestSettingsDialog';
 import { surahs } from '@/data/surahs';
-import { Settings, Eye, ArrowRight, ArrowLeft, Lightbulb } from 'lucide-react';
+import { Settings, Eye, ArrowRight, ArrowLeft, Lightbulb, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AyahData {
@@ -36,6 +37,7 @@ interface TikrarQuestion {
 }
 
 export default function Test() {
+  const navigate = useNavigate();
   const { t, isRTL, language } = useLanguage();
   const { ayahData, isAyahDataLoading } = useQuranData();
   
@@ -722,16 +724,24 @@ export default function Test() {
     )}>
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 pt-6">
           <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
             {t('testFeature')}
           </h1>
-          <Button
-            onClick={() => setSettingsOpen(true)}
-            className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
-          >
-            <Settings className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setSettingsOpen(true)}
+              className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
+            >
+              <Settings className="w-5 h-5" />
+            </Button>
+            <Button
+              onClick={() => navigate('/')}
+              className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Test Content */}
@@ -749,7 +759,7 @@ export default function Test() {
           <div className="flex flex-col h-[calc(100vh-12rem)] md:h-auto md:space-y-6">
             {/* Question Counter */}
             <div className="text-center flex-shrink-0">
-              <p className="text-base md:text-xl text-emerald-600 dark:text-emerald-400 font-medium">
+              <p className="text-lg md:text-2xl text-emerald-600 dark:text-emerald-400 font-bold">
                 {t('questionProgress').replace('{current}', formatNumber(questionsCount)).replace('{max}', formatNumber(maxQuestions))}
               </p>
             </div>

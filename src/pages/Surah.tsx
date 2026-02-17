@@ -604,7 +604,10 @@ const Surah = () => {
 
       {/* Preloading indicator overlay */}
       {isPreloadingAyahs && (
-        <div className="fixed bottom-[120px] md:bottom-[140px] left-0 right-0 z-50 flex items-center justify-center pointer-events-none">
+        <div 
+          className="fixed left-0 right-0 z-50 flex items-center justify-center pointer-events-none"
+          style={{ bottom: 'calc(120px + env(safe-area-inset-bottom))' }}
+        >
           <div className="bg-emerald-700/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-emerald-500/30">
             <p className="text-[#F2E3BB] text-sm md:text-base font-medium text-center">
               {audioSource === 'everyayah' 
@@ -846,6 +849,25 @@ const Surah = () => {
         onFilterReadingChange={setFilterReading}
         onFilterStyleChange={setFilterStyle}
         onFilterQualityChange={setFilterQuality}
+        onNavigateToSurah={async (surahId) => {
+          // Stop any playing audio
+          stopAudio();
+          
+          // Set the playing ayah to first ayah of selected surah (same as NavigationDialog)
+          setCurrentPlayingAyah({ surah: surahId, ayah: 1 });
+          isAyahNavigation.current = true;
+          
+          // Navigate to page containing first ayah of selected surah
+          const firstPage = await getAyahPage(surahId, 1);
+          if (firstPage) {
+            setTimeout(() => {
+              navigate(`/page/${firstPage}`);
+            }, 0);
+          }
+          
+          // Close the dialog
+          setShowReciterDialog(false);
+        }}
         onListen={() => {
           if (audioSource === 'everyayah') {
             // Ensure the reciter from filtered list is selected
@@ -865,8 +887,7 @@ const Surah = () => {
             }
           }
           
-          // Close the dialog after saving (no auto-play for both sources)
-          setShowReciterDialog(false);
+          // Note: Dialog closing is handled by onNavigateToSurah
         }}
       />
 
