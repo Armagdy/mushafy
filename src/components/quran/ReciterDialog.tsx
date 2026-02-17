@@ -88,16 +88,21 @@ export function ReciterDialog({
   // Dropdown visibility state
   const [showEveryAyahDropdown, setShowEveryAyahDropdown] = useState(false);
   const [showMp3QuranDropdown, setShowMp3QuranDropdown] = useState(false);
-  const everyAyahRef = useRef<HTMLDivElement>(null);
-  const mp3QuranRef = useRef<HTMLDivElement>(null);
+  const everyAyahContainerRef = useRef<HTMLDivElement>(null);
+  const mp3QuranContainerRef = useRef<HTMLDivElement>(null);
+  const everyAyahInputRef = useRef<HTMLInputElement>(null);
+  const mp3QuranInputRef = useRef<HTMLInputElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (everyAyahRef.current && !everyAyahRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      // Check if click is outside the container for EveryAyah
+      if (everyAyahContainerRef.current && !everyAyahContainerRef.current.contains(target)) {
         setShowEveryAyahDropdown(false);
       }
-      if (mp3QuranRef.current && !mp3QuranRef.current.contains(event.target as Node)) {
+      // Check if click is outside the container for MP3Quran
+      if (mp3QuranContainerRef.current && !mp3QuranContainerRef.current.contains(target)) {
         setShowMp3QuranDropdown(false);
       }
     };
@@ -232,19 +237,26 @@ export function ReciterDialog({
             {/* EveryAyah Tab Content */}
             <TabsContent value="everyayah" className="space-y-2 sm:space-y-3 mt-3">
           {/* Reciter Name Search Box */}
-          <div className="flex flex-col gap-2" ref={everyAyahRef}>
+          <div className="flex flex-col gap-2" ref={everyAyahContainerRef}>
             <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
               {t('reciterName')}
             </span>
             <div className="relative">
-              <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400 z-10" />
                 <Input
+                  ref={everyAyahInputRef}
                   placeholder={t('searchReciter')}
-                  value={getEveryAyahDisplayValue()}
+                  value={showEveryAyahDropdown ? everyAyahSearch : getEveryAyahDisplayValue()}
                   onChange={(e) => {
                     setEveryAyahSearch(e.target.value);
                     setShowEveryAyahDropdown(true);
+                  }}
+                  onKeyUp={(e) => {
+                    // Fallback for Android: read value directly from input on any key
+                    const target = e.target as HTMLInputElement;
+                    if (target.value !== everyAyahSearch) {
+                      setEveryAyahSearch(target.value);
+                    }
                   }}
                   onFocus={() => {
                     setEveryAyahSearch('');
@@ -253,11 +265,13 @@ export function ReciterDialog({
                   className="pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg bg-emerald-50 dark:bg-emerald-900/20"
                 />
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
               
               {/* Dropdown Results */}
               {showEveryAyahDropdown && (
-                <div className="absolute z-50 w-full mt-1 bg-[#FBF9F4] dark:bg-emerald-950 border border-emerald-300 rounded-lg shadow-lg max-h-[250px] overflow-y-auto">
+                <div 
+                  className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#FBF9F4] dark:bg-emerald-950 border border-emerald-300 rounded-lg shadow-lg"
+                  style={{ maxHeight: '200px', overflowY: 'scroll' }}
+                >
                   {uniqueReciterNames
                     .filter((reciter) => {
                       const name = language === 'ar' ? reciter.nameAr : reciter.name;
@@ -428,19 +442,26 @@ export function ReciterDialog({
             {/* MP3Quran Tab Content */}
             <TabsContent value="mp3quran" className="space-y-2 sm:space-y-3 mt-3">
               {/* Reciter Search Box */}
-              <div className="flex flex-col gap-2" ref={mp3QuranRef}>
+              <div className="flex flex-col gap-2" ref={mp3QuranContainerRef}>
                 <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
                   {t('reciterName')}
                 </span>
                 <div className="relative">
-                  <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400 z-10" />
                     <Input
+                      ref={mp3QuranInputRef}
                       placeholder={t('searchReciter')}
-                      value={getMp3QuranDisplayValue()}
+                      value={showMp3QuranDropdown ? mp3QuranSearch : getMp3QuranDisplayValue()}
                       onChange={(e) => {
                         setMp3QuranSearch(e.target.value);
                         setShowMp3QuranDropdown(true);
+                      }}
+                      onKeyUp={(e) => {
+                        // Fallback for Android: read value directly from input on any key
+                        const target = e.target as HTMLInputElement;
+                        if (target.value !== mp3QuranSearch) {
+                          setMp3QuranSearch(target.value);
+                        }
                       }}
                       onFocus={() => {
                         setMp3QuranSearch('');
@@ -449,11 +470,13 @@ export function ReciterDialog({
                       className="pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg bg-emerald-50 dark:bg-emerald-900/20"
                     />
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                  </div>
                   
                   {/* Dropdown Results */}
                   {showMp3QuranDropdown && (
-                    <div className="absolute z-50 w-full mt-1 bg-[#FBF9F4] dark:bg-emerald-950 border border-emerald-300 rounded-lg shadow-lg max-h-[250px] overflow-y-auto">
+                    <div 
+                      className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#FBF9F4] dark:bg-emerald-950 border border-emerald-300 rounded-lg shadow-lg"
+                      style={{ maxHeight: '200px', overflowY: 'scroll' }}
+                    >
                       {mp3QuranReciters
                         .filter((reciter) => matchesSearch(getMp3QuranReciterName(reciter), mp3QuranSearch))
                         .slice()
