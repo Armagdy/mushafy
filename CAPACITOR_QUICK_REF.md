@@ -126,6 +126,26 @@ adb logcat | grep Capacitor
 2. Find your device
 3. Click "Inspect"
 
+## 📦 APK Optimization
+
+### Mushaf Images (On-Demand Loading)
+**Mushaf images are NOT bundled in the APK** to keep size small (~100+ MB saved).
+
+**How it works:**
+- **Build-time exclusion:** Vite automatically excludes mushaf images during production builds
+- Images fetch from GitHub on-demand when users view pages
+- Cached in native storage after first load
+- Offline-capable after initial download
+
+**Configuration:**
+- Vite exclusion plugin: [vite.config.ts](vite.config.ts) `excludeMushafImagesPlugin`
+- No manual cleanup needed - handled automatically during `npm run build`
+
+**Excluded directories:**
+- `mushaf_madinah_images/`
+- `mushaf_tashel_pages/`
+- `mushuf_mwdoa_images/`
+
 ## 🏗️ Building Release APK
 
 ### Quick Build
