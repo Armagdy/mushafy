@@ -448,12 +448,11 @@ export const useAudioPlayer = ({
       // Calculate total duration and create concatenated buffer
       const totalDuration = audioBuffers.reduce((sum, buffer) => sum + buffer.duration, 0);
       
-      // Use lower sample rate for memory efficiency on Android
-      // 22050 Hz is sufficient for speech and saves 50% memory
-      const targetSampleRate = Math.min(audioBuffers[0].sampleRate, 22050);
-      const downsampleRatio = audioBuffers[0].sampleRate / targetSampleRate;
+      // Keep original sample rate for best audio quality
+      // Downsampling to 22050Hz was causing significant quality loss
+      const targetSampleRate = audioBuffers[0].sampleRate;
       
-      // Force mono (1 channel) to save memory
+      // Force mono (1 channel) to save memory while preserving quality
       const numberOfChannels = 1;
       const totalLength = Math.ceil((totalDuration * targetSampleRate));
       
@@ -483,30 +482,28 @@ export const useAudioPlayer = ({
         throw new Error('Out of memory - surah too large for concatenation');
       }
       
-      // Copy all buffers into the concatenated buffer (with downsampling and mono conversion)
+      // Copy all buffers into the concatenated buffer (mono conversion, no downsampling)
       const targetData = concatenated.getChannelData(0);
       let offset = 0;
       
       for (let i = 0; i < audioBuffers.length; i++) {
         const buffer = audioBuffers[i];
         const sourceLength = buffer.length;
-        const targetLength = Math.ceil(sourceLength / downsampleRatio);
         
-        // Mix to mono and downsample
-        for (let j = 0; j < targetLength && offset + j < totalLength; j++) {
-          const sourceIndex = Math.floor(j * downsampleRatio);
+        // Mix to mono without downsampling - preserves original quality
+        for (let j = 0; j < sourceLength && offset + j < totalLength; j++) {
           let sample = 0;
           
-          // Average all channels
+          // Average all channels for mono conversion
           for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
-            sample += buffer.getChannelData(ch)[sourceIndex];
+            sample += buffer.getChannelData(ch)[j];
           }
           sample /= buffer.numberOfChannels;
           
           targetData[offset + j] = sample;
         }
         
-        offset += targetLength;
+        offset += sourceLength;
       }
       
       // Convert buffer to WAV blob and create URL
@@ -713,11 +710,11 @@ export const useAudioPlayer = ({
       // Calculate total duration and create concatenated buffer
       const totalDuration = audioBufferSequence.reduce((sum, buffer) => sum + buffer.duration, 0);
       
-      // Use lower sample rate for memory efficiency on Android
-      const targetSampleRate = Math.min(audioBufferSequence[0].sampleRate, 22050);
-      const downsampleRatio = audioBufferSequence[0].sampleRate / targetSampleRate;
+      // Keep original sample rate for best audio quality
+      // Downsampling to 22050Hz was causing significant quality loss
+      const targetSampleRate = audioBufferSequence[0].sampleRate;
       
-      // Force mono (1 channel) to save memory
+      // Force mono (1 channel) to save memory while preserving quality
       const numberOfChannels = 1;
       const totalLength = Math.ceil(totalDuration * targetSampleRate);
       
@@ -746,30 +743,28 @@ export const useAudioPlayer = ({
         throw new Error('Out of memory - repeat too large');
       }
       
-      // Copy all buffers into the concatenated buffer (with downsampling and mono conversion)
+      // Copy all buffers into the concatenated buffer (mono conversion, no downsampling)
       const targetData = concatenated.getChannelData(0);
       let offset = 0;
       
       for (let i = 0; i < audioBufferSequence.length; i++) {
         const buffer = audioBufferSequence[i];
         const sourceLength = buffer.length;
-        const targetLength = Math.ceil(sourceLength / downsampleRatio);
         
-        // Mix to mono and downsample
-        for (let j = 0; j < targetLength && offset + j < totalLength; j++) {
-          const sourceIndex = Math.floor(j * downsampleRatio);
+        // Mix to mono without downsampling - preserves original quality
+        for (let j = 0; j < sourceLength && offset + j < totalLength; j++) {
           let sample = 0;
           
-          // Average all channels
+          // Average all channels for mono conversion
           for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
-            sample += buffer.getChannelData(ch)[sourceIndex];
+            sample += buffer.getChannelData(ch)[j];
           }
           sample /= buffer.numberOfChannels;
           
           targetData[offset + j] = sample;
         }
         
-        offset += targetLength;
+        offset += sourceLength;
       }
       
       // Convert buffer to WAV blob and create URL
@@ -946,11 +941,11 @@ export const useAudioPlayer = ({
       // Calculate total duration and create concatenated buffer
       const totalDuration = audioBufferSequence.reduce((sum, buffer) => sum + buffer.duration, 0);
       
-      // Use lower sample rate for memory efficiency on Android
-      const targetSampleRate = Math.min(audioBufferSequence[0].sampleRate, 22050);
-      const downsampleRatio = audioBufferSequence[0].sampleRate / targetSampleRate;
+      // Keep original sample rate for best audio quality
+      // Downsampling to 22050Hz was causing significant quality loss
+      const targetSampleRate = audioBufferSequence[0].sampleRate;
       
-      // Force mono (1 channel) to save memory
+      // Force mono (1 channel) to save memory while preserving quality
       const numberOfChannels = 1;
       const totalLength = Math.ceil(totalDuration * targetSampleRate);
       
@@ -979,30 +974,28 @@ export const useAudioPlayer = ({
         throw new Error('Out of memory - MP3Quran repeat too large');
       }
       
-      // Copy all buffers into the concatenated buffer (with downsampling and mono conversion)
+      // Copy all buffers into the concatenated buffer (mono conversion, no downsampling)
       const targetData = concatenated.getChannelData(0);
       let offset = 0;
       
       for (let i = 0; i < audioBufferSequence.length; i++) {
         const buffer = audioBufferSequence[i];
         const sourceLength = buffer.length;
-        const targetLength = Math.ceil(sourceLength / downsampleRatio);
         
-        // Mix to mono and downsample
-        for (let j = 0; j < targetLength && offset + j < totalLength; j++) {
-          const sourceIndex = Math.floor(j * downsampleRatio);
+        // Mix to mono without downsampling - preserves original quality
+        for (let j = 0; j < sourceLength && offset + j < totalLength; j++) {
           let sample = 0;
           
-          // Average all channels
+          // Average all channels for mono conversion
           for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
-            sample += buffer.getChannelData(ch)[sourceIndex];
+            sample += buffer.getChannelData(ch)[j];
           }
           sample /= buffer.numberOfChannels;
           
           targetData[offset + j] = sample;
         }
         
-        offset += targetLength;
+        offset += sourceLength;
       }
       
       // Convert buffer to WAV blob and create URL
