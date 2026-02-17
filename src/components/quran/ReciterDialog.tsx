@@ -92,6 +92,10 @@ export function ReciterDialog({
   const mp3QuranContainerRef = useRef<HTMLDivElement>(null);
   const everyAyahInputRef = useRef<HTMLInputElement>(null);
   const mp3QuranInputRef = useRef<HTMLInputElement>(null);
+  
+  // Polling refs for Android IME composition fix
+  const everyAyahPollingRef = useRef<NodeJS.Timeout | null>(null);
+  const mp3QuranPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -110,6 +114,58 @@ export function ReciterDialog({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Poll EveryAyah input for changes (fixes Android IME composition issue)
+  useEffect(() => {
+    if (showEveryAyahDropdown && everyAyahInputRef.current) {
+      everyAyahPollingRef.current = setInterval(() => {
+        if (everyAyahInputRef.current) {
+          const currentValue = everyAyahInputRef.current.value;
+          if (currentValue !== everyAyahSearch) {
+            setEveryAyahSearch(currentValue);
+          }
+        }
+      }, 100); // Poll every 100ms
+    } else {
+      if (everyAyahPollingRef.current) {
+        clearInterval(everyAyahPollingRef.current);
+        everyAyahPollingRef.current = null;
+      }
+    }
+
+    return () => {
+      if (everyAyahPollingRef.current) {
+        clearInterval(everyAyahPollingRef.current);
+        everyAyahPollingRef.current = null;
+      }
+    };
+  }, [showEveryAyahDropdown, everyAyahSearch]);
+
+  // Poll MP3Quran input for changes (fixes Android IME composition issue)
+  useEffect(() => {
+    if (showMp3QuranDropdown && mp3QuranInputRef.current) {
+      mp3QuranPollingRef.current = setInterval(() => {
+        if (mp3QuranInputRef.current) {
+          const currentValue = mp3QuranInputRef.current.value;
+          if (currentValue !== mp3QuranSearch) {
+            setMp3QuranSearch(currentValue);
+          }
+        }
+      }, 100); // Poll every 100ms
+    } else {
+      if (mp3QuranPollingRef.current) {
+        clearInterval(mp3QuranPollingRef.current);
+        mp3QuranPollingRef.current = null;
+      }
+    }
+
+    return () => {
+      if (mp3QuranPollingRef.current) {
+        clearInterval(mp3QuranPollingRef.current);
+        mp3QuranPollingRef.current = null;
+      }
+    };
+  }, [showMp3QuranDropdown, mp3QuranSearch]);
 
   // Update selected surah/ayah when current changes
   useEffect(() => {
@@ -250,6 +306,11 @@ export function ReciterDialog({
                   onChange={(e) => {
                     setEveryAyahSearch(e.target.value);
                     setShowEveryAyahDropdown(true);
+                  }}
+                  onCompositionUpdate={(e) => {
+                    // Android IME composition: update during text composition
+                    const target = e.target as HTMLInputElement;
+                    setEveryAyahSearch(target.value);
                   }}
                   onKeyUp={(e) => {
                     // Fallback for Android: read value directly from input on any key
@@ -455,6 +516,11 @@ export function ReciterDialog({
                       onChange={(e) => {
                         setMp3QuranSearch(e.target.value);
                         setShowMp3QuranDropdown(true);
+                      }}
+                      onCompositionUpdate={(e) => {
+                        // Android IME composition: update during text composition
+                        const target = e.target as HTMLInputElement;
+                        setMp3QuranSearch(target.value);
                       }}
                       onKeyUp={(e) => {
                         // Fallback for Android: read value directly from input on any key
