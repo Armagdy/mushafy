@@ -896,10 +896,16 @@ export const useAudioPlayer = ({
   const concatenateMp3QuranRepeat = useCallback(async (
     startSurah: number,
     endSurah: number,
-    passageRepeatCount: number
-  ): Promise<{ blobUrl: string; timestamps: {surah: number; passage: number; startTime: number}[] } | null> => {
+    startAyah: number,
+    endAyah: number,
+    passageRepeatCount: number,
+    ayahTimingsData?: AyahTiming[]
+  ): Promise<{ blobUrl: string; timestamps: {surah: number; passage: number; startTime: number}[]; ayahTimestamps?: {surah: number; ayah: number; repetition: number; passage: number; startTime: number}[] } | null> => {
     if (!selectedMoshaf || audioSource !== 'mp3quran') return null;
     if (!audioContext) return null;
+    
+    // Check if we're in ayah-level repeat mode (single surah with timing)
+    const isAyahLevelRepeat = startSurah === endSurah && ayahTimingsData && ayahTimingsData.length > 0;
     
     // Generate list of all surahs in the range
     const surahsInRange: number[] = [];
@@ -980,26 +986,122 @@ export const useAudioPlayer = ({
       // Build the sequence of audio buffers with passage repeats
       const audioBufferSequence: AudioBuffer[] = [];
       const timestamps: {surah: number; passage: number; startTime: number}[] = [];
+      const ayahTimestamps: {surah: number; ayah: number; repetition: number; passage: number; startTime: number}[] = [];
       let currentTime = 0;
       let segmentCount = downloadProgress;
       
-      for (let passage = 1; passage <= passageRepeatCount; passage++) {
-        for (const surahNum of surahsInRange) {
-          const buffer = audioBufferCache.get(surahNum);
-          if (!buffer) continue;
-          
-          // Record timestamp for this segment
+      // If ayah-level repeat with timing data, extract specific ayah range
+      if (isAyahLevelRepeat && ayahTimingsData) {
+        const buffer = audioBufferCache.get(startSurah);
+        if (!buffer) {
+          setIsPreloadingAyahs(false);
+          setPreloadProgress({ current: 0, total: 0 });
+          return null;
+        }
+        
+        // Find timing for start and end ayahs
+        const startTiming = ayahTimingsData.find(t => t.ayah === startAyah);
+        const endTiming = ayahTimingsData.find(t => t.ayah === endAyah);
+        
+        if (!startTiming || !endTiming) {
+          console.error(`❌ Timing not found for ayah range ${startAyah}-${endAyah}`);
+          setIsPreloadingAyahs(false);
+          setPreloadProgress({ current: 0, total: 0 });
+          return null;
+        }
+        
+        // Extract ayah range from audio buffer
+        // Timing is in milliseconds, convert to seconds
+        const extractionStartTime = startTiming.start_time / 1000;
+        const extractionEndTime = endTiming.end_time / 1000;
+        const sampleRate = buffer.sampleRate;
+        
+        const startSample = Math.floor(extractionStartTime * sampleRate);
+        const endSample = Math.ceil(extractionEndTime * sampleRate);
+        const extractedLength = endSample - startSample;
+        
+        if (extractedLength <= 0 || startSample >= buffer.length) {
+          console.error(`❌ Invalid sample range: ${startSample}-${endSample}`);
+          setIsPreloadingAyahs(false);
+          setPreloadProgress({ current: 0, total: 0 });
+          return null;
+        }
+        
+        console.log(`📍 Extracting ayahs ${startAyah}-${endAyah} from surah ${startSurah}: ${extractionStartTime.toFixed(2)}s - ${extractionEndTime.toFixed(2)}s (${extractedLength} samples)`);
+        
+        // Create extracted buffer for this ayah range
+        const extractedBuffer = audioContext.createBuffer(
+          buffer.numberOfChannels,
+          extractedLength,
+          sampleRate
+        );
+        
+        // Copy the ayah range samples
+        for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+          const sourceChannel = buffer.getChannelData(ch);
+          const targetChannel = extractedBuffer.getChannelData(ch);
+          for (let i = 0; i < extractedLength; i++) {
+            const sourceIndex = startSample + i;
+            if (sourceIndex < buffer.length) {
+              targetChannel[i] = sourceChannel[sourceIndex];
+            }
+          }
+        }
+        
+        // Repeat the extracted passage
+        for (let passage = 1; passage <= passageRepeatCount; passage++) {
+          // Passage-level timestamp
           timestamps.push({
-            surah: surahNum,
+            surah: startSurah,
             passage,
             startTime: currentTime
           });
           
-          audioBufferSequence.push(buffer);
-          currentTime += buffer.duration;
+          // Build detailed ayah-level timestamps for this passage
+          for (let ayahNum = startAyah; ayahNum <= endAyah; ayahNum++) {
+            const ayahTiming = ayahTimingsData.find(t => t.ayah === ayahNum);
+            if (!ayahTiming) continue;
+            
+            // Calculate relative time within the extracted buffer
+            const ayahStartInOriginal = ayahTiming.start_time / 1000; // Convert ms to seconds
+            const relativeStartTime = ayahStartInOriginal - extractionStartTime; // Offset from start of extraction
+            const absoluteStartTime = currentTime + relativeStartTime; // Absolute time in concatenated audio
+            
+            ayahTimestamps.push({
+              surah: startSurah,
+              ayah: ayahNum,
+              repetition: 1, // MP3Quran doesn't support per-ayah repetition
+              passage: passage,
+              startTime: absoluteStartTime
+            });
+          }
+          
+          audioBufferSequence.push(extractedBuffer);
+          currentTime += extractedBuffer.duration;
           
           segmentCount++;
           setPreloadProgress({ current: segmentCount, total: totalSegments });
+        }
+      } else {
+        // Full surah repeat (original behavior)
+        for (let passage = 1; passage <= passageRepeatCount; passage++) {
+          for (const surahNum of surahsInRange) {
+            const buffer = audioBufferCache.get(surahNum);
+            if (!buffer) continue;
+            
+            // Record timestamp for this segment
+            timestamps.push({
+              surah: surahNum,
+              passage,
+              startTime: currentTime
+            });
+            
+            audioBufferSequence.push(buffer);
+            currentTime += buffer.duration;
+            
+            segmentCount++;
+            setPreloadProgress({ current: segmentCount, total: totalSegments });
+          }
         }
       }
       
@@ -1099,7 +1201,12 @@ export const useAudioPlayer = ({
       
       console.log(`✅ Created MP3Quran repeat audio: ${surahsInRange.length} surahs × ${passageRepeatCount} passages = ${timestamps.length} segments`);
       
-      return { blobUrl, timestamps };
+      if (ayahTimestamps.length > 0) {
+        console.log(`📍 Ayah-level tracking enabled: ${ayahTimestamps.length} ayah timestamps generated`);
+        return { blobUrl, timestamps, ayahTimestamps };
+      } else {
+        return { blobUrl, timestamps };
+      }
     } catch (error) {
       console.error('❌ Error concatenating MP3Quran repeat:', error);
       
@@ -1848,7 +1955,10 @@ export const useAudioPlayer = ({
       const result = await concatenateMp3QuranRepeat(
         startSurah,
         endSurah,
-        passageCount
+        startAyah,
+        endAyah,
+        passageCount,
+        ayahTimings.length > 0 ? ayahTimings : undefined
       );
       
       if (!result) {
@@ -1861,23 +1971,31 @@ export const useAudioPlayer = ({
       setIsRepeatConcatenatedMode(true);
       setCurrentRepeatPassage(1);
       setCurrentRepeatSurah(startSurah);
-      setCurrentRepeatAyah(1);
+      setCurrentRepeatAyah(startAyah);
       setCurrentRepeatAyahCount(1);
+      
+      // Set ayah-level timestamps if available
+      if (result.ayahTimestamps && result.ayahTimestamps.length > 0) {
+        setRepeatAyahTimestamps(result.ayahTimestamps);
+        console.log(`✅ MP3Quran repeat with ayah-level tracking: ${result.ayahTimestamps.length} ayah segments`);
+      } else {
+        setRepeatAyahTimestamps([]);
+      }
       
       // Navigate to the start page
       const startSurahData = ayahData.find(s => s.number === startSurah);
       if (startSurahData && startSurahData.verses && startSurahData.verses.length > 0) {
-        const firstVerse = startSurahData.verses[0];
-        if (firstVerse && firstVerse.page && firstVerse.page !== currentPageNum) {
+        const startVerse = startSurahData.verses.find((v: any) => v.number === startAyah);
+        if (startVerse && startVerse.page && startVerse.page !== currentPageNum) {
           isAyahNavigation.current = true;
-          navigate(`/page/${firstVerse.page}#${startSurah}-1`);
+          navigate(`/page/${startVerse.page}#${startSurah}-${startAyah}`);
         }
       }
       
       // Play the concatenated repeat audio
-      setCurrentPlayingAyah({ surah: startSurah, ayah: 1 });
-      updateMediaSession(startSurah, 1, true);
-      updateNativeMusicControls(startSurah, 1, true).catch(console.error);
+      setCurrentPlayingAyah({ surah: startSurah, ayah: startAyah });
+      updateMediaSession(startSurah, startAyah, true);
+      updateNativeMusicControls(startSurah, startAyah, true).catch(console.error);
       requestWakeLock();
       
       // Show loading spinner while browser loads the audio blob
@@ -1919,7 +2037,7 @@ export const useAudioPlayer = ({
       setCurrentRepeatAyahCount(1);
       playAyah(startSurah, startAyah);
     }
-  }, [repeatPassageCount, repeatAyahCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, audioSource, selectedReciter, selectedMoshaf, audioElement, ayahData, currentPageNum, navigate, isAyahNavigation, updateMediaSession, requestWakeLock, releaseWakeLock, concatenateRepeatAyahs, concatenateMp3QuranRepeat, playAyah]);
+  }, [repeatPassageCount, repeatAyahCount, repeatStartSurah, repeatStartAyah, repeatEndSurah, repeatEndAyah, audioSource, selectedReciter, selectedMoshaf, audioElement, ayahData, currentPageNum, navigate, isAyahNavigation, updateMediaSession, requestWakeLock, releaseWakeLock, concatenateRepeatAyahs, concatenateMp3QuranRepeat, playAyah, ayahTimings]);
   
   // Helper function to check if a surah is available in the current moshaf
   const isSurahAvailableInMoshaf = useCallback((surahNum: number): boolean => {
@@ -2078,6 +2196,9 @@ export const useAudioPlayer = ({
   useEffect(() => {
     if (!audioElement) return;
     
+    // Skip this handler during repeat mode - the repeat handler will take over
+    if (isRepeatActive && isRepeatConcatenatedMode) return;
+    
     if (audioSource === 'everyayah' && ayahTimestamps.length > 0 && concatenatedSurah) {
       // EveryAyah mode - track ayah changes
       const handleTimeUpdate = () => {
@@ -2113,19 +2234,27 @@ export const useAudioPlayer = ({
     return () => {
       audioElement.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [audioElement, audioSource, ayahTimings, ayahTimestamps, concatenatedSurah, currentSurahAudio, currentPlayingAyah, updateMediaSession, updateCurrentAyahFromTime]);
+  }, [audioElement, audioSource, ayahTimings, ayahTimestamps, concatenatedSurah, currentSurahAudio, currentPlayingAyah, updateMediaSession, updateCurrentAyahFromTime, isRepeatActive, isRepeatConcatenatedMode]);
   
   // Track current ayah during concatenated repeat mode
   useEffect(() => {
     if (!audioElement || !isRepeatActive || !isRepeatConcatenatedMode || repeatAyahTimestamps.length === 0) return;
     
+    let lastUpdateTime = 0;
+    
     const handleTimeUpdate = () => {
       const time = audioElement.currentTime;
       
-      // Find which segment we're currently in
+      // Throttle updates to prevent flickering (max 4 updates per second)
+      const now = Date.now();
+      if (now - lastUpdateTime < 250) return;
+      lastUpdateTime = now;
+      
+      // Find which segment we're currently in with a small buffer to prevent boundary flickering
       let currentSegment = repeatAyahTimestamps[0];
       for (let i = 0; i < repeatAyahTimestamps.length; i++) {
-        if (time >= repeatAyahTimestamps[i].startTime) {
+        // Use 50ms buffer before transition to prevent flickering at boundaries
+        if (time >= repeatAyahTimestamps[i].startTime - 0.05) {
           currentSegment = repeatAyahTimestamps[i];
         } else {
           break;

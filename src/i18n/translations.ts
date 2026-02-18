@@ -88,7 +88,7 @@ export const translations = {
     recitationType: 'نوع التلاوة',    everyAyah: 'كل آية',
     mp3Quran: 'مصحف صوتي',
     everyAyahExplanation: 'يتم تشغيل كل آية بشكل منفصل مع إمكانية التنقل بين الآيات',
-    mp3QuranExplanation: 'يتم تشغيل السورة كاملة من البداية إلى النهاية',
+    mp3QuranExplanation: 'لا يمكن استخدام التكرار و اختيار الايات مع بعض هؤلاء القراء',
     hafs: 'حفص',
     warsh: 'ورش',
     qalon: 'قالون',
