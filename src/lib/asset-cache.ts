@@ -1,46 +1,33 @@
 /**
- * Asset Cache Service using IndexedDB
- * Caches mushaf pages and other assets for offline PWA use
+ * Asset Cache Service using Hybrid Storage
+ * - Native filesystem on Android/iOS (unlimited storage)
+ * - IndexedDB fallback on web browsers
+ * Caches mushaf pages and other assets for offline use
  */
 
 import { checkNetworkBeforeDownload } from '@/hooks/useNetwork';
+import { NativeStorage, isNativePlatform, getPlatform } from './native-storage';
 
-const DB_NAME = 'quran-asset-cache';
-const DB_VERSION = 1;
-const STORE_NAME = 'assets';
+// Hybrid storage instance
+const assetStorage = new NativeStorage('quran-asset-cache');
 
-interface CachedAsset {
-  url: string;
-  blobData: Blob;
-  mimeType: string;
-  cachedAt: number;
-  category: string; // 'mushaf-mwdoa', 'mushaf-tashel', 'mushaf-madinah', 'audio-everyayah', 'audio-mp3quran'
-}
+// Initialize storage on module load
+assetStorage.init().catch(console.error);
 
 /**
- * Open IndexedDB connection
+ * Sanitize URL to create a valid cache key for filesystem
  */
-const openDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-    
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'url' });
-        objectStore.createIndex('category', 'category', { unique: false });
-        objectStore.createIndex('cachedAt', 'cachedAt', { unique: false });
-      }
-    };
-  });
+const urlToCacheKey = (url: string): string => {
+  // Convert URL to a safe filename by replacing special chars
+  return url
+    .replace(/^https?:\/\//, '')
+    .replace(/[^a-zA-Z0-9]/g, '_')
+    .substring(0, 200); // Limit length
 };
 
 /**
  * Cache an asset from URL
+ * Uses native filesystem on Android/iOS, IndexedDB on web
  */
 export const cacheAsset = async (
   url: string,
@@ -51,6 +38,8 @@ export const cacheAsset = async (
     // Check network connectivity before downloading
     checkNetworkBeforeDownload();
     
+    await assetStorage.init();
+    
     // Fetch the asset
     const response = await fetch(url, { mode: 'cors', signal });
     if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
@@ -58,27 +47,16 @@ export const cacheAsset = async (
     const blobData = await response.blob();
     const mimeType = response.headers.get('content-type') || 'application/octet-stream';
     
-    // Store in IndexedDB
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    
-    const cachedAsset: CachedAsset = {
+    const key = urlToCacheKey(url);
+    const metadata = {
       url,
-      blobData,
-      mimeType,
-      cachedAt: Date.now(),
       category,
+      mimeType,
     };
     
-    store.put(cachedAsset);
+    await assetStorage.setItem(key, blobData, metadata);
     
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    db.close();
+    console.log(`✅ [${getPlatform()}] Cached asset: ${url} in category ${category}`);
     return true;
   } catch (error) {
     console.error('Error caching asset:', error);
@@ -88,23 +66,26 @@ export const cacheAsset = async (
 
 /**
  * Get cached asset
+ * Uses native filesystem on Android/iOS, IndexedDB on web
  */
 export const getCachedAsset = async (url: string): Promise<Blob | null> => {
   try {
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
+    const filename = url.split('/').pop() || 'unknown';
+    console.log(`[AssetCache] 🔍 getCachedAsset called for: ${filename}`);
     
-    const request = store.get(url);
+    await assetStorage.init();
     
-    const result = await new Promise<CachedAsset | undefined>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+    const key = urlToCacheKey(url);
+    console.log(`[AssetCache] Using cache key: ${key}`);
+    const result = await assetStorage.getItem(key);
     
-    db.close();
+    if (result && result.data instanceof Blob) {
+      console.log(`✅ [${getPlatform()}] Cache HIT for ${filename} (size: ${result.data.size} bytes)`);
+      return result.data;
+    }
     
-    return result ? result.blobData : null;
+    console.log(`❌ [${getPlatform()}] Cache MISS for ${filename}`);
+    return null;
   } catch (error) {
     console.error('Error retrieving cached asset:', error);
     return null;
@@ -121,31 +102,29 @@ export const isAssetCached = async (url: string): Promise<boolean> => {
 
 /**
  * Clear all cached assets by category
+ * Uses native filesystem on Android/iOS, IndexedDB on web
  */
 export const clearCategoryCache = async (category: string): Promise<void> => {
   try {
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const index = store.index('category');
+    await assetStorage.init();
     
-    const request = index.openCursor(IDBKeyRange.only(category));
+    const allKeys = await assetStorage.keys();
+    let deletedCount = 0;
     
-    request.onsuccess = (event) => {
-      const cursor = (event.target as IDBRequest).result;
-      if (cursor) {
-        cursor.delete();
-        cursor.continue();
+    // Filter keys by category and delete
+    for (const key of allKeys) {
+      try {
+        const item = await assetStorage.getItem(key);
+        if (item && item.metadata?.category === category) {
+          await assetStorage.removeItem(key);
+          deletedCount++;
+        }
+      } catch (err) {
+        console.warn(`Failed to check/delete item ${key}:`, err);
       }
-    };
+    }
     
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    db.close();
-    console.log(`Cleared cache for category: ${category}`);
+    console.log(`✅ [${getPlatform()}] Cleared ${deletedCount} assets from category: ${category}`);
   } catch (error) {
     console.error('Error clearing category cache:', error);
   }
@@ -153,22 +132,13 @@ export const clearCategoryCache = async (category: string): Promise<void> => {
 
 /**
  * Clear entire asset cache
+ * Uses native filesystem on Android/iOS, IndexedDB on web
  */
 export const clearAllAssetCache = async (): Promise<void> => {
   try {
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    
-    store.clear();
-    
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-    
-    db.close();
-    console.log('Cleared all asset cache');
+    await assetStorage.init();
+    await assetStorage.clear();
+    console.log(`✅ [${getPlatform()}] Cleared all asset cache`);
   } catch (error) {
     console.error('Error clearing asset cache:', error);
   }
@@ -176,6 +146,7 @@ export const clearAllAssetCache = async (): Promise<void> => {
 
 /**
  * Get cache statistics
+ * Uses native filesystem on Android/iOS, IndexedDB on web
  */
 export const getAssetCacheStats = async (): Promise<{
   totalEntries: number;
@@ -183,28 +154,29 @@ export const getAssetCacheStats = async (): Promise<{
   categoryCounts: Record<string, number>;
 }> => {
   try {
-    const db = await openDB();
-    const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
+    await assetStorage.init();
     
-    const allRequest = store.getAll();
-    
-    const all = await new Promise<CachedAsset[]>((resolve, reject) => {
-      allRequest.onsuccess = () => resolve(allRequest.result);
-      allRequest.onerror = () => reject(allRequest.error);
-    });
-    
-    const estimatedSize = all.reduce((sum, item) => sum + item.blobData.size, 0);
+    const allKeys = await assetStorage.keys();
+    let estimatedSize = 0;
     const categoryCounts: Record<string, number> = {};
     
-    all.forEach(item => {
-      categoryCounts[item.category] = (categoryCounts[item.category] || 0) + 1;
-    });
-    
-    db.close();
+    for (const key of allKeys) {
+      try {
+        const item = await assetStorage.getItem(key);
+        if (item) {
+          if (item.data instanceof Blob) {
+            estimatedSize += item.data.size;
+          }
+          const category = item.metadata?.category || 'unknown';
+          categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+        }
+      } catch (err) {
+        console.warn(`Failed to get stats for item ${key}:`, err);
+      }
+    }
     
     return {
-      totalEntries: all.length,
+      totalEntries: allKeys.length,
       estimatedSize,
       categoryCounts,
     };
