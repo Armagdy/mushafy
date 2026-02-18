@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, ChevronDown } from "lucide-react";
+import { Search, ChevronDown, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 import type { Mp3QuranReciter, Mp3QuranMoshaf } from "@/lib/mp3quran-service";
+import { checkAyahTiming } from "@/lib/mp3quran-service";
+import { getCachedAyahTiming, cacheAyahTiming } from "@/lib/audio-cache";
 import { surahs } from "@/data/surahs";
 
 interface ReciterDialogProps {
@@ -84,6 +86,11 @@ export function ReciterDialog({
   const [mp3QuranSearch, setMp3QuranSearch] = useState('');
   const [selectedSurahForPlayback, setSelectedSurahForPlayback] = useState(currentSurahId);
   const [selectedAyahForPlayback, setSelectedAyahForPlayback] = useState(currentPlayingAyah?.ayah || 1);
+  
+  // MP3Quran timing validation state
+  const [isCheckingTiming, setIsCheckingTiming] = useState(false);
+  const [timingAvailable, setTimingAvailable] = useState(false);
+  const [timingError, setTimingError] = useState<'network' | 'not-found' | null>(null);
   
   // Dropdown visibility state
   const [showEveryAyahDropdown, setShowEveryAyahDropdown] = useState(false);
@@ -172,6 +179,62 @@ export function ReciterDialog({
     setSelectedSurahForPlayback(currentSurahId);
     setSelectedAyahForPlayback(currentPlayingAyah?.ayah || 1);
   }, [currentSurahId, currentPlayingAyah]);
+
+  // Check ayah timing availability for MP3Quran
+  useEffect(() => {
+    // Only check for MP3Quran mode
+    if (audioSource !== 'mp3quran' || !selectedMp3QuranReciter || !selectedMoshaf) {
+      setTimingAvailable(false);
+      setTimingError(null);
+      setIsCheckingTiming(false);
+      return;
+    }
+
+    const checkTiming = async () => {
+      setIsCheckingTiming(true);
+      setTimingError(null);
+      setTimingAvailable(false);
+
+      try {
+        // Check cache first
+        const cachedTiming = await getCachedAyahTiming(selectedMoshaf.id, selectedSurahForPlayback);
+        
+        if (cachedTiming && cachedTiming.length > 0) {
+          console.log(`✅ Timing available from cache for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
+          setTimingAvailable(true);
+          setIsCheckingTiming(false);
+          return;
+        }
+
+        // Not in cache, fetch from API
+        console.log(`🔍 Checking timing from API for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
+        const result = await checkAyahTiming(selectedSurahForPlayback, selectedMoshaf.id);
+
+        if (result.success && result.timings.length > 0) {
+          // Save to cache
+          await cacheAyahTiming(selectedMoshaf.id, selectedSurahForPlayback, result.timings);
+          console.log(`✅ Timing fetched and cached for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
+          setTimingAvailable(true);
+        } else {
+          // Handle errors
+          if (result.error === 'network') {
+            setTimingError('network');
+          } else if (result.error === 'not-found') {
+            setTimingError('not-found');
+          }
+          setTimingAvailable(false);
+        }
+      } catch (error) {
+        console.error('Error checking timing:', error);
+        setTimingError('network');
+        setTimingAvailable(false);
+      } finally {
+        setIsCheckingTiming(false);
+      }
+    };
+
+    checkTiming();
+  }, [audioSource, selectedMp3QuranReciter, selectedMoshaf, selectedSurahForPlayback]);
 
   // Get current surah info
   const currentSurah = surahs.find(s => s.id === selectedSurahForPlayback) || surahs[0];
@@ -714,6 +777,39 @@ export function ReciterDialog({
                 </Select>
               </div>
 
+              {/* Timing Status Display */}
+              {selectedMp3QuranReciter && selectedMoshaf && (
+                <div className="flex flex-col gap-2 mt-2">
+                  {isCheckingTiming && (
+                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-sm md:text-base">
+                      <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
+                      <span>{t('checkingTiming')}</span>
+                    </div>
+                  )}
+                  
+                  {!isCheckingTiming && timingAvailable && (
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm md:text-base">
+                      <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5" />
+                      <span>{t('timingAvailable')}</span>
+                    </div>
+                  )}
+                  
+                  {!isCheckingTiming && timingError === 'network' && (
+                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm md:text-base">
+                      <XCircle className="w-4 h-4 md:w-5 md:h-5" />
+                      <span>{t('timingNetworkError')}</span>
+                    </div>
+                  )}
+                  
+                  {!isCheckingTiming && timingError === 'not-found' && (
+                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm md:text-base">
+                      <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                      <span className="whitespace-pre-line">{t('timingNotAvailable')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Save Button for MP3Quran */}
               <div className="pt-2 sm:pt-3 mt-2">
                 <Button
@@ -721,10 +817,17 @@ export function ReciterDialog({
                     onListen();
                     await onNavigateToSurah(selectedSurahForPlayback);
                   }}
-                  disabled={!selectedMp3QuranReciter || !selectedMoshaf}
+                  disabled={!selectedMp3QuranReciter || !selectedMoshaf || isCheckingTiming || timingError === 'network'}
                   className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {t('save')}
+                  {isCheckingTiming ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      {t('checkingTiming')}
+                    </span>
+                  ) : (
+                    t('save')
+                  )}
                 </Button>
               </div>
                 </>

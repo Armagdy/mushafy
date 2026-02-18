@@ -17,6 +17,7 @@ interface RepeatDialogProps {
   repeatPassageCount: number;
   repeatAyahCount: number;
   audioSource: 'everyayah' | 'mp3quran';
+  hasAyahTimings?: boolean;
   onRepeatStartSurahChange: (value: number) => void;
   onRepeatStartAyahChange: (value: number) => void;
   onRepeatEndSurahChange: (value: number) => void;
@@ -37,6 +38,7 @@ export function RepeatDialog({
   repeatPassageCount,
   repeatAyahCount,
   audioSource,
+  hasAyahTimings = false,
   onRepeatStartSurahChange,
   onRepeatStartAyahChange,
   onRepeatEndSurahChange,
@@ -46,6 +48,9 @@ export function RepeatDialog({
   onStartRepeat,
 }: RepeatDialogProps) {
   const { t, isRTL, language } = useLanguage();
+
+  // Ayah selection should be disabled only for MP3Quran without timing
+  const ayahSelectionDisabled = audioSource === 'mp3quran' && !hasAyahTimings;
 
   const handleStartSurahChange = (val: string) => {
     const newStartSurah = parseInt(val);
@@ -114,10 +119,10 @@ export function RepeatDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={repeatStartAyah.toString()} onValueChange={handleStartAyahChange} disabled={audioSource === 'mp3quran'}>
+              <Select value={repeatStartAyah.toString()} onValueChange={handleStartAyahChange} disabled={ayahSelectionDisabled}>
                 <SelectTrigger className={cn(
                   "flex-1 text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500",
-                  audioSource === 'mp3quran' && "opacity-50 cursor-not-allowed"
+                  ayahSelectionDisabled && "opacity-50 cursor-not-allowed"
                 )}>
                   <SelectValue placeholder={t('ayahNumber')} />
                 </SelectTrigger>
@@ -155,10 +160,10 @@ export function RepeatDialog({
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={repeatEndAyah.toString()} onValueChange={(val) => onRepeatEndAyahChange(parseInt(val))} disabled={audioSource === 'mp3quran'}>
+              <Select value={repeatEndAyah.toString()} onValueChange={(val) => onRepeatEndAyahChange(parseInt(val))} disabled={ayahSelectionDisabled}>
                 <SelectTrigger className={cn(
                   "flex-1 text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500",
-                  audioSource === 'mp3quran' && "opacity-50 cursor-not-allowed"
+                  ayahSelectionDisabled && "opacity-50 cursor-not-allowed"
                 )}>
                   <SelectValue placeholder={t('ayahNumber')} />
                 </SelectTrigger>
@@ -211,17 +216,17 @@ export function RepeatDialog({
                 max="100"
                 value={repeatAyahCount || ''}
                 onChange={(e) => onRepeatAyahCountChange(parseInt(e.target.value) || 0)}
-                disabled={audioSource === 'mp3quran'}
+                disabled={ayahSelectionDisabled}
                 className={cn(
                   "flex-1 text-base md:text-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500",
-                  audioSource === 'mp3quran' && "opacity-50 cursor-not-allowed"
+                  ayahSelectionDisabled && "opacity-50 cursor-not-allowed"
                 )}
               />
               <span className="text-sm md:text-base text-emerald-600 dark:text-emerald-400">{t('times')}</span>
             </div>
-            {audioSource === 'mp3quran' && (
-              <p className="text-xs md:text-sm text-emerald-600 dark:text-emerald-400 italic">
-                {isRTL ? "تكرار الآية غير متاح مع تلاوات السور الكاملة" : "Ayah repeat not available with mp3quran reciters"}
+            {ayahSelectionDisabled && (
+              <p className="text-xs md:text-sm text-emerald-600 dark:text-emerald-400 italic whitespace-pre-line">
+                {t('timingNotAvailable')}
               </p>
             )}
           </div>

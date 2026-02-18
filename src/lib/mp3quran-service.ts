@@ -222,6 +222,82 @@ export async function getAyahTiming(
 }
 
 /**
+ * Check and fetch ayah timing with better error handling
+ * Returns object with success status and timing data or error
+ */
+export async function checkAyahTiming(
+  surahNumber: number,
+  moshafId: number
+): Promise<{
+  success: boolean;
+  timings: AyahTiming[];
+  error?: 'network' | 'not-found' | 'unknown';
+  message?: string;
+}> {
+  const cacheKey = `${surahNumber}-${moshafId}`;
+  
+  // Check in-memory cache first
+  if (timingCache.has(cacheKey)) {
+    const timings = timingCache.get(cacheKey)!;
+    return { success: true, timings };
+  }
+
+  try {
+    const response = await fetch(
+      `https://www.mp3quran.net/api/v3/ayat_timing?surah=${surahNumber}&read=${moshafId}`,
+      { signal: AbortSignal.timeout(10000) } // 10 second timeout
+    );
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return {
+          success: false,
+          timings: [],
+          error: 'not-found',
+          message: 'Ayah timing not available for this recitation'
+        };
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const timings: AyahTiming[] = await response.json();
+    
+    // Validate timing data
+    if (!Array.isArray(timings) || timings.length === 0) {
+      return {
+        success: false,
+        timings: [],
+        error: 'not-found',
+        message: 'No timing data found for this recitation'
+      };
+    }
+    
+    // Cache the result
+    timingCache.set(cacheKey, timings);
+
+    return { success: true, timings };
+  } catch (error: any) {
+    // Network errors (timeout, no connection, etc.)
+    if (error.name === 'AbortError' || error.message?.includes('fetch') || error.message?.includes('network')) {
+      return {
+        success: false,
+        timings: [],
+        error: 'network',
+        message: 'Network error: Unable to fetch timing data'
+      };
+    }
+    
+    // Unknown errors
+    return {
+      success: false,
+      timings: [],
+      error: 'unknown',
+      message: error.message || 'Unknown error occurred'
+    };
+  }
+}
+
+/**
  * Build audio URL for complete surah
  */
 export function getSurahAudioUrl(server: string, surahNumber: number): string {

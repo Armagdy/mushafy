@@ -4,7 +4,7 @@ import { ASSETS_BASE_URL } from '@/config/assets';
 import { getAudioData } from '@/lib/quran-data-service';
 import { getMp3QuranReciters, getAyahTiming, getSurahAudioUrl, getCurrentAyahFromTime, seekToAyah, type Mp3QuranReciter, type Mp3QuranMoshaf, type AyahTiming } from '@/lib/mp3quran-service';
 import { surahs } from '@/data/surahs';
-import { cacheAudio, getCachedAudio, cacheMp3QuranAudio, getCachedMp3QuranAudio, cacheIndividualAyah, getCachedIndividualAyah, getAllCachedAyahsForSurah } from '@/lib/audio-cache';
+import { cacheAudio, getCachedAudio, cacheMp3QuranAudio, getCachedMp3QuranAudio, cacheIndividualAyah, getCachedIndividualAyah, getAllCachedAyahsForSurah, getCachedAyahTiming } from '@/lib/audio-cache';
 import { debugMediaSession } from '@/lib/media-session-debug';
 import QuranMediaSession from '@/lib/quran-media-session';
 import { Capacitor } from '@capacitor/core';
@@ -2534,6 +2534,33 @@ export const useAudioPlayer = ({
       }
     }
   }, [selectedMp3QuranReciter]);
+
+  // Load cached timing data when MP3Quran moshaf is selected
+  // This enables ayah picker and repeat dialog BEFORE playback starts
+  useEffect(() => {
+    if (audioSource !== 'mp3quran' || !selectedMoshaf || !currentSurahId) {
+      return;
+    }
+
+    const loadCachedTiming = async () => {
+      try {
+        const cachedTiming = await getCachedAyahTiming(selectedMoshaf.id, currentSurahId);
+        
+        if (cachedTiming && cachedTiming.length > 0) {
+          console.log(`✅ Loaded cached timing for moshaf ${selectedMoshaf.id} surah ${currentSurahId} (${cachedTiming.length} ayahs)`);
+          setAyahTimings(cachedTiming);
+        } else {
+          console.log(`❌ No cached timing for moshaf ${selectedMoshaf.id} surah ${currentSurahId}`);
+          setAyahTimings([]);
+        }
+      } catch (error) {
+        console.error('Error loading cached timing:', error);
+        setAyahTimings([]);
+      }
+    };
+
+    loadCachedTiming();
+  }, [audioSource, selectedMoshaf, currentSurahId]);
   
   // Update audio element event listener when handleAudioEnded changes
   useEffect(() => {

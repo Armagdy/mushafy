@@ -921,6 +921,7 @@ const Surah = () => {
         repeatPassageCount={repeatPassageCount}
         repeatAyahCount={repeatAyahCount}
         audioSource={audioSource}
+        hasAyahTimings={hasAyahTimings}
         onRepeatStartSurahChange={setRepeatStartSurah}
         onRepeatStartAyahChange={setRepeatStartAyah}
         onRepeatEndSurahChange={setRepeatEndSurah}

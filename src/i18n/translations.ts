@@ -217,6 +217,11 @@ export const translations = {
     offlineMode: 'وضع عدم الاتصال',
     loadingAyahs: 'تحميل الآيات جملة واحدة لأفضل استماع',
     loadingAudio: 'جاري تحميل الصوت...',
+    checkingTiming: 'جاري التحقق من توقيت الآيات...',
+    timingAvailable: 'يمكن استخدام هذا القارئ في التكرار وتحديد الآيات',
+    timingNotAvailable: 'لا يمكن استخدام هذا القارئ في التكرار وتحديد الآيات\nابحث عنه فى "كل آية" بدلا من مصحف صوتي',
+    timingNetworkError: 'خطأ في الشبكة: لا يمكن جلب توقيت الآيات',
+    timingFetchError: 'فشل تحميل توقيت الآيات',
   },
   en: {
     appName: 'Mushafy',
@@ -435,6 +440,11 @@ export const translations = {
     offlineMode: 'Offline Mode',
     loadingAyahs: 'Loading all ayahs at once for better listening experience',
     loadingAudio: 'Loading audio...',
+    checkingTiming: 'Checking ayah timing...',
+    timingAvailable: 'This reciter can be used in repeating and ayah picker',
+    timingNotAvailable: 'This reciter cannot be used in repeating and ayah picker\nSearch for them in "EveryAyah" instead of "Full Surah"',
+    timingNetworkError: 'Network error: Unable to fetch ayah timing',
+    timingFetchError: 'Failed to load ayah timing',
   },
 };
 

@@ -373,3 +373,63 @@ export const isMp3QuranAudioCached = async (
   const cached = await getCachedMp3QuranAudio(moshafId, surahNum);
   return cached !== null;
 };
+
+/**
+ * Cache ayah timing data separately (without audio)
+ * Used for pre-validation of reciter/moshaf/surah combinations
+ */
+export const cacheAyahTiming = async (
+  moshafId: number,
+  surahNum: number,
+  timingData: any[]
+): Promise<void> => {
+  try {
+    await audioStorage.init();
+    
+    const key = `timing-${moshafId}-${surahNum}`;
+    const metadata = {
+      moshafId,
+      surahNum,
+      dataType: 'ayah-timing',
+      cachedAt: Date.now(),
+    };
+    
+    // Store as JSON blob
+    const jsonString = JSON.stringify(timingData);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    
+    await audioStorage.setItem(key, blob, metadata);
+    
+    console.log(`✅ [${getPlatform()}] Cached ayah timing: moshaf ${moshafId} surah ${surahNum} (${timingData.length} ayahs)`);
+  } catch (error) {
+    console.error('Error caching ayah timing:', error);
+  }
+};
+
+/**
+ * Retrieve cached ayah timing data
+ */
+export const getCachedAyahTiming = async (
+  moshafId: number,
+  surahNum: number
+): Promise<any[] | null> => {
+  try {
+    await audioStorage.init();
+    
+    const key = `timing-${moshafId}-${surahNum}`;
+    const result = await audioStorage.getItem(key);
+    
+    if (result && result.data instanceof Blob && result.metadata?.dataType === 'ayah-timing') {
+      const jsonString = await result.data.text();
+      const timingData = JSON.parse(jsonString);
+      console.log(`✅ [${getPlatform()}] Cache HIT for ayah timing: moshaf ${moshafId} surah ${surahNum}`);
+      return timingData;
+    }
+    
+    console.log(`❌ [${getPlatform()}] Cache MISS for ayah timing: moshaf ${moshafId} surah ${surahNum}`);
+    return null;
+  } catch (error) {
+    console.error('Error retrieving cached ayah timing:', error);
+    return null;
+  }
+};
