@@ -9,7 +9,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 import type { Mp3QuranReciter, Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { checkAyahTiming } from "@/lib/mp3quran-service";
-import { getCachedAyahTiming, cacheAyahTiming } from "@/lib/audio-cache";
+import { getCachedAyahTiming, cacheAyahTiming, getCachedIndividualAyah, isMp3QuranAudioCached } from "@/lib/audio-cache";
 import { surahs } from "@/data/surahs";
 
 interface ReciterDialogProps {
@@ -91,6 +91,13 @@ export function ReciterDialog({
   const [isCheckingTiming, setIsCheckingTiming] = useState(false);
   const [timingAvailable, setTimingAvailable] = useState(false);
   const [timingError, setTimingError] = useState<'network' | 'not-found' | null>(null);
+  
+  // MP3Quran surah availability state
+  const [isSurahAvailable, setIsSurahAvailable] = useState(true);
+  
+  // EveryAyah surah availability state
+  const [isCheckingEveryAyahSurah, setIsCheckingEveryAyahSurah] = useState(false);
+  const [isEveryAyahSurahAvailable, setIsEveryAyahSurahAvailable] = useState(true);
   
   // Dropdown visibility state
   const [showEveryAyahDropdown, setShowEveryAyahDropdown] = useState(false);
@@ -179,6 +186,105 @@ export function ReciterDialog({
     setSelectedSurahForPlayback(currentSurahId);
     setSelectedAyahForPlayback(currentPlayingAyah?.ayah || 1);
   }, [currentSurahId, currentPlayingAyah]);
+
+  // Check if selected surah is available in the selected moshaf (MP3Quran only)
+  useEffect(() => {
+    if (audioSource !== 'mp3quran' || !selectedMoshaf || !selectedMoshaf.surah_list) {
+      setIsSurahAvailable(true);
+      return;
+    }
+
+    const checkSurahAvailability = async () => {
+      // First check if audio is cached - if yes, it's definitely available
+      const isCached = await isMp3QuranAudioCached(selectedMoshaf.id, selectedSurahForPlayback);
+      if (isCached) {
+        console.log(`✅ Surah ${selectedSurahForPlayback} is cached for moshaf ${selectedMoshaf.id}`);
+        setIsSurahAvailable(true);
+        return;
+      }
+
+      // Not cached, check surah_list
+      const surahList = selectedMoshaf.surah_list.split(',').map(s => parseInt(s.trim(), 10));
+      const isAvailable = surahList.includes(selectedSurahForPlayback);
+      
+      setIsSurahAvailable(isAvailable);
+      
+      if (!isAvailable) {
+        console.log(`❌ Surah ${selectedSurahForPlayback} not available in moshaf ${selectedMoshaf.id}`);
+      }
+    };
+
+    checkSurahAvailability();
+  }, [audioSource, selectedMoshaf, selectedSurahForPlayback]);
+
+  // Check if selected surah is available for EveryAyah reciter (check first ayah)
+  useEffect(() => {
+    if (audioSource !== 'everyayah' || !selectedReciter || !selectedReciter.folder) {
+      setIsEveryAyahSurahAvailable(true);
+      setIsCheckingEveryAyahSurah(false);
+      return;
+    }
+
+    const checkSurahAvailability = async () => {
+      setIsCheckingEveryAyahSurah(true);
+
+      try {
+        // First check if first ayah is cached - if yes, surah is available
+        const cachedAyah = await getCachedIndividualAyah(
+          selectedReciter.folder,
+          selectedSurahForPlayback,
+          1
+        );
+        
+        if (cachedAyah) {
+          console.log(`✅ Surah ${selectedSurahForPlayback} first ayah is cached for ${selectedReciter.folder}`);
+          setIsEveryAyahSurahAvailable(true);
+          setIsCheckingEveryAyahSurah(false);
+          return;
+        }
+
+        // Not cached, verify via network
+        // Format surah and ayah numbers (3 digits)
+        const surahStr = String(selectedSurahForPlayback).padStart(3, '0');
+        const ayahStr = '001'; // Check first ayah
+        
+        // Build the audio URL
+        const audioUrl = `https://everyayah.com/data/${selectedReciter.folder}/${surahStr}${ayahStr}.mp3`;
+        
+        // Try to fetch first 1KB to verify file exists
+        const response = await fetch(audioUrl, {
+          method: 'GET',
+          headers: {
+            'Range': 'bytes=0-1023'
+          }
+        });
+        
+        // Check if response is OK or Partial Content (206)
+        if (response.ok || response.status === 206) {
+          const blob = await response.blob();
+          if (blob.size > 0) {
+            setIsEveryAyahSurahAvailable(true);
+          } else {
+            console.log(`❌ Surah ${selectedSurahForPlayback} not available for reciter ${selectedReciter.folder}`);
+            setIsEveryAyahSurahAvailable(false);
+          }
+        } else {
+          console.log(`❌ Surah ${selectedSurahForPlayback} not available for reciter ${selectedReciter.folder} (status: ${response.status})`);
+          setIsEveryAyahSurahAvailable(false);
+        }
+      } catch (error) {
+        console.error('Error checking EveryAyah surah availability:', error);
+        // On network error, mark as unavailable to prevent playback failure
+        setIsEveryAyahSurahAvailable(false);
+      } finally {
+        setIsCheckingEveryAyahSurah(false);
+      }
+    };
+
+    // Debounce the check slightly to avoid too many requests
+    const timeoutId = setTimeout(checkSurahAvailability, 300);
+    return () => clearTimeout(timeoutId);
+  }, [audioSource, selectedReciter, selectedSurahForPlayback]);
 
   // Check ayah timing availability for MP3Quran
   useEffect(() => {
@@ -620,6 +726,25 @@ export function ReciterDialog({
             </div>
           </div>
 
+              {/* Surah Availability Status for EveryAyah */}
+              {selectedReciter && (
+                <div className="flex flex-col gap-2 mt-2">
+                  {isCheckingEveryAyahSurah && (
+                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-sm md:text-base p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
+                      <span>{t('loading')}</span>
+                    </div>
+                  )}
+                  
+                  {!isCheckingEveryAyahSurah && !isEveryAyahSurahAvailable && (
+                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm md:text-base p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                      <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                      <span>{t('surahNotAvailableForReciter')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Save Button for EveryAyah */}
               <div className="pt-2 sm:pt-3 mt-2">
                 <Button
@@ -627,10 +752,17 @@ export function ReciterDialog({
                     onListen();
                     await onNavigateToSurah(selectedSurahForPlayback);
                   }}
-                  disabled={!selectedReciter && filteredReciters.length === 0}
+                  disabled={(!selectedReciter && filteredReciters.length === 0) || isCheckingEveryAyahSurah || !isEveryAyahSurahAvailable}
                   className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {t('save')}
+                  {isCheckingEveryAyahSurah ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      {t('loading')}
+                    </span>
+                  ) : (
+                    t('save')
+                  )}
                 </Button>
               </div>
             </>
@@ -777,8 +909,16 @@ export function ReciterDialog({
                 </Select>
               </div>
 
+              {/* Surah Availability Warning for MP3Quran */}
+              {selectedMp3QuranReciter && selectedMoshaf && !isSurahAvailable && (
+                <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm md:text-base mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                  <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                  <span>{t('surahNotAvailableForReciter')}</span>
+                </div>
+              )}
+
               {/* Timing Status Display */}
-              {selectedMp3QuranReciter && selectedMoshaf && (
+              {selectedMp3QuranReciter && selectedMoshaf && isSurahAvailable && (
                 <div className="flex flex-col gap-2 mt-2">
                   {isCheckingTiming && (
                     <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-sm md:text-base">
@@ -817,7 +957,7 @@ export function ReciterDialog({
                     onListen();
                     await onNavigateToSurah(selectedSurahForPlayback);
                   }}
-                  disabled={!selectedMp3QuranReciter || !selectedMoshaf || isCheckingTiming || timingError === 'network'}
+                  disabled={!selectedMp3QuranReciter || !selectedMoshaf || !isSurahAvailable || isCheckingTiming || timingError === 'network'}
                   className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isCheckingTiming ? (
