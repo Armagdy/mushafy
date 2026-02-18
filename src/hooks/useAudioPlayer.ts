@@ -1676,21 +1676,14 @@ export const useAudioPlayer = ({
     if (audioElement) {
       // Stop HTML Audio Element
       audioElement.pause();
-      
-      // For EveryAyah: Clear everything and reset to 0
-      // For MP3Quran: Keep the source and preserve time/duration state for smooth visual continuity
-      if (audioSource === 'everyayah') {
-        audioElement.currentTime = 0;
-        audioElement.src = '';
-        console.log('Audio element stopped and cleared (EveryAyah)');
-      } else {
-        // For MP3Quran: Don't reset currentTime to 0 - it will be set when seeking to new ayah
-        // This prevents progress bar from flickering back to 0% and then jumping to correct position
-        console.log('Audio element paused (MP3Quran - source and state preserved)');
-      }
+      audioElement.currentTime = 0;
+      audioElement.src = '';
+      console.log('Audio element stopped and cleared');
     }
     
+    // Clear all playback states
     setIsPlaying(false);
+    setCurrentPlayingAyah(null);
     setIsRepeatActive(false);
     setIsRepeatConcatenatedMode(false);
     setCurrentRepeatPassage(0);
@@ -1698,13 +1691,15 @@ export const useAudioPlayer = ({
     setCurrentRepeatSurah(0);
     setCurrentRepeatAyahCount(0);
     
-    // For MP3Quran: preserve timing data so ayah picker remains enabled
-    // For EveryAyah: clear everything since concatenated audio is being cleared below
+    // Clear audio source states
     if (audioSource === 'everyayah') {
       setCurrentSurahAudio(null);
       setAyahTimings([]);
+    } else {
+      // For MP3Quran: also clear current surah audio state on stop
+      setCurrentSurahAudio(null);
+      // Keep ayahTimings so ayah picker remains enabled if user wants to play again
     }
-    // Note: MP3Quran timing data is preserved to keep ayah picker functional
     
     // Clear concatenated ayah state
     if (concatenatedBlobUrl) {
@@ -1728,7 +1723,7 @@ export const useAudioPlayer = ({
     
     releaseWakeLock();
     console.log('=== STOP AUDIO COMPLETE ===');
-  }, [audioElement, releaseWakeLock, concatenatedBlobUrl, repeatBlobUrl]);
+  }, [audioElement, releaseWakeLock, concatenatedBlobUrl, repeatBlobUrl, audioSource, currentPlayingAyah, isPlaying]);
   
   // Seek to a specific time in the audio
   const seekToTime = useCallback((time: number) => {
