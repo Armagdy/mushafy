@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Bookmark, BookMarked, BookOpen, X } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { useToast } from "@/hooks/use-toast";
 import { surahs } from "@/data/surahs";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,8 @@ export function BookmarksDialog({
 }: BookmarksDialogProps) {
   const { t, isRTL, language } = useLanguage();
   const { toast } = useToast();
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
 
   const [selectedBookmarkType, setSelectedBookmarkType] = useState<string>('bookmark');
   const [bookmarkSurahId, setBookmarkSurahId] = useState(currentSurahId);
@@ -93,7 +96,7 @@ export function BookmarksDialog({
         style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
       >
         <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
-          <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
+          <DialogTitle className={cn("text-center font-bold text-[#F2E3BB]", textSizeClasses.title)}>
             {t('bookmarks')}
           </DialogTitle>
         </DialogHeader>
@@ -101,10 +104,10 @@ export function BookmarksDialog({
         <div className="p-4 space-y-2 sm:space-y-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
-            <TabsTrigger value="add" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">
+            <TabsTrigger value="add" className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]", textSizeClasses.text)}>
               {isRTL ? 'اضف علامة جديدة' : 'Add New Bookmark'}
             </TabsTrigger>
-            <TabsTrigger value="view" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">
+            <TabsTrigger value="view" className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]", textSizeClasses.text)}>
               {isRTL ? 'العلامات' : 'Bookmarks'}
             </TabsTrigger>
           </TabsList>
@@ -113,7 +116,7 @@ export function BookmarksDialog({
             <div className="space-y-2 sm:space-y-3">
               {/* Bookmark Type Selector */}
               <div className="space-y-2">
-                <Label htmlFor="bookmark-type" className={`text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                <Label htmlFor="bookmark-type" className={cn("font-medium text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                   {t('bookmarkType')}
                 </Label>
                 <Select value={selectedBookmarkType} onValueChange={setSelectedBookmarkType}>
@@ -124,19 +127,19 @@ export function BookmarksDialog({
                     <SelectItem value="bookmark" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                       <div className="flex items-center gap-2">
                         <Bookmark className="w-3 h-3 sm:w-4 sm:h-4 text-amber-500" />
-                        <span className="text-base md:text-xl">{isRTL ? 'علامة' : 'Bookmark'}</span>
+                        <span className={textSizeClasses.text}>{isRTL ? 'علامة' : 'Bookmark'}</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="memorization" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                       <div className="flex items-center gap-2">
                         <BookMarked className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-600" />
-                        <span className="text-base md:text-xl">{isRTL ? 'حفظ' : 'Memorization'}</span>
+                        <span className={textSizeClasses.text}>{isRTL ? 'حفظ' : 'Memorization'}</span>
                       </div>
                     </SelectItem>
                     <SelectItem value="reading" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                       <div className="flex items-center gap-2">
                         <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600" />
-                        <span className="text-base md:text-xl">{isRTL ? 'قراءة' : 'Reading'}</span>
+                        <span className={textSizeClasses.text}>{isRTL ? 'قراءة' : 'Reading'}</span>
                       </div>
                     </SelectItem>
                   </SelectContent>
@@ -145,7 +148,7 @@ export function BookmarksDialog({
 
               {/* Surah Selector */}
               <div className="space-y-2">
-                <Label htmlFor="bookmark-surah" className={`text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                <Label htmlFor="bookmark-surah" className={cn("font-medium text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                   {isRTL ? 'السورة' : 'Surah'}
                 </Label>
                 <Select value={bookmarkSurahId.toString()} onValueChange={(val) => {
@@ -159,7 +162,7 @@ export function BookmarksDialog({
                   <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                     {surahs.map((surah) => (
                       <SelectItem key={surah.id} value={surah.id.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
-                        <span className="text-base md:text-xl">
+                        <span className={textSizeClasses.text}>
                           {surah.id}. {language === 'ar' ? surah.name : surah.englishName}
                         </span>
                       </SelectItem>
@@ -170,7 +173,7 @@ export function BookmarksDialog({
 
               {/* Ayah Selector */}
               <div className="space-y-2">
-                <Label htmlFor="bookmark-ayah" className={`text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                <Label htmlFor="bookmark-ayah" className={cn("font-medium text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                   {isRTL ? 'الآية' : 'Ayah'}
                 </Label>
                 <Select value={bookmarkAyahNum.toString()} onValueChange={(val) => setBookmarkAyahNum(parseInt(val))}>
@@ -180,7 +183,7 @@ export function BookmarksDialog({
                   <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
                     {Array.from({ length: surahs.find(s => s.id === bookmarkSurahId)?.numberOfAyahs || 1 }, (_, i) => i + 1).map((ayahNum) => (
                       <SelectItem key={ayahNum} value={ayahNum.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
-                        <span className="text-base md:text-xl">
+                        <span className={textSizeClasses.text}>
                           {isRTL ? 'آية' : 'Ayah'} {ayahNum}
                         </span>
                       </SelectItem>
@@ -189,7 +192,6 @@ export function BookmarksDialog({
                 </Select>
               </div>
 
-              {/* Save Button */}
               <Button
                 onClick={async () => {
                   console.log('🔖 Save Button Clicked:', {
@@ -250,7 +252,7 @@ export function BookmarksDialog({
                   // Switch to view tab to show the saved bookmark
                   setActiveTab('view');
                 }}
-                className="w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] text-base md:text-xl"
+                className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
               >
                 {t('save')}
               </Button>
@@ -262,7 +264,7 @@ export function BookmarksDialog({
               {/* Quick Bookmarks */}
               {bookmarks.length > 0 && (
                 <div className="px-1 sm:px-2 py-1">
-                  <div className="font-semibold text-amber-600 dark:text-amber-400 px-2 py-1">
+                  <div className={cn("font-semibold text-amber-600 dark:text-amber-400 px-2 py-1", textSizeClasses.text)}>
                     {isRTL ? 'علامات' : 'Bookmarks'} ({bookmarks.length})
                   </div>
                   {bookmarks.map((page) => (
@@ -299,7 +301,7 @@ export function BookmarksDialog({
               {/* Memorization Bookmarks */}
               {memorizationBookmarks.length > 0 && (
                 <div className="px-1 sm:px-2 py-1">
-                  <div className="font-semibold text-emerald-600 dark:text-emerald-400 px-2 py-1">
+                  <div className={cn("font-semibold text-emerald-600 dark:text-emerald-400 px-2 py-1", textSizeClasses.text)}>
                     {isRTL ? 'حفظ' : 'Memorization'} ({memorizationBookmarks.length})
                   </div>
                   {memorizationBookmarks.map((page) => (
@@ -315,7 +317,7 @@ export function BookmarksDialog({
                         className={`flex items-center gap-1.5 sm:gap-2 flex-1 ${isRTL ? 'text-right' : 'text-left'}`}
                       >
                         <BookMarked className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-600 flex-shrink-0" />
-                        <div className="flex-1 min-w-0 font-medium truncate">
+                        <div className={cn("flex-1 min-w-0 font-medium truncate", textSizeClasses.text)}>
                           {bookmarkPageSurahs[page] || '...'}{bookmarkPageAyahs[page] ? ` - ${isRTL ? 'آية' : 'Ayah'} ${bookmarkPageAyahs[page]}` : ''} - {t('page')} {page}
                         </div>
                       </button>
@@ -336,7 +338,7 @@ export function BookmarksDialog({
               {/* Reading Bookmarks */}
               {readingBookmarks.length > 0 && (
                 <div className="px-1 sm:px-2 py-1">
-                  <div className="font-semibold text-blue-600 dark:text-blue-400 px-2 py-1">
+                  <div className={cn("font-semibold text-blue-600 dark:text-blue-400 px-2 py-1", textSizeClasses.text)}>
                     {isRTL ? 'قراءة' : 'Reading'} ({readingBookmarks.length})
                   </div>
                   {readingBookmarks.map((page) => (
@@ -352,7 +354,7 @@ export function BookmarksDialog({
                         className={`flex items-center gap-1.5 sm:gap-2 flex-1 ${isRTL ? 'text-right' : 'text-left'}`}
                       >
                         <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 flex-shrink-0" />
-                        <div className="flex-1 min-w-0 font-medium truncate">
+                        <div className={cn("flex-1 min-w-0 font-medium truncate", textSizeClasses.text)}>
                           {bookmarkPageSurahs[page] || '...'}{bookmarkPageAyahs[page] ? ` - ${isRTL ? 'آية' : 'Ayah'} ${bookmarkPageAyahs[page]}` : ''} - {t('page')} {page}
                         </div>
                       </button>
@@ -372,7 +374,7 @@ export function BookmarksDialog({
               
               {/* No Bookmarks Message */}
               {bookmarks.length === 0 && memorizationBookmarks.length === 0 && readingBookmarks.length === 0 && (
-                <div className="px-3 sm:px-4 py-4 sm:py-6 text-emerald-600 dark:text-emerald-400 text-center">
+                <div className={cn("px-3 sm:px-4 py-4 sm:py-6 text-emerald-600 dark:text-emerald-400 text-center", textSizeClasses.text)}>
                   {t('noBookmarks')}
                 </div>
               )}

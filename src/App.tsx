@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { MushafProvider } from "@/contexts/MushafContext";
+import { DialogTextSizeProvider } from "@/contexts/DialogTextSizeContext";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import Index from "./pages/Index";
 import Surah from "./pages/Surah";
@@ -41,7 +42,9 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <LanguageProvider>
       <MushafProvider>
-        <AppContent />
+        <DialogTextSizeProvider>
+          <AppContent />
+        </DialogTextSizeProvider>
       </MushafProvider>
     </LanguageProvider>
   </QueryClientProvider>

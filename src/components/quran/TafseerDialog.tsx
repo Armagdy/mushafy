@@ -3,6 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
 import { useTafseer } from "@/hooks/useTafseer";
 import { useState, useEffect } from "react";
@@ -24,6 +25,8 @@ export function TafseerDialog({
   surahName 
 }: TafseerDialogProps) {
   const { t, isRTL, language } = useLanguage();
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   const {
     tafseers,
     selectedTafseerId,
@@ -139,7 +142,7 @@ export function TafseerDialog({
         style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
       >
         <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
-          <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
+          <DialogTitle className={cn("text-center font-bold text-[#F2E3BB]", textSizeClasses.title)}>
             {t('tafseer')}
           </DialogTitle>
         </DialogHeader>
@@ -152,7 +155,7 @@ export function TafseerDialog({
         )}>
           {/* Surah Selector */}
           <div className="space-y-2">
-            <label className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">
+            <label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
               {t('selectSurah')}
             </label>
             <Select
@@ -160,8 +163,9 @@ export function TafseerDialog({
               onValueChange={handleSurahChange}
             >
               <SelectTrigger className={cn(
-                "w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-xl",
-                isRTL && "text-right"
+                "w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500",
+                isRTL && "text-right",
+                textSizeClasses.text
               )}>
                 <SelectValue />
               </SelectTrigger>
@@ -171,8 +175,9 @@ export function TafseerDialog({
                     key={surah.id} 
                     value={surah.id.toString()}
                     className={cn(
-                      "focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-xl",
-                      isRTL ? "text-right" : "text-left"
+                      "focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100",
+                      isRTL ? "text-right" : "text-left",
+                      textSizeClasses.text
                     )}
                   >
                     {formatNumber(surah.id)}. {language === 'ar' ? surah.name : surah.englishName}
@@ -184,7 +189,7 @@ export function TafseerDialog({
 
           {/* Ayah Selector */}
           <div className="space-y-2">
-            <label className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">
+            <label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
               {t('selectAyah')}
             </label>
             <Select
@@ -192,8 +197,9 @@ export function TafseerDialog({
               onValueChange={handleAyahChange}
             >
               <SelectTrigger className={cn(
-                "w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-xl",
-                isRTL && "text-right"
+                "w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500",
+                isRTL && "text-right",
+                textSizeClasses.text
               )}>
                 <SelectValue />
               </SelectTrigger>
@@ -203,8 +209,9 @@ export function TafseerDialog({
                     key={ayahNum} 
                     value={ayahNum.toString()}
                     className={cn(
-                      "focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-xl",
-                      isRTL ? "text-right" : "text-left"
+                      "focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100",
+                      isRTL ? "text-right" : "text-left",
+                      textSizeClasses.text
                     )}
                   >
                     {t('ayah')} {formatNumber(ayahNum)}
@@ -223,19 +230,19 @@ export function TafseerDialog({
           <button
             onClick={handlePreviousAyah}
             disabled={currentAyahNumber <= 1}
-            className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md px-3 md:px-4 py-1.5 md:py-2 text-base md:text-xl text-[#F2E3BB] font-medium transition-all"
+            className={cn("bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md px-3 md:px-4 py-1.5 md:py-2 text-[#F2E3BB] font-medium transition-all", textSizeClasses.button)}
           >
             {t('previousAyah')}
           </button>
           
           <div className="text-center flex-1">
-            <div className="text-base md:text-xl font-bold text-emerald-900">{formatNumber(currentAyahNumber)} / {formatNumber(maxAyahs)}</div>
+            <div className={cn("font-bold text-emerald-900", textSizeClasses.text)}>{formatNumber(currentAyahNumber)} / {formatNumber(maxAyahs)}</div>
           </div>
 
           <button
             onClick={handleNextAyah}
             disabled={currentAyahNumber >= maxAyahs}
-            className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md px-3 md:px-4 py-1.5 md:py-2 text-base md:text-xl text-[#F2E3BB] font-medium transition-all"
+            className={cn("bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md px-3 md:px-4 py-1.5 md:py-2 text-[#F2E3BB] font-medium transition-all", textSizeClasses.button)}
           >
             {t('nextAyah')}
           </button>
@@ -246,19 +253,19 @@ export function TafseerDialog({
           "rounded-lg",
           isRTL && "rtl"
         )}>
-          <div className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300 pb-2">{t('ayahText')}</div>
+          <div className={cn("font-medium text-emerald-800 dark:text-emerald-300 pb-2", textSizeClasses.label)}>{t('ayahText')}</div>
           {isLoadingAyah ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="w-5 h-5 animate-spin text-emerald-600 dark:text-emerald-400" />
             </div>
           ) : ayahText ? (
-            <ScrollArea className="max-h-[120px] sm:max-h-[150px] md:max-h-[180px] lg:max-h-[200px] p-3 border border-emerald-200 dark:border-emerald-700 rounded-lg">
-              <div className="text-lg md:text-xl lg:text-2xl leading-relaxed text-right font-arabic text-emerald-900 dark:text-emerald-100">
+            <ScrollArea className="max-h-[120px] sm:max-h-[150px] md:max-h-[180px] lg:max-h-[200px] p-4 border border-emerald-300 dark:border-emerald-600 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20">
+              <div className={cn("leading-[2.2] text-right text-emerald-900 dark:text-emerald-50", textSizeClasses.text)} style={{ fontFamily: "'Scheherazade New', 'Noto Naskh Arabic', serif" }}>
                 {ayahText}
               </div>
             </ScrollArea>
           ) : (
-            <div className="text-center py-4 text-emerald-600 dark:text-emerald-400 text-base md:text-xl">
+            <div className={cn("text-center py-4 text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
               {isRTL ? 'لا يمكن تحميل نص الآية' : 'Unable to load ayah text'}
             </div>
           )}
@@ -266,7 +273,7 @@ export function TafseerDialog({
 
         {/* Tafseer Selector */}
         <div className="space-y-2">
-          <label className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">
+          <label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
             {t('selectTafseer')}
           </label>
           <Select
@@ -274,8 +281,9 @@ export function TafseerDialog({
             onValueChange={(value) => setSelectedTafseerId(parseInt(value))}
           >
             <SelectTrigger className={cn(
-              "w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-xl",
-              isRTL && "text-right"
+              "w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500",
+              isRTL && "text-right",
+              textSizeClasses.text
             )}>
               <SelectValue placeholder={t('selectTafseer')} />
             </SelectTrigger>
@@ -285,8 +293,9 @@ export function TafseerDialog({
                   key={tafseer.id} 
                   value={tafseer.id.toString()}
                   className={cn(
-                    "focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-xl font-bold",
-                    isRTL ? "text-right" : "text-left"
+                    "focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 font-bold",
+                    isRTL ? "text-right" : "text-left",
+                    textSizeClasses.text
                   )}
                 >
                   {tafseer.name}
@@ -301,15 +310,15 @@ export function TafseerDialog({
           {isLoading ? (
             <div className="flex items-center justify-center h-full gap-2">
               <Loader2 className="w-6 h-6 md:w-8 md:h-8 animate-spin text-emerald-600 dark:text-emerald-400" />
-              <span className="text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+              <span className={cn("text-emerald-800 dark:text-emerald-300", textSizeClasses.text)}>
                 {t('loadingTafseer')}
               </span>
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-full space-y-4 px-4">
               <div className="text-center">
-                <p className="text-red-600 dark:text-red-400 font-medium mb-2 text-base md:text-xl">{error}</p>
-                <p className="text-base md:text-xl text-emerald-600 dark:text-emerald-400">
+                <p className={cn("text-red-600 dark:text-red-400 font-medium mb-2", textSizeClasses.text)}>{error}</p>
+                <p className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
                   {isRTL 
                     ? 'يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى'
                     : 'Please check your internet connection and try again'
@@ -318,7 +327,7 @@ export function TafseerDialog({
               </div>
               <button
                 onClick={() => fetchTafseerForAyah(currentSurahNumber, currentAyahNumber)}
-                className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md px-4 py-2 text-base md:text-xl text-[#F2E3BB] font-medium transition-all"
+                className={cn("bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md px-4 py-2 text-[#F2E3BB] font-medium transition-all", textSizeClasses.button)}
               >
                 {isRTL ? 'إعادة المحاولة' : 'Retry'}
               </button>
@@ -326,13 +335,13 @@ export function TafseerDialog({
           ) : tafseerText ? (
             <div className={cn(
               "leading-relaxed text-emerald-900 dark:text-emerald-100",
-              "text-base md:text-lg lg:text-xl",
-              isRTL ? "text-right" : "text-left"
+              isRTL ? "text-right" : "text-left",
+              textSizeClasses.text
             )}>
               {tafseerText.text}
             </div>
           ) : (
-            <div className="flex items-center justify-center h-full text-emerald-600 dark:text-emerald-400 text-base md:text-xl">
+            <div className={cn("flex items-center justify-center h-full text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
               {t('tafseerNotAvailable')}
             </div>
           )}

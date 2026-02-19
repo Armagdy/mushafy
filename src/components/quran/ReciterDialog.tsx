@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, ChevronDown, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
 import type { Mp3QuranReciter, Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { checkAyahTiming } from "@/lib/mp3quran-service";
@@ -82,6 +83,8 @@ export function ReciterDialog({
   onNavigateToSurah,
 }: ReciterDialogProps) {
   const { t, isRTL, language } = useLanguage();
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   const [everyAyahSearch, setEveryAyahSearch] = useState('');
   const [mp3QuranSearch, setMp3QuranSearch] = useState('');
   const [selectedSurahForPlayback, setSelectedSurahForPlayback] = useState(currentSurahId);
@@ -506,7 +509,7 @@ export function ReciterDialog({
         style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
       >
         <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
-          <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
+          <DialogTitle className={cn("text-center font-bold text-[#F2E3BB]", textSizeClasses.title)}>
             {t('selectReciter')}
           </DialogTitle>
         </DialogHeader>
@@ -515,10 +518,10 @@ export function ReciterDialog({
           {/* Audio Source Tabs */}
           <Tabs value={audioSource} onValueChange={(value) => onAudioSourceChange(value as 'everyayah' | 'mp3quran')} className="w-full">
             <TabsList className="grid w-full grid-cols-2 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
-              <TabsTrigger value="everyayah" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">
+              <TabsTrigger value="everyayah" className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]", textSizeClasses.text)}>
                 {t('everyAyah')}
               </TabsTrigger>
-              <TabsTrigger value="mp3quran" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">
+              <TabsTrigger value="mp3quran" className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]", textSizeClasses.text)}>
                 {t('mp3Quran')}
               </TabsTrigger>
             </TabsList>
@@ -526,8 +529,9 @@ export function ReciterDialog({
             {/* Tab Explanation Text */}
             <div className="mt-3 mb-2 px-2 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700">
               <p className={cn(
-                "text-sm md:text-base text-emerald-700 dark:text-emerald-300",
-                isRTL ? "text-right" : "text-left"
+                "text-emerald-700 dark:text-emerald-300",
+                isRTL ? "text-right" : "text-left",
+                textSizeClasses.text
               )}>
                 {audioSource === 'everyayah' ? t('everyAyahExplanation') : t('mp3QuranExplanation')}
               </p>
@@ -537,7 +541,7 @@ export function ReciterDialog({
             <TabsContent value="everyayah" className="space-y-2 sm:space-y-3 mt-3">
           {/* Reciter Name Search Box */}
           <div className="flex flex-col gap-2" ref={everyAyahContainerRef}>
-            <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+            <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
               {t('reciterName')}
             </span>
             <div className="relative">
@@ -566,7 +570,7 @@ export function ReciterDialog({
                     setEveryAyahSearch('');
                     setShowEveryAyahDropdown(true);
                   }}
-                  className="pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg bg-emerald-50 dark:bg-emerald-900/20"
+                  className={cn("pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-emerald-50 dark:bg-emerald-900/20", textSizeClasses.text)}
                 />
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               
@@ -596,7 +600,7 @@ export function ReciterDialog({
                           setShowEveryAyahDropdown(false);
                         }}
                       >
-                        <div className={cn("flex items-center gap-2 w-full text-base md:text-xl", language === 'ar' && "flex-row-reverse text-right")}>
+                        <div className={cn("flex items-center gap-2 w-full", language === 'ar' && "flex-row-reverse text-right", textSizeClasses.text)}>
                           <span className="text-emerald-600 dark:text-emerald-400 font-medium">{index + 1}.</span>
                           <span className="flex-1">{language === 'ar' ? reciter.nameAr : reciter.name}</span>
                         </div>
@@ -613,7 +617,7 @@ export function ReciterDialog({
           
               {/* Reading Type Filter */}
               <div className="flex flex-col gap-2">
-                <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+                <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
                   {t('readingType')}
                 </span>
                 <Select value={filterReading} onValueChange={onFilterReadingChange} modal={false}>
@@ -621,16 +625,16 @@ export function ReciterDialog({
                     <SelectValue />
                   </SelectTrigger>
               <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
-                {filterReciterName === 'all' && <SelectItem value="all" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('all')}</SelectItem>}
-                {availableReadings.includes('hafs') && <SelectItem value="hafs" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('hafs')}</SelectItem>}
-                {availableReadings.includes('warsh') && <SelectItem value="warsh" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('warsh')}</SelectItem>}
+                {filterReciterName === 'all' && <SelectItem value="all" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('all')}</SelectItem>}
+                {availableReadings.includes('hafs') && <SelectItem value="hafs" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('hafs')}</SelectItem>}
+                {availableReadings.includes('warsh') && <SelectItem value="warsh" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('warsh')}</SelectItem>}
               </SelectContent>
             </Select>
           </div>
           
           {/* Recitation Style Filter */}
           <div className="flex flex-col gap-2">
-            <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+            <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
               {t('recitationStyle')}
             </span>
             <Select value={filterStyle} onValueChange={onFilterStyleChange} modal={false}>
@@ -638,16 +642,16 @@ export function ReciterDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
-                {filterReciterName === 'all' && <SelectItem value="all" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('all')}</SelectItem>}
-                {availableStyles.includes('murattal') && <SelectItem value="murattal" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('murattal')}</SelectItem>}
-                {availableStyles.includes('mujawwad') && <SelectItem value="mujawwad" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('mujawwad')}</SelectItem>}
+                {filterReciterName === 'all' && <SelectItem value="all" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('all')}</SelectItem>}
+                {availableStyles.includes('murattal') && <SelectItem value="murattal" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('murattal')}</SelectItem>}
+                {availableStyles.includes('mujawwad') && <SelectItem value="mujawwad" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('mujawwad')}</SelectItem>}
               </SelectContent>
             </Select>
           </div>
           
           {/* Quality Filter */}
           <div className="flex flex-col gap-2">
-            <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+            <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
               {t('quality')}
             </span>
             <Select value={filterQuality} onValueChange={onFilterQualityChange} modal={false}>
@@ -655,14 +659,14 @@ export function ReciterDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
-                {filterReciterName === 'all' && <SelectItem value="all" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">{t('all')}</SelectItem>}
-                {availableQualities.includes('192kbps') && <SelectItem value="192kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">192kbps</SelectItem>}
-                {availableQualities.includes('128kbps') && <SelectItem value="128kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">128kbps</SelectItem>}
-                {availableQualities.includes('64kbps') && <SelectItem value="64kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">64kbps</SelectItem>}
-                {availableQualities.includes('48kbps') && <SelectItem value="48kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">48kbps</SelectItem>}
-                {availableQualities.includes('40kbps') && <SelectItem value="40kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">40kbps</SelectItem>}
-                {availableQualities.includes('32kbps') && <SelectItem value="32kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">32kbps</SelectItem>}
-                {availableQualities.includes('16kbps') && <SelectItem value="16kbps" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">16kbps</SelectItem>}
+                {filterReciterName === 'all' && <SelectItem value="all" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('all')}</SelectItem>}
+                {availableQualities.includes('192kbps') && <SelectItem value="192kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>192kbps</SelectItem>}
+                {availableQualities.includes('128kbps') && <SelectItem value="128kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>128kbps</SelectItem>}
+                {availableQualities.includes('64kbps') && <SelectItem value="64kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>64kbps</SelectItem>}
+                {availableQualities.includes('48kbps') && <SelectItem value="48kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>48kbps</SelectItem>}
+                {availableQualities.includes('40kbps') && <SelectItem value="40kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>40kbps</SelectItem>}
+                {availableQualities.includes('32kbps') && <SelectItem value="32kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>32kbps</SelectItem>}
+                {availableQualities.includes('16kbps') && <SelectItem value="16kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>16kbps</SelectItem>}
               </SelectContent>
             </Select>
           </div>
@@ -674,7 +678,7 @@ export function ReciterDialog({
           <div className="grid grid-cols-2 gap-2">
             {/* Ayah Selection */}
             <div className="flex flex-col gap-2">
-              <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+              <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
                 {t('chooseAyah')}
               </span>
               <Select value={selectedAyahForPlayback.toString()} onValueChange={(value) => setSelectedAyahForPlayback(Number(value))}>
@@ -687,7 +691,7 @@ export function ReciterDialog({
                       <SelectItem
                         key={ayahNum}
                         value={ayahNum.toString()}
-                        className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100"
+                        className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100", textSizeClasses.text)}
                       >
                         {t('ayah')} {ayahNum}
                       </SelectItem>
@@ -699,7 +703,7 @@ export function ReciterDialog({
 
             {/* Surah Selection */}
             <div className="flex flex-col gap-2">
-              <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+              <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
                 {t('chooseSurah')}
               </span>
               <Select value={selectedSurahForPlayback.toString()} onValueChange={(value) => {
@@ -715,7 +719,7 @@ export function ReciterDialog({
                       <SelectItem
                         key={surah.id}
                         value={surah.id.toString()}
-                        className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100"
+                        className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100", textSizeClasses.text)}
                       >
                         {language === 'ar' ? `${surah.id}. ${surah.name}` : `${surah.id}. ${surah.englishName}`}
                       </SelectItem>
@@ -730,14 +734,14 @@ export function ReciterDialog({
               {selectedReciter && (
                 <div className="flex flex-col gap-2 mt-2">
                   {isCheckingEveryAyahSurah && (
-                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-sm md:text-base p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className={cn("flex items-center gap-2 text-blue-600 dark:text-blue-400 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800", textSizeClasses.text)}>
                       <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
                       <span>{t('loading')}</span>
                     </div>
                   )}
                   
                   {!isCheckingEveryAyahSurah && !isEveryAyahSurahAvailable && (
-                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm md:text-base p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <div className={cn("flex items-center gap-2 text-red-600 dark:text-red-400 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800", textSizeClasses.text)}>
                       <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
                       <span>{t('surahNotAvailableForReciter')}</span>
                     </div>
@@ -753,7 +757,7 @@ export function ReciterDialog({
                     await onNavigateToSurah(selectedSurahForPlayback);
                   }}
                   disabled={(!selectedReciter && filteredReciters.length === 0) || isCheckingEveryAyahSurah || !isEveryAyahSurahAvailable}
-                  className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed", textSizeClasses.button)}
                 >
                   {isCheckingEveryAyahSurah ? (
                     <span className="flex items-center gap-2">
@@ -773,7 +777,7 @@ export function ReciterDialog({
             <TabsContent value="mp3quran" className="space-y-2 sm:space-y-3 mt-3">
               {/* Reciter Search Box */}
               <div className="flex flex-col gap-2" ref={mp3QuranContainerRef}>
-                <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+                <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
                   {t('reciterName')}
                 </span>
                 <div className="relative">
@@ -802,7 +806,7 @@ export function ReciterDialog({
                         setMp3QuranSearch('');
                         setShowMp3QuranDropdown(true);
                       }}
-                      className="pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg bg-emerald-50 dark:bg-emerald-900/20"
+                      className={cn("pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-emerald-50 dark:bg-emerald-900/20", textSizeClasses.text)}
                     />
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                   
@@ -829,7 +833,7 @@ export function ReciterDialog({
                               setShowMp3QuranDropdown(false);
                             }}
                           >
-                            <div className="flex items-center gap-2 w-full flex-row-reverse text-right text-base md:text-xl">
+                            <div className={cn("flex items-center gap-2 w-full flex-row-reverse text-right", textSizeClasses.text)}>
                               <span className="text-emerald-600 dark:text-emerald-400 font-medium">{index + 1}.</span>
                               <span className="flex-1">{getMp3QuranReciterName(reciter)}</span>
                             </div>
@@ -847,7 +851,7 @@ export function ReciterDialog({
               {/* Moshaf/Recitation Type Selection */}
               {selectedMp3QuranReciter.moshaf.length > 0 && (
                 <div className="flex flex-col gap-2">
-                  <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+                  <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
                     {t('recitationType')}
                   </span>
                   <Select
@@ -868,7 +872,7 @@ export function ReciterDialog({
                         <SelectItem
                           key={moshaf.id}
                           value={moshaf.id.toString()}
-                          className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation"
+                          className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}
                         >
                           {translateMoshafName(moshaf.name)} ({moshaf.surah_total} {t('surahs')})
                         </SelectItem>
@@ -883,7 +887,7 @@ export function ReciterDialog({
 
               {/* Surah Selection */}
               <div className="flex flex-col gap-2">
-                <span className="font-medium text-base md:text-xl text-emerald-800 dark:text-emerald-300">
+                <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
                   {t('chooseSurah')}
                 </span>
                 <Select value={selectedSurahForPlayback.toString()} onValueChange={(value) => {
@@ -899,7 +903,7 @@ export function ReciterDialog({
                         <SelectItem
                           key={surah.id}
                           value={surah.id.toString()}
-                          className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation"
+                          className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}
                         >
                           {language === 'ar' ? `${surah.id}. ${surah.name}` : `${surah.id}. ${surah.englishName}`}
                         </SelectItem>
@@ -911,7 +915,7 @@ export function ReciterDialog({
 
               {/* Surah Availability Warning for MP3Quran */}
               {selectedMp3QuranReciter && selectedMoshaf && !isSurahAvailable && (
-                <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm md:text-base mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                <div className={cn("flex items-center gap-2 text-red-600 dark:text-red-400 mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800", textSizeClasses.text)}>
                   <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
                   <span>{t('surahNotAvailableForReciter')}</span>
                 </div>
@@ -921,28 +925,28 @@ export function ReciterDialog({
               {selectedMp3QuranReciter && selectedMoshaf && isSurahAvailable && (
                 <div className="flex flex-col gap-2 mt-2">
                   {isCheckingTiming && (
-                    <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-sm md:text-base">
+                    <div className={cn("flex items-center gap-2 text-blue-600 dark:text-blue-400", textSizeClasses.text)}>
                       <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
                       <span>{t('checkingTiming')}</span>
                     </div>
                   )}
                   
                   {!isCheckingTiming && timingAvailable && (
-                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm md:text-base">
+                    <div className={cn("flex items-center gap-2 text-green-600 dark:text-green-400", textSizeClasses.text)}>
                       <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5" />
                       <span>{t('timingAvailable')}</span>
                     </div>
                   )}
                   
                   {!isCheckingTiming && timingError === 'network' && (
-                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm md:text-base">
+                    <div className={cn("flex items-center gap-2 text-red-600 dark:text-red-400", textSizeClasses.text)}>
                       <XCircle className="w-4 h-4 md:w-5 md:h-5" />
                       <span>{t('timingNetworkError')}</span>
                     </div>
                   )}
                   
                   {!isCheckingTiming && timingError === 'not-found' && (
-                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm md:text-base">
+                    <div className={cn("flex items-center gap-2 text-amber-600 dark:text-amber-400", textSizeClasses.text)}>
                       <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
                       <span className="whitespace-pre-line">{t('timingNotAvailable')}</span>
                     </div>
@@ -958,7 +962,7 @@ export function ReciterDialog({
                     await onNavigateToSurah(selectedSurahForPlayback);
                   }}
                   disabled={!selectedMp3QuranReciter || !selectedMoshaf || !isSurahAvailable || isCheckingTiming || timingError === 'network'}
-                  className="w-full text-base md:text-xl bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed", textSizeClasses.button)}
                 >
                   {isCheckingTiming ? (
                     <span className="flex items-center gap-2">

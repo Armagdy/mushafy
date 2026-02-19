@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
@@ -41,6 +42,8 @@ export function NavigationDialog({
   initialTab
 }: NavigationDialogProps) {
   const { t, isRTL } = useLanguage();
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   
   // Navigation tab state
   const [searchTab, setSearchTab] = useState<'surah' | 'juz' | 'page' | 'word'>(() => {
@@ -457,7 +460,7 @@ export function NavigationDialog({
         style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
       >
         <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
-          <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
+          <DialogTitle className={cn("text-center font-bold text-[#F2E3BB]", textSizeClasses.title)}>
             {mode === 'word' ? (isRTL ? 'بحث فى نصوص الايات' : 'Search') : (isRTL ? 'انتقل' : 'Go To')}
           </DialogTitle>
         </DialogHeader>
@@ -484,11 +487,11 @@ export function NavigationDialog({
                     performWordSearch();
                   }
                 }}
-                className="flex-1 px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2"
+                className={cn("flex-1 px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
               />
               <Button
                 onClick={performWordSearch}
-                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] text-base md:text-xl"
+                className={cn("px-4 py-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
               >
                 {isRTL ? ' بحث' : 'Search'}
               </Button>
@@ -497,7 +500,7 @@ export function NavigationDialog({
             {isSearchLoading && (
               <div className="flex flex-col items-center justify-center py-8 space-y-3">
                 <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-base md:text-xl text-emerald-600 dark:text-emerald-400">
+                <p className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
                   {isRTL ? 'جاري البحث...' : 'Searching...'}
                 </p>
               </div>
@@ -505,7 +508,7 @@ export function NavigationDialog({
             
             {!isSearchLoading && wordSearchResults.length > 0 && (
               <div className="max-h-96 overflow-y-auto space-y-2">
-                <div className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300 mb-2">
+                <div className={cn("font-medium text-emerald-800 dark:text-emerald-300 mb-2", textSizeClasses.text)}>
                   {t('foundIn')} {wordSearchResults.length} {t('ayahs')}
                 </div>
                 {wordSearchResults.map((result, index) => (
@@ -520,15 +523,15 @@ export function NavigationDialog({
                     className={`w-full p-3 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-[#FBF9F4] dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-gray-700 transition-all ${isRTL ? 'text-right' : 'text-left'}`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="font-semibold text-base md:text-xl text-emerald-600 dark:text-emerald-400">
-                        {isRTL ? result.surahName : result.surahNameEn} - {isRTL ? 'الآية' : 'Ayah'} {result.ayahNumber}
-                      </div>
-                      <div className="text-base md:text-xl text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                    <div className={cn("font-semibold text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
+                      {isRTL ? result.surahName : result.surahNameEn} - {isRTL ? 'الآية' : 'Ayah'} {result.ayahNumber}
+                    </div>
+                    <div className={cn("text-emerald-600 dark:text-emerald-400 whitespace-nowrap", textSizeClasses.text)}>
                         {isRTL ? 'صفحة' : 'Page'} {result.page}
                       </div>
                     </div>
                     <div className={cn(
-                      "text-lg md:text-xl lg:text-2xl",
+                      textSizeClasses.text,
                       isRTL ? "text-right font-arabic text-emerald-900 dark:text-emerald-100 leading-20" : "text-left text-emerald-900 dark:text-emerald-100 leading-relaxed"
                     )}>
                       {isRTL 
@@ -545,9 +548,9 @@ export function NavigationDialog({
           /* Navigation Search - With tabs */
           <Tabs value={searchTab} onValueChange={setSearchTab as any} className="w-full">
             <TabsList className="grid w-full grid-cols-3 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
-              <TabsTrigger value="juz" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">{isRTL ? 'جزء' : 'Juz'}</TabsTrigger>
-              <TabsTrigger value="page" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">{isRTL ? 'صفحة' : 'Page'}</TabsTrigger>
-              <TabsTrigger value="surah" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">{isRTL ? 'سورة' : 'Surah'}</TabsTrigger>
+              <TabsTrigger value="juz" className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]", textSizeClasses.text)}>{isRTL ? 'جزء' : 'Juz'}</TabsTrigger>
+              <TabsTrigger value="page" className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]", textSizeClasses.text)}>{isRTL ? 'صفحة' : 'Page'}</TabsTrigger>
+              <TabsTrigger value="surah" className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]", textSizeClasses.text)}>{isRTL ? 'سورة' : 'Surah'}</TabsTrigger>
             </TabsList>
 
             {/* Surah Tab */}
@@ -561,7 +564,7 @@ export function NavigationDialog({
                 <div className="grid grid-cols-2 gap-2">
                   {/* Juz Filter */}
                   <div>
-                    <label className={`text-base md:text-xl font-medium mb-1 block text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <label className={cn("font-medium mb-1 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                       {t('filterByJuz')}
                     </label>
                     <select
@@ -601,7 +604,7 @@ export function NavigationDialog({
                           setSearchAyah('');
                         }
                       }}
-                      className="w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2"
+                      className={cn("w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
                     >
                       <option value="">{t('all')}</option>
                       {Array.from({ length: 30 }, (_, i) => i + 1).map(num => (
@@ -614,7 +617,7 @@ export function NavigationDialog({
 
                   {/* Surah Dropdown */}
                   <div>
-                    <label className={`text-base md:text-xl font-medium mb-1 block text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <label className={cn("font-medium mb-1 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                       {t('chooseSurah')}
                     </label>
                     <select
@@ -623,7 +626,7 @@ export function NavigationDialog({
                         setSearchSurah(e.target.value);
                         setSearchAyah('1');
                       }}
-                      className="w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2"
+                      className={cn("w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
                     >
                       <option value="">{t('selectSurah')}</option>
                       {(() => {
@@ -684,7 +687,7 @@ export function NavigationDialog({
 
                   {/* Hizb Filter */}
                   <div>
-                    <label className={`text-base md:text-xl font-medium mb-1 block text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <label className={cn("font-medium mb-1 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                       {t('filterByHezb')}
                     </label>
                     <select
@@ -726,8 +729,8 @@ export function NavigationDialog({
                           setSearchSurah('');
                           setSearchAyah('');
                         }
-                      }}
-                      className="w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2"
+                      }}   
+                      className={cn("w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
                     >
                       <option value="">{t('all')}</option>
                       {(() => {
@@ -756,14 +759,14 @@ export function NavigationDialog({
 
                   {/* Ayah Filter */}
                   <div>
-                    <label className={`text-base md:text-xl font-medium mb-1 block text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                    <label className={cn("font-medium mb-1 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                       {t('chooseAyah')}
                     </label>
                     <select
                       value={searchAyah}
                       onChange={(e) => setSearchAyah(e.target.value)}
                       disabled={!searchSurah || selectedSurahAyahs.length === 0}
-                      className="w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={cn("w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed", textSizeClasses.text)}
                     >
                       <option value="">{t('selectAyah')}</option>
                       {searchSurah && selectedSurahAyahs.length > 0 && selectedSurahAyahs.map(ayah => (
@@ -778,7 +781,7 @@ export function NavigationDialog({
                 <Button
                   onClick={handleGoToSurah}
                   disabled={!searchSurah && !searchAyah}
-                  className="w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] text-base md:text-xl"
+                  className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
                 >
                   {searchAyah ? t('goToAyah') : t('goToSurah')}
                 </Button>
@@ -793,7 +796,7 @@ export function NavigationDialog({
                 className="space-y-4"
               >
                 <div>
-                  <label className={`text-base md:text-xl font-medium mb-2 block text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                  <label className={cn("font-medium mb-2 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                     {t('selectJuz')}
                   </label>
                   <select
@@ -814,7 +817,7 @@ export function NavigationDialog({
                         setSearchJuzQuarter('');
                       }
                     }}
-                    className="w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2"
+                    className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
                   >
                     <option value="">{t('selectJuz')}</option>
                     {Array.from({ length: 30 }, (_, i) => i + 1).map(num => (
@@ -826,7 +829,7 @@ export function NavigationDialog({
                 </div>
                 
                 <div>
-                  <label className={`text-base md:text-xl font-medium mb-2 block text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                  <label className={cn("font-medium mb-2 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                     {t('selectHezb')}
                   </label>
                   <select
@@ -843,7 +846,7 @@ export function NavigationDialog({
                         setSearchJuzQuarter('');
                       }
                     }}
-                    className="w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2"
+                    className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
                   >
                     <option value="">{t('selectHezb')}</option>
                     {(() => {
@@ -871,13 +874,13 @@ export function NavigationDialog({
                 </div>
                 
                 <div>
-                  <label className={`text-base md:text-xl font-medium mb-2 block text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                  <label className={cn("font-medium mb-2 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                     {t('selectQuarter')}
                   </label>
                   <select
                     value={searchJuzQuarter}
                     onChange={(e) => setSearchJuzQuarter(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2"
+                    className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
                   >
                     <option value="">{t('selectQuarter')}</option>
                     {(() => {
@@ -906,7 +909,7 @@ export function NavigationDialog({
                 <Button
                   onClick={handleGoToJuz}
                   disabled={!searchJuz && !searchJuzHezb && !searchJuzQuarter}
-                  className="w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] text-base md:text-xl"
+                  className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
                 >
                   {searchJuzQuarter ? t('goToQuarter') : searchJuzHezb ? t('goToHezb') : t('goToJuz')}
                 </Button>
@@ -919,7 +922,7 @@ export function NavigationDialog({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <label className={`text-base md:text-xl font-medium mb-2 block text-emerald-800 dark:text-emerald-300 ${isRTL ? 'text-right' : 'text-left'}`}>
+                <label className={cn("font-medium mb-2 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                   {t('pageNumber')}
                 </label>
                 <input
@@ -929,12 +932,12 @@ export function NavigationDialog({
                   onChange={(e) => setSearchPage(e.target.value)}
                   min="1"
                   max="604"
-                  className="w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2"
+                  className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
                 />
                 
                 {/* Validation Error Message */}
                 {pageValidationError && (
-                  <div className="text-sm md:text-base text-red-600 dark:text-red-400 text-center font-medium bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 mt-3">
+                  <div className={cn("text-red-600 dark:text-red-400 text-center font-medium bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 mt-3", textSizeClasses.text)}>
                     {pageValidationError}
                   </div>
                 )}
@@ -942,7 +945,7 @@ export function NavigationDialog({
                 <Button
                   onClick={handleGoToSearchPage}
                   disabled={!searchPage || !!pageValidationError}
-                  className="w-full mt-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] text-base md:text-xl"
+                  className={cn("w-full mt-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
                 >
                   {t('goToPage')}
                 </Button>

@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { motion } from "framer-motion";
 import { BookText } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
 
 interface AyahSelectorDialogProps {
@@ -44,6 +45,8 @@ export function AyahSelectorDialog({
   onStopAudio,
 }: AyahSelectorDialogProps) {
   const { t, isRTL, language } = useLanguage();
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   const navigate = useNavigate();
   const ayahListRef = useRef<HTMLDivElement>(null);
 
@@ -93,7 +96,7 @@ export function AyahSelectorDialog({
         style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
       > 
         <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
-          <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
+          <DialogTitle className={cn("text-center font-bold text-[#F2E3BB]", textSizeClasses.title)}>
             {t('selectAyahToPlay')}
           </DialogTitle>
         </DialogHeader>
@@ -125,7 +128,7 @@ export function AyahSelectorDialog({
             return surahsToShow.map((surah: any) => (
               <div key={surah.number} className="border border-emerald-200 dark:border-emerald-700 rounded-lg overflow-hidden">
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 flex items-center justify-between">
-                  <span className="font-semibold text-sm text-emerald-800 dark:text-emerald-300">
+                  <span className={cn("font-semibold text-emerald-800 dark:text-emerald-300", textSizeClasses.text)}>
                     {language === 'ar' ? surah.name?.ar : surah.name?.en}
                   </span>
                   {onViewTafseer && (
@@ -137,7 +140,7 @@ export function AyahSelectorDialog({
                           handleTafseerClick(e, surah.number, firstVerse.number, language === 'ar' ? surah.name?.ar : surah.name?.en);
                         }
                       }}
-                      className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                      className={cn("flex items-center gap-1 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300", textSizeClasses.text)}
                       title={t('tafseer')}
                     >
                       <BookText className="w-4 h-4" />
@@ -153,11 +156,13 @@ export function AyahSelectorDialog({
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => handleAyahClick(surah.number, verse.number, verse.page)}
-                        className={`w-full aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all ${
+                        className={cn(
+                          "w-full aspect-square rounded-lg flex items-center justify-center font-medium transition-all",
+                          textSizeClasses.text,
                           currentPlayingAyah?.surah === surah.number && currentPlayingAyah?.ayah === verse.number
                             ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md'
                             : 'bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-gray-700 dark:text-gray-200'
-                        }`}
+                        )}
                       >
                         {verse.number}
                       </motion.button>
