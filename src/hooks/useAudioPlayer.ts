@@ -3011,12 +3011,7 @@ export const useAudioPlayer = ({
           
           case 'stop':
             console.log('⏹️ [QuranMediaSession] STOP button pressed');
-            if (audioElement) {
-              audioElement.pause();
-              setIsPlaying(false);
-              setCurrentPlayingAyah(null);
-              QuranMediaSession.destroy().catch(console.error);
-            }
+            stopAudio();
             break;
           
           default:
@@ -3045,7 +3040,7 @@ export const useAudioPlayer = ({
       QuranMediaSession.removeAllListeners().catch(console.error);
       console.log('[QuranMediaSession] Listeners removed');
     };
-  }, [audioElement, currentPlayingAyah, updateMediaSession, updateNativeMusicControls, getNextAyah, playAyah]);
+  }, [audioElement, currentPlayingAyah, updateMediaSession, updateNativeMusicControls, getNextAyah, playAyah, stopAudio]);
   
   return {
     // Audio state
