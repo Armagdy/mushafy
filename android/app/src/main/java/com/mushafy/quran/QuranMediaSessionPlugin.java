@@ -164,6 +164,12 @@ public class QuranMediaSessionPlugin extends Plugin {
     
     @PluginMethod
     public void updateMetadata(PluginCall call) {
+        // Reinitialize if media session was destroyed
+        if (mediaSession == null) {
+            Log.d(TAG, "MediaSession was null, reinitializing...");
+            initializeMediaSession();
+        }
+        
         currentTrack = call.getString("track", "");
         currentArtist = call.getString("artist", "");
         currentAlbum = call.getString("album", "");
@@ -195,6 +201,12 @@ public class QuranMediaSessionPlugin extends Plugin {
     
     @PluginMethod
     public void updatePlaybackState(PluginCall call) {
+        // Reinitialize if media session was destroyed
+        if (mediaSession == null) {
+            Log.d(TAG, "MediaSession was null, reinitializing...");
+            initializeMediaSession();
+        }
+        
         isPlaying = call.getBoolean("isPlaying", false);
         // Use getDouble since JavaScript sends float values, then convert to ms
         position = (long)(call.getDouble("position", 0.0) * 1000); // Convert seconds to ms
@@ -221,6 +233,12 @@ public class QuranMediaSessionPlugin extends Plugin {
     }
     
     private void updatePlaybackState(int state, long position) {
+        // Safety check - reinitialize if needed
+        if (mediaSession == null || stateBuilder == null) {
+            Log.w(TAG, "MediaSession or stateBuilder is null in updatePlaybackState, reinitializing...");
+            initializeMediaSession();
+        }
+        
         PlaybackStateCompat playbackState = stateBuilder
             .setState(state, position, 1.0f)
             .build();
@@ -240,6 +258,12 @@ public class QuranMediaSessionPlugin extends Plugin {
     }
     
     private void showNotification() {
+        // Safety check - reinitialize if needed
+        if (mediaSession == null) {
+            Log.w(TAG, "MediaSession is null in showNotification, reinitializing...");
+            initializeMediaSession();
+        }
+        
         Context context = getContext();
         
         // Create intent to open app when notification is tapped

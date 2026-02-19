@@ -1717,8 +1717,19 @@ export const useAudioPlayer = ({
       setRepeatAyahTimestamps([]);
     }
     
+    // Clear media session and remove notification
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = 'none';
+      navigator.mediaSession.metadata = null;
+      console.log('🗑️ Media session cleared (web)');
+    }
+    
+    // Clear native media session (iOS/Android)
+    if (Capacitor.isNativePlatform()) {
+      QuranMediaSession.destroy().catch((error) => {
+        console.error('❌ Failed to destroy native media session:', error);
+      });
+      console.log('🗑️ Native media session destroyed');
     }
     
     releaseWakeLock();
