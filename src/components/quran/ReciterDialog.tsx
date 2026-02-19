@@ -101,6 +101,7 @@ export function ReciterDialog({
   // EveryAyah surah availability state
   const [isCheckingEveryAyahSurah, setIsCheckingEveryAyahSurah] = useState(false);
   const [isEveryAyahSurahAvailable, setIsEveryAyahSurahAvailable] = useState(true);
+  const [everyAyahSurahError, setEveryAyahSurahError] = useState<'network' | 'not-found' | null>(null);
   
   // Dropdown visibility state
   const [showEveryAyahDropdown, setShowEveryAyahDropdown] = useState(false);
@@ -225,11 +226,13 @@ export function ReciterDialog({
     if (audioSource !== 'everyayah' || !selectedReciter || !selectedReciter.folder) {
       setIsEveryAyahSurahAvailable(true);
       setIsCheckingEveryAyahSurah(false);
+      setEveryAyahSurahError(null);
       return;
     }
 
     const checkSurahAvailability = async () => {
       setIsCheckingEveryAyahSurah(true);
+      setEveryAyahSurahError(null);
 
       try {
         // First check if first ayah is cached - if yes, surah is available
@@ -242,6 +245,7 @@ export function ReciterDialog({
         if (cachedAyah) {
           console.log(`✅ Surah ${selectedSurahForPlayback} first ayah is cached for ${selectedReciter.folder}`);
           setIsEveryAyahSurahAvailable(true);
+          setEveryAyahSurahError(null);
           setIsCheckingEveryAyahSurah(false);
           return;
         }
@@ -267,18 +271,28 @@ export function ReciterDialog({
           const blob = await response.blob();
           if (blob.size > 0) {
             setIsEveryAyahSurahAvailable(true);
+            setEveryAyahSurahError(null);
           } else {
             console.log(`❌ Surah ${selectedSurahForPlayback} not available for reciter ${selectedReciter.folder}`);
             setIsEveryAyahSurahAvailable(false);
+            setEveryAyahSurahError('not-found');
           }
         } else {
-          console.log(`❌ Surah ${selectedSurahForPlayback} not available for reciter ${selectedReciter.folder} (status: ${response.status})`);
-          setIsEveryAyahSurahAvailable(false);
+          if (response.status === 404) {
+            console.log(`❌ Surah ${selectedSurahForPlayback} not available for reciter ${selectedReciter.folder} (status: ${response.status})`);
+            setIsEveryAyahSurahAvailable(false);
+            setEveryAyahSurahError('not-found');
+          } else {
+            console.log(`⚠️ Network/server error while checking surah ${selectedSurahForPlayback} for reciter ${selectedReciter.folder} (status: ${response.status})`);
+            setIsEveryAyahSurahAvailable(false);
+            setEveryAyahSurahError('network');
+          }
         }
       } catch (error) {
         console.error('Error checking EveryAyah surah availability:', error);
-        // On network error, mark as unavailable to prevent playback failure
+        // Network or connectivity issue
         setIsEveryAyahSurahAvailable(false);
+        setEveryAyahSurahError('network');
       } finally {
         setIsCheckingEveryAyahSurah(false);
       }
@@ -750,8 +764,15 @@ export function ReciterDialog({
                       <span>{t('loading')}</span>
                     </div>
                   )}
+
+                  {!isCheckingEveryAyahSurah && everyAyahSurahError === 'network' && (
+                    <div className={cn("flex items-center gap-2 text-red-600 dark:text-red-400 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800", textSizeClasses.text)}>
+                      <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                      <span>{t('everyAyahNetworkError')}</span>
+                    </div>
+                  )}
                   
-                  {!isCheckingEveryAyahSurah && !isEveryAyahSurahAvailable && (
+                  {!isCheckingEveryAyahSurah && everyAyahSurahError === 'not-found' && (
                     <div className={cn("flex items-center gap-2 text-red-600 dark:text-red-400 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800", textSizeClasses.text)}>
                       <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
                       <span>{t('surahNotAvailableForReciter')}</span>
