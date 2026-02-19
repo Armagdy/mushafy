@@ -76,6 +76,7 @@ export function NavigationDialog({
   
   // Page tab state
   const [searchPage, setSearchPage] = useState(() => localStorage.getItem('quran-search-page') || '');
+  const [pageValidationError, setPageValidationError] = useState<string>('');
   
   // Word search state
   const [searchWord, setSearchWord] = useState('');
@@ -110,6 +111,37 @@ export function NavigationDialog({
   useEffect(() => {
     if (searchPage) localStorage.setItem('quran-search-page', searchPage);
   }, [searchPage]);
+
+  // Validate page number
+  useEffect(() => {
+    if (searchTab === 'page') {
+      const pageStr = searchPage.trim();
+      
+      // Allow empty values
+      if (pageStr === '') {
+        setPageValidationError('');
+        return;
+      }
+      
+      const pageNum = parseInt(pageStr);
+      
+      // Check if value is a valid number
+      if (isNaN(pageNum)) {
+        setPageValidationError(t('pageRangeError'));
+        return;
+      }
+      
+      // Check range (1-604)
+      if (pageNum < 1 || pageNum > 604) {
+        setPageValidationError(t('pageRangeError'));
+        return;
+      }
+      
+      setPageValidationError('');
+    } else {
+      setPageValidationError('');
+    }
+  }, [searchTab, searchPage, t]);
 
   // Update selected surah ayahs when surah changes
   useEffect(() => {
@@ -400,7 +432,7 @@ export function NavigationDialog({
 
   const handleGoToSearchPage = () => {
     const pageNum = parseInt(searchPage);
-    if (pageNum > 0 && pageNum <= 604) {
+    if (pageNum > 0 && pageNum <= 604 && !pageValidationError) {
       console.log('=== NAVIGATING TO PAGE ===');
       console.log('Page:', pageNum);
       onNavigate(pageNum);
@@ -899,10 +931,18 @@ export function NavigationDialog({
                   max="604"
                   className="w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 text-base md:text-xl focus:outline-none focus:ring-2"
                 />
+                
+                {/* Validation Error Message */}
+                {pageValidationError && (
+                  <div className="text-sm md:text-base text-red-600 dark:text-red-400 text-center font-medium bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 mt-3">
+                    {pageValidationError}
+                  </div>
+                )}
+                
                 <Button
                   onClick={handleGoToSearchPage}
-                  disabled={!searchPage}
-                  className="w-full mt-4 bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] text-base md:text-xl"
+                  disabled={!searchPage || !!pageValidationError}
+                  className="w-full mt-4 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] text-base md:text-xl"
                 >
                   {t('goToPage')}
                 </Button>

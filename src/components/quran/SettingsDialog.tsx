@@ -70,8 +70,9 @@ export function SettingsDialog({
   // Download state
   const [downloadType, setDownloadType] = useState<'pages' | 'everyayah' | 'mp3quran'>('pages');
   const [downloadMushafType, setDownloadMushafType] = useState<MushafType>(mushafType);
-  const [downloadFromPage, setDownloadFromPage] = useState(1);
-  const [downloadToPage, setDownloadToPage] = useState(604);
+  const [downloadFromPage, setDownloadFromPage] = useState<string | number>(1);
+  const [downloadToPage, setDownloadToPage] = useState<string | number>(604);
+  const [pageValidationError, setPageValidationError] = useState<string>('');
   const [downloadFromSurah, setDownloadFromSurah] = useState(1);
   const [downloadToSurah, setDownloadToSurah] = useState(114);
   const [downloadFromAyah, setDownloadFromAyah] = useState(1);
@@ -261,12 +262,51 @@ export function SettingsDialog({
     };
   }, [showMp3QuranDropdown, mp3QuranSearch]);
   
+  // Validate page range
+  React.useEffect(() => {
+    if (downloadType === 'pages') {
+      const fromStr = String(downloadFromPage).trim();
+      const toStr = String(downloadToPage).trim();
+      
+      // Allow empty values while typing
+      if (fromStr === '' || toStr === '') {
+        setPageValidationError(t('pageRangeError'));
+        return;
+      }
+      
+      const fromNum = parseInt(fromStr);
+      const toNum = parseInt(toStr);
+      
+      // Check if values are valid numbers
+      if (isNaN(fromNum) || isNaN(toNum)) {
+        setPageValidationError(t('pageRangeError'));
+        return;
+      }
+      
+      // Check range (1-604)
+      if (fromNum < 1 || fromNum > 604 || toNum < 1 || toNum > 604) {
+        setPageValidationError(t('pageRangeError'));
+        return;
+      }
+      
+      // Check order
+      if (fromNum > toNum) {
+        setPageValidationError(t('pageOrderError'));
+        return;
+      }
+      
+      setPageValidationError('');
+    } else {
+      setPageValidationError('');
+    }
+  }, [downloadType, downloadFromPage, downloadToPage, t]);
+  
   // Determine if download button should be enabled
   const isDownloadEnabled = (() => {
     if (isDownloading) return false;
     
     if (downloadType === 'pages') {
-      return true; // Pages just need a range
+      return pageValidationError === ''; // Pages need valid range
     } else if (downloadType === 'everyayah') {
       // Need reciter, style, and quality all selected (not __all__)
       return selectedEveryAyahReciter !== '' && 
@@ -397,7 +437,7 @@ export function SettingsDialog({
     try {
       if (downloadType === 'pages') {
         // Cache mushaf pages
-        const total = downloadToPage - downloadFromPage + 1;
+        const total = parseInt(String(downloadToPage)) - parseInt(String(downloadFromPage)) + 1;
         setDownloadProgress({ current: 0, total });
         
         // Get mushaf path based on download mushaf type
@@ -409,11 +449,11 @@ export function SettingsDialog({
         const mushafPath = `${ASSETS_BASE_URL}/${folder}`;
         const category = `mushaf-${downloadMushafType}`;
         
-        for (let page = downloadFromPage; page <= downloadToPage; page++) {
+        for (let page = parseInt(String(downloadFromPage)); page <= parseInt(String(downloadToPage)); page++) {
           if (signal.aborted) break;
           const url = `${mushafPath}/${getPageImageFilename(page)}`;
           await cacheAsset(url, category, signal);
-          setDownloadProgress({ current: page - downloadFromPage + 1, total });
+          setDownloadProgress({ current: page - parseInt(String(downloadFromPage)) + 1, total });
         }
       } else if (downloadType === 'everyayah') {
         // Cache EveryAyah audio
@@ -734,7 +774,7 @@ export function SettingsDialog({
                         min={1}
                         max={604}
                         value={downloadFromPage}
-                        onChange={(e) => setDownloadFromPage(Math.min(604, Math.max(1, parseInt(e.target.value) || 1)))}
+                        onChange={(e) => setDownloadFromPage(e.target.value)}
                         className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
                       />
                     </div>
@@ -745,7 +785,7 @@ export function SettingsDialog({
                         min={1}
                         max={604}
                         value={downloadToPage}
-                        onChange={(e) => setDownloadToPage(Math.min(604, Math.max(1, parseInt(e.target.value) || 604)))}
+                        onChange={(e) => setDownloadToPage(e.target.value)}
                         className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
                       />
                     </div>
@@ -1034,6 +1074,13 @@ export function SettingsDialog({
                       style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}
                     />
                   </div>
+                </div>
+              )}
+              
+              {/* Validation Error Message */}
+              {pageValidationError && (
+                <div className="text-sm md:text-base text-red-600 dark:text-red-400 text-center font-medium bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800">
+                  {pageValidationError}
                 </div>
               )}
               
