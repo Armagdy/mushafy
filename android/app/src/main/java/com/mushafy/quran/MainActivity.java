@@ -26,6 +26,23 @@ public class MainActivity extends BridgeActivity {
         
         registerPlugin(QuranMediaSessionPlugin.class);
         super.onCreate(savedInstanceState);
+        
+        // Explicitly hide action bar for older Android versions (Android 13 and below)
+        // This fixes the issue where a native title bar appears between status bar and app header
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().hide();
+        }
+        
+        // Remove window background to prevent any background showing through
+        getWindow().setBackgroundDrawable(null);
+        
+        // Ensure the WebView takes full control of the layout
+        View decorView = getWindow().getDecorView();
+        decorView.setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        );
     }
     
     @Override
