@@ -10,7 +10,7 @@ import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTe
 import { cn } from "@/lib/utils";
 import type { Mp3QuranReciter, Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { checkAyahTiming } from "@/lib/mp3quran-service";
-import { getCachedAyahTiming, cacheAyahTiming, getCachedIndividualAyah, isMp3QuranAudioCached } from "@/lib/audio-cache";
+import { getCachedAyahTiming, cacheAyahTiming, getCachedIndividualAyah, isMp3QuranAudioCached, getCachedMp3QuranAudio } from "@/lib/audio-cache";
 import { surahs } from "@/data/surahs";
 
 interface ReciterDialogProps {
@@ -305,11 +305,22 @@ export function ReciterDialog({
       setTimingAvailable(false);
 
       try {
-        // Check cache first
+        // Check dedicated timing cache first
         const cachedTiming = await getCachedAyahTiming(selectedMoshaf.id, selectedSurahForPlayback);
         
         if (cachedTiming && cachedTiming.length > 0) {
           console.log(`✅ Timing available from cache for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
+          setTimingAvailable(true);
+          setIsCheckingTiming(false);
+          return;
+        }
+
+        // Fallback: if MP3Quran audio is already cached and has embedded timing metadata, use it
+        const cachedMp3Audio = await getCachedMp3QuranAudio(selectedMoshaf.id, selectedSurahForPlayback);
+        if (cachedMp3Audio && cachedMp3Audio.timingData && cachedMp3Audio.timingData.length > 0) {
+          console.log(`✅ Timing available from cached MP3Quran audio for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
+          // Persist to dedicated timing cache for faster future checks
+          await cacheAyahTiming(selectedMoshaf.id, selectedSurahForPlayback, cachedMp3Audio.timingData);
           setTimingAvailable(true);
           setIsCheckingTiming(false);
           return;
@@ -961,7 +972,7 @@ export function ReciterDialog({
                     onListen();
                     await onNavigateToSurah(selectedSurahForPlayback);
                   }}
-                  disabled={!selectedMp3QuranReciter || !selectedMoshaf || !isSurahAvailable || isCheckingTiming || timingError === 'network'}
+                  disabled={!selectedMp3QuranReciter || !selectedMoshaf || !isSurahAvailable}
                   className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed", textSizeClasses.button)}
                 >
                   {isCheckingTiming ? (
