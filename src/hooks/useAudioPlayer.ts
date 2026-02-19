@@ -2284,6 +2284,21 @@ export const useAudioPlayer = ({
           setCurrentPlayingAyah({ surah: currentSurahAudio, ayah: currentAyah });
           updateMediaSession(currentSurahAudio, currentAyah, true);
           updateNativeMusicControls(currentSurahAudio, currentAyah, true).catch(console.error);
+          
+          // Navigate to the page containing this ayah (same pattern as EveryAyah)
+          const surahData = ayahData.find(s => s.number === currentSurahAudio);
+          if (surahData && surahData.verses) {
+            const verse = surahData.verses.find((v: any) => v.number === currentAyah);
+            console.log(`MP3Quran: Ayah changed to ${currentSurahAudio}:${currentAyah}, verse page: ${verse?.page}, currentPage: ${currentPageNum}, isAyahNav: ${isAyahNavigation.current}`);
+            if (verse && verse.page && verse.page !== currentPageNum && !isAyahNavigation.current) {
+              console.log(`🔄 MP3Quran: Navigating from page ${currentPageNum} to page ${verse.page} for ayah ${currentSurahAudio}:${currentAyah}`);
+              isAyahNavigation.current = true;
+              navigate(`/page/${verse.page}#${currentSurahAudio}-${currentAyah}`);
+              setTimeout(() => {
+                isAyahNavigation.current = false;
+              }, 300);
+            }
+          }
         }
       }
     };
@@ -2293,7 +2308,7 @@ export const useAudioPlayer = ({
     return () => {
       audioElement.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [audioElement, audioSource, ayahTimings, ayahTimestamps, concatenatedSurah, currentSurahAudio, currentPlayingAyah, updateMediaSession, updateCurrentAyahFromTime, isRepeatActive, isRepeatConcatenatedMode]);
+  }, [audioElement, audioSource, ayahTimings, ayahTimestamps, concatenatedSurah, currentSurahAudio, currentPlayingAyah, updateMediaSession, updateCurrentAyahFromTime, isRepeatActive, isRepeatConcatenatedMode, ayahData, currentPageNum, navigate, isAyahNavigation]);
   
   // Track current ayah during concatenated repeat mode
   useEffect(() => {
