@@ -507,7 +507,7 @@ export function NavigationDialog({
             )}
             
             {!isSearchLoading && wordSearchResults.length > 0 && (
-              <div className="max-h-96 overflow-y-auto space-y-2">
+              <div className="max-h-[500px] sm:max-h-[550px] md:max-h-[600px] overflow-y-auto space-y-2">
                 <div className={cn("font-medium text-emerald-800 dark:text-emerald-300 mb-2", textSizeClasses.text)}>
                   {t('foundIn')} {wordSearchResults.length} {t('ayahs')}
                 </div>
@@ -530,10 +530,14 @@ export function NavigationDialog({
                         {isRTL ? 'صفحة' : 'Page'} {result.page}
                       </div>
                     </div>
-                    <div className={cn(
-                      textSizeClasses.text,
-                      isRTL ? "text-right font-arabic text-emerald-900 dark:text-emerald-100 leading-20" : "text-left text-emerald-900 dark:text-emerald-100 leading-relaxed"
-                    )}>
+                    <div 
+                      className={cn(
+                        "p-3 border border-emerald-300 dark:border-emerald-600 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20",
+                        textSizeClasses.text,
+                        isRTL ? "text-right text-emerald-900 dark:text-emerald-100 leading-[2.2]" : "text-left text-emerald-900 dark:text-emerald-100 leading-relaxed"
+                      )}
+                      style={isRTL ? { fontFamily: "'Scheherazade New', 'Noto Naskh Arabic', serif" } : undefined}
+                    >
                       {isRTL 
                         ? highlightText(result.arabicText, searchWord, true)
                         : highlightText(result.englishText, searchWord, false)
