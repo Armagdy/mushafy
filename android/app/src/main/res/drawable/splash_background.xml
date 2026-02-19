@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Dark green background #0E4E38 -->
+    <!-- Dark green background #0B5A42 -->
     <item>
-        <color android:color="#0E4E38"/>
+        <color android:color="#0B5A42"/>
     </item>
     
     <!-- Centered mushafy logo -->
