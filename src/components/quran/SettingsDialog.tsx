@@ -13,8 +13,9 @@ import { Link } from "react-router-dom";
 import { surahs } from "@/data/surahs";
 import { ASSETS_BASE_URL } from "@/config/assets";
 import { getAudioData } from "@/lib/quran-data-service";
-import { getMp3QuranReciters, getSurahAudioUrl, type Mp3QuranReciter, type Mp3QuranMoshaf } from "@/lib/mp3quran-service";
+import { getMp3QuranReciters, getSurahAudioUrl, getAyahTiming, type Mp3QuranReciter, type Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { cacheAsset } from "@/lib/asset-cache";
+import { isMp3QuranAudioCached, cacheMp3QuranAudio } from "@/lib/audio-cache";
 import { getPageImageFilename } from "@/lib/quran-mapping";
 import { useNetwork } from "@/hooks/useNetwork";
 import { useToast } from "@/hooks/use-toast";
@@ -441,8 +442,40 @@ export function SettingsDialog({
         
         for (let surahNum = downloadFromSurah; surahNum <= downloadToSurah; surahNum++) {
           if (signal.aborted) break;
-          const url = getSurahAudioUrl(selectedMoshaf.server, surahNum);
-          await cacheAsset(url, category, signal);
+          
+          // Check if this surah is already cached
+          const isCached = await isMp3QuranAudioCached(selectedMoshaf.id, surahNum);
+          if (isCached) {
+            console.log(`⏭️ Skipping surah ${surahNum} - already cached for moshaf ${selectedMoshaf.id}`);
+            setDownloadProgress({ current: surahNum - downloadFromSurah + 1, total });
+            continue;
+          }
+          
+          console.log(`📥 Downloading surah ${surahNum} for moshaf ${selectedMoshaf.id}`);
+          
+          try {
+            // Download audio file
+            const url = getSurahAudioUrl(selectedMoshaf.server, surahNum);
+            const response = await fetch(url, { signal });
+            if (!response.ok) throw new Error(`Failed to download surah ${surahNum}`);
+            const audioBlob = await response.blob();
+            
+            // Fetch timing data
+            let timingData = [];
+            try {
+              timingData = await getAyahTiming(surahNum, selectedMoshaf.id);
+            } catch (timingError) {
+              console.warn(`No timing data for surah ${surahNum}, caching without timing`);
+            }
+            
+            // Cache using audio-cache (not asset-cache)
+            await cacheMp3QuranAudio(selectedMoshaf.id, surahNum, audioBlob, timingData);
+            console.log(`✅ Cached surah ${surahNum} with ${timingData.length} ayah timings`);
+          } catch (error: any) {
+            if (error.name === 'AbortError') throw error;
+            console.error(`Failed to cache surah ${surahNum}:`, error);
+          }
+          
           setDownloadProgress({ current: surahNum - downloadFromSurah + 1, total });
         }
       }
