@@ -207,7 +207,13 @@ const Surah = () => {
     ayahData,
     isAyahNavigation,
     onSurahUnavailable: (reason) => {
-      if (reason === 'unavailable') {
+      if (reason === 'network-error') {
+        toast({
+          title: t('surahNotCachedOffline'),
+          description: t('connectToPlaySurah'),
+          variant: 'destructive',
+        });
+      } else if (reason === 'unavailable') {
         toast({
           title: t('surahNotAvailableForReciter'),
           variant: 'destructive',

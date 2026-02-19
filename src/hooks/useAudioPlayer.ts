@@ -5,6 +5,7 @@ import { getAudioData } from '@/lib/quran-data-service';
 import { getMp3QuranReciters, getAyahTiming, getSurahAudioUrl, getCurrentAyahFromTime, seekToAyah, type Mp3QuranReciter, type Mp3QuranMoshaf, type AyahTiming } from '@/lib/mp3quran-service';
 import { surahs } from '@/data/surahs';
 import { cacheAudio, getCachedAudio, cacheMp3QuranAudio, getCachedMp3QuranAudio, cacheIndividualAyah, getCachedIndividualAyah, getAllCachedAyahsForSurah, getCachedAyahTiming } from '@/lib/audio-cache';
+import { isNetworkError } from '@/hooks/useNetwork';
 import { debugMediaSession } from '@/lib/media-session-debug';
 import QuranMediaSession from '@/lib/quran-media-session';
 import { Capacitor } from '@capacitor/core';
@@ -32,7 +33,7 @@ interface UseAudioPlayerProps {
   currentPageAyah: number | null;
   ayahData: any[];
   isAyahNavigation: React.MutableRefObject<boolean>;
-  onSurahUnavailable?: (reason: 'unavailable' | 'completed') => void;
+  onSurahUnavailable?: (reason: 'unavailable' | 'network-error' | 'completed') => void;
 }
 
 export const useAudioPlayer = ({
@@ -79,6 +80,9 @@ export const useAudioPlayer = ({
   
   // AbortController to cancel ongoing preloading operations
   const preloadAbortControllerRef = useRef<AbortController | null>(null);
+  
+  // Track last concatenation error type for better error reporting
+  const lastConcatenationErrorRef = useRef<'network' | 'other' | null>(null);
   
   // Track last time we updated native controls position (for throttling)
   const lastPositionUpdateRef = useRef<number>(0);
@@ -477,6 +481,14 @@ export const useAudioPlayer = ({
     
     if (missingAyahs > 0) {
       console.log(`⬇️ Need to download ${missingAyahs} ayahs for ${selectedReciter.folder} surah ${surahNum}`);
+      // Check if we're offline - if so, can't download missing ayahs
+      if (!navigator.onLine) {
+        console.error('❌ Cannot download ayahs - device is offline');
+        setIsPreloadingAyahs(false);
+        setPreloadProgress({ current: 0, total: 0 });
+        lastConcatenationErrorRef.current = 'network';
+        return null;
+      }
     } else {
       console.log(`✅ All ${totalAyahs} ayahs already cached for ${selectedReciter.folder} surah ${surahNum}`);
     }
@@ -540,11 +552,16 @@ export const useAudioPlayer = ({
               console.log('⛔ Preload aborted during fetch');
               setIsPreloadingAyahs(false);
               setPreloadProgress({ current: 0, total: 0 });
+              lastConcatenationErrorRef.current = null;
               return null;
             }
             console.error(`Failed to load ayah ${surahNum}:${ayahNum}:`, error);
             setIsPreloadingAyahs(false);
             setPreloadProgress({ current: 0, total: 0 });
+            // Track if this is a network error or if user is offline
+            const isNetError = !navigator.onLine || isNetworkError(error);
+            lastConcatenationErrorRef.current = isNetError ? 'network' : 'other';
+            console.log(`Error type detected: ${lastConcatenationErrorRef.current}`);
             return null;
           }
         }
@@ -1369,12 +1386,32 @@ export const useAudioPlayer = ({
             setCurrentSurahAudio(surahNum);
             
             // Handle audio load error
-            const handleError = () => {
-              console.error('Failed to load audio - surah may not exist for this reciter');
+            const handleError = (event: Event) => {
+              const audioEl = event.target as HTMLAudioElement;
+              const error = audioEl.error;
+              
+              console.error('Failed to load audio - surah may not exist for this reciter', error);
+              console.log('Error code:', error?.code, 'Online:', navigator.onLine);
               setIsPlaying(false);
               setCurrentSurahAudio(null);
+              setIsPreloadingAyahs(false);
+              releaseWakeLock();
+              
               if (onSurahUnavailable) {
-                onSurahUnavailable('unavailable');
+                // Check if it's a network error
+                // MEDIA_ERR_NETWORK (2) = network error
+                // MEDIA_ERR_SRC_NOT_SUPPORTED (4) = file doesn't exist or format issue
+                // But when offline, browser might report code 4 even though it's really a network issue
+                const isNetworkIssue = !navigator.onLine || (error && error.code === 2);
+                if (isNetworkIssue) {
+                  // Network error - offline or connection issue
+                  console.log('Detected as network error');
+                  onSurahUnavailable('network-error');
+                } else {
+                  // File not found or other error
+                  console.log('Detected as file not available');
+                  onSurahUnavailable('unavailable');
+                }
               }
             };
             audioElement.addEventListener('error', handleError, { once: true });
@@ -1469,6 +1506,22 @@ export const useAudioPlayer = ({
           setIsPlaying(false);
           setIsPreloadingAyahs(false);
           releaseWakeLock();
+          // Notify based on error type
+          if (onSurahUnavailable) {
+            const errorType = lastConcatenationErrorRef.current;
+            console.log(`Notifying error type: ${errorType}`);
+            if (errorType === 'network') {
+              onSurahUnavailable('network-error');
+            } else if (errorType === 'other') {
+              onSurahUnavailable('unavailable');
+            } else {
+              // Fallback - if no error type was set, assume unavailable
+              console.warn('No error type set, defaulting to unavailable');
+              onSurahUnavailable('unavailable');
+            }
+            // Reset error ref
+            lastConcatenationErrorRef.current = null;
+          }
           return;
         }
         
