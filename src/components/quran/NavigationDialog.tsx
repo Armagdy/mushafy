@@ -573,33 +573,30 @@ export function NavigationDialog({
                         const juzValue = e.target.value;
                         setFilterJuz(juzValue);
                         
+                        // Auto-select first surah of the Juz (don't change Hezb)
                         if (juzValue) {
                           const juzNum = parseInt(juzValue);
-                          const firstHezb = (juzNum - 1) * 2 + 1;
-                          setFilterHezb(firstHezb.toString());
-                          
-                          // Auto-select first surah based on the Hezb (since Hezb filter takes precedence)
-                          const hezbRanges: Record<number, number[]> = {
-                            1: [1, 2], 2: [2], 3: [2], 4: [2, 3], 5: [3], 6: [3],
-                            7: [3], 8: [3, 4], 9: [4], 10: [4], 11: [4, 5], 12: [5],
-                            13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [7, 8],
-                            19: [8, 9], 20: [9], 21: [9, 10], 22: [10, 11], 23: [11], 24: [11, 12],
-                            25: [12, 13], 26: [13, 14, 15], 27: [15, 16], 28: [16, 17], 29: [17, 18], 30: [18, 19, 20],
-                            31: [20, 21], 32: [21, 22], 33: [22, 23], 34: [23, 24], 35: [24, 25], 36: [25, 26],
-                            37: [26, 27], 38: [27, 28], 39: [28, 29], 40: [29, 30, 31], 41: [31, 32, 33], 42: [33],
-                            43: [33, 34], 44: [34, 35, 36], 45: [36, 37], 46: [37, 38, 39], 47: [39, 40], 48: [40, 41],
-                            49: [41, 42, 43], 50: [43, 44, 45, 46], 51: [46, 47, 48], 52: [48, 49, 50, 51], 53: [51, 52, 53, 54, 55], 54: [55, 56, 57, 58],
-                            55: [58, 59, 60, 61, 62], 56: [62, 63, 64, 65, 66, 67], 57: [67, 68, 69, 70, 71, 72], 58: [72, 73, 74, 75, 76, 77, 78],
-                            59: [78, 79, 80, 81, 82, 83, 84, 85, 86, 87], 60: [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114],
+                          const juzRanges: Record<number, number[]> = {
+                            1: [1, 2], 2: [2], 3: [2, 3], 4: [3, 4], 5: [4],
+                            6: [4, 5], 7: [5, 6], 8: [6, 7], 9: [7, 8],
+                            10: [8, 9], 11: [9, 10, 11], 12: [11, 12, 13],
+                            13: [13, 14, 15], 14: [15, 16], 15: [17],
+                            16: [18], 17: [21], 18: [23], 19: [25, 26, 27],
+                            20: [27, 28, 29], 21: [29, 30, 31, 32, 33],
+                            22: [33, 34, 35, 36], 23: [36, 37, 38, 39],
+                            24: [39, 40, 41], 25: [41, 42, 43, 44, 45],
+                            26: [46, 47, 48, 49, 50, 51], 27: [51, 52, 53, 54, 55, 56, 57],
+                            28: [58, 59, 60, 61, 62, 63, 64, 65, 66],
+                            29: [67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77],
+                            30: [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114]
                           };
                           
-                          const firstSurahId = hezbRanges[firstHezb]?.[0];
+                          const firstSurahId = juzRanges[juzNum]?.[0];
                           if (firstSurahId) {
                             setSearchSurah(firstSurahId.toString());
                             setSearchAyah('1');
                           }
                         } else {
-                          setFilterHezb('');
                           setSearchSurah('');
                           setSearchAyah('');
                         }
@@ -696,10 +693,10 @@ export function NavigationDialog({
                         const hezbValue = e.target.value;
                         setFilterHezb(hezbValue);
                         
+                        // Auto-select first surah of the Hezb
                         if (hezbValue) {
                           const hezbNum = parseInt(hezbValue);
                           
-                          // Auto-select first surah in this Hezb
                           const hezbRanges: Record<number, number[]> = {
                             1: [1, 2], 2: [2], 3: [2], 4: [2, 3], 5: [3], 6: [3],
                             7: [3], 8: [3, 4], 9: [4], 10: [4], 11: [4, 5], 12: [5],
