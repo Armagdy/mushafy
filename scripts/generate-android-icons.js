@@ -54,16 +54,27 @@ async function generateIcon(size, outputPath) {
 
 async function generateAdaptiveIcon(size, outputPath) {
   try {
-    // Adaptive icons need more padding (108dp vs 72dp safe area)
+    // Adaptive icons: 108dp total, 66dp safe zone minimum
+    // Scale logo to 80% of canvas to be larger while still having padding
+    const logoSize = Math.round(size * 0.80);
+    
+    // Create transparent canvas with logo centered
     await sharp(SOURCE_IMAGE)
-      .resize(size, size, {
+      .resize(logoSize, logoSize, {
         fit: 'contain',
-        background: { r: 0, g: 0, b: 0, alpha: 0 } // transparent for foreground
+        background: { r: 0, g: 0, b: 0, alpha: 0 }
+      })
+      .extend({
+        top: Math.round((size - logoSize) / 2),
+        bottom: Math.round((size - logoSize) / 2),
+        left: Math.round((size - logoSize) / 2),
+        right: Math.round((size - logoSize) / 2),
+        background: { r: 0, g: 0, b: 0, alpha: 0 }
       })
       .png()
       .toFile(outputPath);
     
-    console.log(`✓ Generated ${size}x${size} adaptive icon: ${path.basename(outputPath)}`);
+    console.log(`✓ Generated ${size}x${size} adaptive icon (${logoSize}px logo): ${path.basename(outputPath)}`);
   } catch (error) {
     console.error(`✗ Failed to generate ${size}x${size} adaptive icon:`, error.message);
   }
