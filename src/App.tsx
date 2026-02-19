@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { MushafProvider } from "@/contexts/MushafContext";
 import { DialogTextSizeProvider } from "@/contexts/DialogTextSizeContext";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import { useAppKeepAwake } from "@/hooks/useAppKeepAwake";
 import Index from "./pages/Index";
 import Surah from "./pages/Surah";
 import Test from "./pages/Test";
@@ -18,6 +19,7 @@ const queryClient = new QueryClient();
 function AppContent() {
   // Dynamically update PWA theme color to match system dark/light mode
   useThemeColor();
+  useAppKeepAwake();
 
   return (
     <TooltipProvider>
