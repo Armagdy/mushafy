@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { surahs } from "@/data/surahs";
 import { cn } from "@/lib/utils";
 import { useState, useLayoutEffect } from "react";
-import { getAyahPage } from "@/lib/quran-mapping";
+import { getAyahPage, getPageSurahInfo } from "@/lib/quran-mapping";
 
 interface BookmarksDialogProps {
   open: boolean;
@@ -57,33 +57,24 @@ export function BookmarksDialog({
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
 
   const [selectedBookmarkType, setSelectedBookmarkType] = useState<string>('bookmark');
+  const [bookmarkPage, setBookmarkPage] = useState(currentPage);
   const [bookmarkSurahId, setBookmarkSurahId] = useState(currentSurahId);
-  const [bookmarkAyahNum, setBookmarkAyahNum] = useState(currentAyahNum);
   const [activeTab, setActiveTab] = useState('add');
 
-  // Update dropdowns synchronously when dialog opens to avoid flash of old values
+  // Update dropdowns when dialog opens
   useLayoutEffect(() => {
     if (open) {
       // Reset to add tab when dialog opens
       setActiveTab('add');
-      
-      // Use currentPlayingAyah if available (user selected specific ayah), otherwise use first ayah on page
-      const selectedSurahId = currentPlayingAyah?.surah || currentSurahId;
-      const selectedAyahNum = currentPlayingAyah?.ayah || currentAyahNum;
-      
-      setBookmarkSurahId(selectedSurahId);
-      setBookmarkAyahNum(selectedAyahNum);
+      setBookmarkPage(currentPage);
+      setBookmarkSurahId(currentSurahId);
       console.log('📖 Bookmark Dialog Opened:', {
         currentPage,
         currentSurahId,
-        currentAyahNum,
-        currentPlayingAyah,
-        selectedSurahId,
-        selectedAyahNum,
         selectedBookmarkType
       });
     }
-  }, [open, currentPage, currentSurahId, currentAyahNum, currentPlayingAyah]);
+  }, [open, currentPage, currentSurahId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -151,11 +142,7 @@ export function BookmarksDialog({
                 <Label htmlFor="bookmark-surah" className={cn("font-medium text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                   {isRTL ? 'السورة' : 'Surah'}
                 </Label>
-                <Select value={bookmarkSurahId.toString()} onValueChange={(val) => {
-                  setBookmarkSurahId(parseInt(val));
-                  // Reset ayah to 1 when surah changes
-                  setBookmarkAyahNum(1);
-                }}>
+                <Select value={bookmarkSurahId.toString()} onValueChange={(val) => setBookmarkSurahId(parseInt(val))}>
                   <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                     <SelectValue />
                   </SelectTrigger>
@@ -171,20 +158,20 @@ export function BookmarksDialog({
                 </Select>
               </div>
 
-              {/* Ayah Selector */}
+              {/* Page Selector */}
               <div className="space-y-2">
-                <Label htmlFor="bookmark-ayah" className={cn("font-medium text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
-                  {isRTL ? 'الآية' : 'Ayah'}
+                <Label htmlFor="bookmark-page" className={cn("font-medium text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
+                  {t('page')}
                 </Label>
-                <Select value={bookmarkAyahNum.toString()} onValueChange={(val) => setBookmarkAyahNum(parseInt(val))}>
+                <Select value={bookmarkPage.toString()} onValueChange={(val) => setBookmarkPage(parseInt(val))}>
                   <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
-                    {Array.from({ length: surahs.find(s => s.id === bookmarkSurahId)?.numberOfAyahs || 1 }, (_, i) => i + 1).map((ayahNum) => (
-                      <SelectItem key={ayahNum} value={ayahNum.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
+                    {Array.from({ length: 604 }, (_, i) => i + 1).map((page) => (
+                      <SelectItem key={page} value={page.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">
                         <span className={textSizeClasses.text}>
-                          {isRTL ? 'آية' : 'Ayah'} {ayahNum}
+                          {page}
                         </span>
                       </SelectItem>
                     ))}
@@ -196,26 +183,18 @@ export function BookmarksDialog({
                 onClick={async () => {
                   console.log('🔖 Save Button Clicked:', {
                     bookmarkSurahId,
-                    bookmarkAyahNum,
+                    bookmarkPage,
                     selectedBookmarkType
                   });
                   
                   const selectedSurah = surahs.find(s => s.id === bookmarkSurahId);
                   const surahName = language === 'ar' ? selectedSurah?.name : selectedSurah?.englishName;
-                  const page = await getAyahPage(bookmarkSurahId, bookmarkAyahNum);
-                  
-                  console.log('📄 Calculated Page for notification:', {
-                    surahName,
-                    bookmarkSurahId,
-                    bookmarkAyahNum,
-                    calculatedPage: page
-                  });
                   
                   // Check if bookmark already exists for this page and type
                   const isDuplicate = 
-                    (selectedBookmarkType === 'bookmark' && bookmarks.includes(page)) ||
-                    (selectedBookmarkType === 'memorization' && memorizationBookmarks.includes(page)) ||
-                    (selectedBookmarkType === 'reading' && readingBookmarks.includes(page));
+                    (selectedBookmarkType === 'bookmark' && bookmarks.includes(bookmarkPage)) ||
+                    (selectedBookmarkType === 'memorization' && memorizationBookmarks.includes(bookmarkPage)) ||
+                    (selectedBookmarkType === 'reading' && readingBookmarks.includes(bookmarkPage));
                   
                   if (isDuplicate) {
                     const typeLabel = selectedBookmarkType === 'bookmark' 
@@ -227,20 +206,25 @@ export function BookmarksDialog({
                     toast({
                       title: isRTL ? 'خطأ' : 'Error',
                       description: isRTL 
-                        ? `${typeLabel} موجودة بالفعل لـ ${surahName} - آية ${bookmarkAyahNum}`
-                        : `${typeLabel} already exists for ${surahName} - Ayah ${bookmarkAyahNum}`,
+                        ? `${typeLabel} موجودة بالفعل لـ ${surahName} - صفحة ${bookmarkPage}`
+                        : `${typeLabel} already exists for ${surahName} - Page ${bookmarkPage}`,
                       duration: 2000,
                       className: 'bg-red-500 text-white border-red-600',
                     });
                     return;
                   }
                   
-                  await onAddBookmarkByType(selectedBookmarkType, bookmarkSurahId, bookmarkAyahNum);
+                  // Get the first ayah info on the selected page to pass to the bookmark function
+                  const pageInfo = await getPageSurahInfo(bookmarkPage);
+                  const targetSurahId = pageInfo?.surahId || bookmarkSurahId;
+                  const targetAyah = pageInfo?.ayah || 1;
+                  
+                  await onAddBookmarkByType(selectedBookmarkType, targetSurahId, targetAyah);
                   
                   // Show detailed notification
                   const description = isRTL 
-                    ? `تم حفظ العلامة إلى ${surahName} - آية ${bookmarkAyahNum} - صفحة ${page}`
-                    : `Saved bookmark to ${surahName} - Ayah ${bookmarkAyahNum} - Page ${page}`;
+                    ? `تم حفظ العلامة إلى ${surahName} - صفحة ${bookmarkPage}`
+                    : `Saved bookmark to ${surahName} - Page ${bookmarkPage}`;
                   
                   toast({
                     title: isRTL ? 'تم الحفظ' : 'Saved',
