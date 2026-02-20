@@ -29,6 +29,7 @@ type AudioSource = 'everyayah' | 'mp3quran';
 
 interface UseAudioPlayerProps {
   currentPageNum: number;
+  secondPageNum?: number;
   currentSurahId: number;
   currentPageAyah: number | null;
   ayahData: any[];
@@ -38,6 +39,7 @@ interface UseAudioPlayerProps {
 
 export const useAudioPlayer = ({
   currentPageNum,
+  secondPageNum,
   currentSurahId,
   currentPageAyah,
   ayahData,
@@ -1627,13 +1629,13 @@ export const useAudioPlayer = ({
           navigator.mediaSession.playbackState = 'paused';
         }
       } else {
-        // Check if currentPlayingAyah is on the current page
+        // Check if currentPlayingAyah is on the current page (or second page in 2-page mode)
         let shouldPlayCurrentAyah = false;
         if (currentPlayingAyah) {
           const surahData = ayahData.find(s => s.number === currentPlayingAyah.surah);
           if (surahData && surahData.verses) {
             const verse = surahData.verses.find((v: any) => v.number === currentPlayingAyah.ayah);
-            if (verse && verse.page === currentPageNum) {
+            if (verse && (verse.page === currentPageNum || (secondPageNum && verse.page === secondPageNum))) {
               shouldPlayCurrentAyah = true;
             }
           }
@@ -1670,13 +1672,13 @@ export const useAudioPlayer = ({
           navigator.mediaSession.playbackState = 'paused';
         }
       } else {
-        // Check if currentPlayingAyah is on the current page
+        // Check if currentPlayingAyah is on the current page (or second page in 2-page mode)
         let shouldPlayCurrentAyah = false;
         if (currentPlayingAyah) {
           const surahData = ayahData.find(s => s.number === currentPlayingAyah.surah);
           if (surahData && surahData.verses) {
             const verse = surahData.verses.find((v: any) => v.number === currentPlayingAyah.ayah);
-            if (verse && verse.page === currentPageNum) {
+            if (verse && (verse.page === currentPageNum || (secondPageNum && verse.page === secondPageNum))) {
               shouldPlayCurrentAyah = true;
             }
           }

@@ -202,6 +202,7 @@ const Surah = () => {
     ayahTimings
   } = useAudioPlayer({
     currentPageNum,
+    secondPageNum: currentPageNum < 604 ? currentPageNum + 1 : undefined,
     currentSurahId,
     currentPageAyah,
     ayahData,
