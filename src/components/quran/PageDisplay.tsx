@@ -20,6 +20,8 @@ interface PageDisplayProps {
   onPreviousPage: () => void;
   onNextPage: () => void;
   onScroll: () => void;
+  isFullscreen: boolean;
+  onImageClick: () => void;
 }
 
 export function PageDisplay({
@@ -36,7 +38,9 @@ export function PageDisplay({
   scrollContainerRef,
   onPreviousPage,
   onNextPage,
-  onScroll
+  onScroll,
+  isFullscreen,
+  onImageClick
 }: PageDisplayProps) {
   const { t, isRTL } = useLanguage();
   const { getMushafPath, mushafType } = useMushaf();
@@ -97,9 +101,10 @@ export function PageDisplay({
                         <CachedImage
                           src={`${getMushafPath()}/${getPageImageFilename(leftPageNum)}`}
                           alt={`${t('page')} ${leftPageNum}`}
-                          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
+                          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
                           loading="lazy"
                           cacheCategory={cacheCategory}
+                          onClick={onImageClick}
                         />
                       </div>
                     </div>
@@ -124,9 +129,10 @@ export function PageDisplay({
                         <CachedImage
                           src={`${getMushafPath()}/${getPageImageFilename(rightPageNum)}`}
                           alt={`${t('page')} ${rightPageNum}`}
-                          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
+                          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
                           loading="lazy"
                           cacheCategory={cacheCategory}
+                          onClick={onImageClick}
                         />
                       </div>
                     </div>
@@ -154,9 +160,10 @@ export function PageDisplay({
                         <CachedImage
                           src={`${getMushafPath()}/${getPageImageFilename(rightPageNum)}`}
                           alt={`${t('page')} ${rightPageNum}`}
-                          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
+                          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
                           loading="lazy"
                           cacheCategory={cacheCategory}
+                          onClick={onImageClick}
                         />
                       </div>
                     </div>
@@ -181,9 +188,10 @@ export function PageDisplay({
                         <CachedImage
                           src={`${getMushafPath()}/${getPageImageFilename(leftPageNum)}`}
                           alt={`${t('page')} ${leftPageNum}`}
-                          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain shadow-2xl rounded-xl border-4 border-white mx-auto"
+                          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
                           loading="lazy"
                           cacheCategory={cacheCategory}
+                          onClick={onImageClick}
                         />
                       </div>
                     </div>
@@ -284,9 +292,10 @@ export function PageDisplay({
                   <CachedImage
                     src={`${getMushafPath()}/${imageFilename}`}
                     alt={`${t('page')} ${pageNum}`}
-                    className="max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain md:shadow-2xl md:rounded-xl md:border-4 md:border-white mx-auto"
+                    className={`max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] md:shadow-2xl md:rounded-xl md:border-4 md:border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
                     loading="eager"
                     cacheCategory={cacheCategory}
+                    onClick={onImageClick}
                   />
                 </div>
               </div>

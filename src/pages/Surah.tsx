@@ -30,6 +30,7 @@ import { useQuranData } from '@/hooks/useQuranData';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { getPageImageFilename, getPageSurahInfo, getPageJuzNumber, getJuzFirstPage, getSurahFirstPage, getAyahPage } from '@/lib/quran-mapping';
 import { cn } from '@/lib/utils';
+import { isNativePlatform } from '@/lib/native-storage';
 
 const Surah = () => {
   const { page } = useParams<{ page: string }>();
@@ -121,6 +122,7 @@ const Surah = () => {
     const saved = localStorage.getItem('quran-show-bottom-bar-text');
     return saved !== null ? saved === 'true' : true;
   });
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -570,6 +572,7 @@ const Surah = () => {
   return (
     <div className="w-full h-screen max-h-screen bg-white dark:bg-gray-900 flex flex-col overflow-hidden" style={{ height: '100dvh', maxHeight: '100dvh' }}>
       {/* Enhanced Islamic Top Header */}
+      {!isFullscreen && (
       <TopBar
         currentSurah={currentSurah}
         currentPageNum={currentPageNum}
@@ -593,6 +596,7 @@ const Surah = () => {
           setSearchOpen(true);
         }}
       />
+      )}
 
       {/* Main Content - Two Page Display */}
       <PageDisplay
@@ -610,6 +614,13 @@ const Surah = () => {
         onPreviousPage={handlePreviousPage}
         onNextPage={handleNextPage}
         onScroll={handleScroll}
+        isFullscreen={isFullscreen}
+        onImageClick={() => {
+          // Only toggle fullscreen on native platforms (Android/iOS)
+          if (isNativePlatform()) {
+            setIsFullscreen(!isFullscreen);
+          }
+        }}
       />
 
       {/* Preloading indicator overlay */}
@@ -629,7 +640,7 @@ const Surah = () => {
       )}
 
       {/* Audio Progress Bar - between page and controls */}
-      {currentPlayingAyah && (
+      {!isFullscreen && currentPlayingAyah && (
         <AudioProgressBar
             currentTime={currentTime}
             duration={duration}
@@ -677,6 +688,7 @@ const Surah = () => {
       )}
 
       {/* Combined Audio & Navigation Bar */}
+      {!isFullscreen && (
       <div className="w-full bg-gradient-to-t from-emerald-800 to-emerald-600">
         <div className="w-full max-w-[1600px] mx-auto rounded-t-2xl">
         {/* Audio Player Bottom Bar */}
@@ -777,6 +789,7 @@ const Surah = () => {
       />
         </div>
       </div>
+      )}
 
       {/* Search/Navigation Dialog */}
       <NavigationDialog
