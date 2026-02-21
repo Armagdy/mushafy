@@ -313,6 +313,45 @@ export const getPageSurahs = async (pageNumber: number): Promise<number[]> => {
   }
 };
 
+// Get quarter information for a specific Hizb (4 quarters per Hizb)
+export const getHizbQuarters = async (hezbNumber: number): Promise<Array<{
+  quarterNumber: number;
+  surahId: number;
+  ayahNumber: number;
+  pageNumber: number;
+}>> => {
+  try {
+    const quranData = await getQuranMetaData();
+    
+    // Each Hizb has 4 quarters, so calculate which quarters belong to this Hizb
+    const firstQuarter = (hezbNumber - 1) * 4 + 1; // First quarter of this Hizb
+    const quarters = [];
+    
+    for (let i = 0; i < 4; i++) {
+      const quarterIndex = firstQuarter + i - 1; // 0-based index in hizb_quarters array
+      
+      if (quarterIndex >= 0 && quarterIndex < quranData.hizb_quarters.length) {
+        const [surahId, ayahNumber] = quranData.hizb_quarters[quarterIndex];
+        
+        // Find which page this quarter starts on
+        const pageNumber = await getAyahPage(surahId, ayahNumber);
+        
+        quarters.push({
+          quarterNumber: firstQuarter + i,
+          surahId,
+          ayahNumber,
+          pageNumber
+        });
+      }
+    }
+    
+    return quarters;
+  } catch (error) {
+    console.error('Failed to get Hizb quarters:', error);
+    return [];
+  }
+};
+
 // Memoized mapping
 let cachedMapPromise: Promise<Record<number, string>> | null = null;
 

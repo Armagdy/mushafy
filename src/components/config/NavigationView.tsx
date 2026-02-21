@@ -7,22 +7,23 @@ import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { surahs } from "@/data/surahs";
-import { BookOpen, Hash, FileText, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Search } from "lucide-react";
+import { BookOpen, Hash, FileText, Layers, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Search } from "lucide-react";
 
 interface NavigationViewProps {
   onNavigate?: (page: number) => void;
   onClose?: () => void;
-  initialType?: 'surah' | 'juz' | 'page';
+  initialType?: 'surah' | 'juz' | 'page' | 'quarter';
   initialSurah?: number;
   initialJuz?: number;
   initialPage?: number;
+  initialQuarter?: number;
 }
 
 /**
  * Navigation View - Full page navigation interface
  * Extracted from NavigationDialog.tsx for use in Configuration page
  */
-export default function NavigationView({ onNavigate, onClose, initialType, initialSurah, initialJuz, initialPage }: NavigationViewProps) {
+export default function NavigationView({ onNavigate, onClose, initialType, initialSurah, initialJuz, initialPage, initialQuarter }: NavigationViewProps) {
   const { t, isRTL, language } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
@@ -33,7 +34,7 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   const { ayahData, isAyahDataLoading } = useQuranData();
   
   // Active navigation type from URL
-  const activeNavType = searchParams.get('type') as 'surah' | 'juz' | 'page' | null;
+  const activeNavType = searchParams.get('type') as 'surah' | 'juz' | 'page' | 'quarter' | null;
   
   // Map surah ID to Juz range (based on Quran structure)
   const getSurahJuzRange = (surahId: number): { start: number; end: number } => {
@@ -167,11 +168,33 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   });
   const [searchJuzHezb, setSearchJuzHezb] = useState(() => localStorage.getItem('quran-search-juz-hezb') || '');
   const [searchJuzQuarter, setSearchJuzQuarter] = useState(() => localStorage.getItem('quran-search-juz-quarter') || '');
+  const [hizbQuartersData, setHizbQuartersData] = useState<Array<{
+    quarterNumber: number;
+    surahId: number;
+    ayahNumber: number;
+    pageNumber: number;
+    ayahText?: string;
+  }>>([]);
   
   // Page tab state
   const [pageValidationError, setPageValidationError] = useState<string>('');
   const [isPageButtonEnabled, setIsPageButtonEnabled] = useState(false); // Polled button state
   const pageInputRef = useRef<HTMLInputElement>(null); // Direct DOM access
+
+  // Quarter tab state
+  const [selectedQuarter, setSelectedQuarter] = useState(() => {
+    if (initialQuarter && initialType === 'quarter') return initialQuarter.toString();
+    return localStorage.getItem('quran-search-quarter') || '';
+  });
+  const [allQuartersData, setAllQuartersData] = useState<Array<{
+    quarterNumber: number;
+    surahId: number;
+    ayahNumber: number;
+    pageNumber: number;
+    ayahText: string;
+  }>>([]);
+  const [quarterSearchQuery, setQuarterSearchQuery] = useState('');
+  const quarterSearchInputRef = useRef<HTMLInputElement>(null);
 
   // Persist navigation values
   useEffect(() => {
@@ -193,6 +216,45 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   useEffect(() => {
     if (searchJuzQuarter) localStorage.setItem('quran-search-juz-quarter', searchJuzQuarter);
   }, [searchJuzQuarter]);
+
+  useEffect(() => {
+    if (selectedQuarter) localStorage.setItem('quran-search-quarter', selectedQuarter);
+  }, [selectedQuarter]);
+
+  // Fetch all quarters data when quarter tab is active
+  useEffect(() => {
+    if (activeNavType === 'quarter' && allQuartersData.length === 0) {
+      const fetchAllQuarters = async () => {
+        const { getQuranMetaData } = await import('@/lib/quran-data-service');
+        const { getAyahPage } = await import('@/lib/quran-mapping');
+        const quranData = await getQuranMetaData();
+        
+        const quarters = [];
+        for (let i = 0; i < quranData.hizb_quarters.length; i++) {
+          const [surahId, ayahNumber] = quranData.hizb_quarters[i];
+          const pageNumber = await getAyahPage(surahId, ayahNumber);
+          
+          // Find ayah text from ayahData
+          const surahData = ayahData.find(s => s.number === surahId);
+          const verse = surahData?.verses?.find((v: any) => v.number === ayahNumber);
+          const textData = verse?.text as any;
+          const ayahText = textData?.ar || textData || '';
+          
+          quarters.push({
+            quarterNumber: i + 1,
+            surahId,
+            ayahNumber,
+            pageNumber,
+            ayahText
+          });
+        }
+        
+        setAllQuartersData(quarters);
+      };
+      
+      fetchAllQuarters();
+    }
+  }, [activeNavType, allQuartersData.length, ayahData]);
 
   // Polling approach for surah search: Update search query from DOM every 50ms (Android IME fix)
   useEffect(() => {
@@ -222,6 +284,35 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
 
     return () => clearInterval(intervalId);
   }, [activeNavType, surahSearchQuery]);
+
+  // Polling approach for quarter search: Update search query from DOM every 50ms
+  useEffect(() => {
+    if (activeNavType !== 'quarter') {
+      return;
+    }
+
+    const checkQuarterInput = () => {
+      const inputEl = quarterSearchInputRef.current;
+      if (!inputEl) {
+        return;
+      }
+
+      const value = inputEl.value;
+      
+      // Only update state if value changed (avoid unnecessary re-renders)
+      if (value !== quarterSearchQuery) {
+        setQuarterSearchQuery(value);
+      }
+    };
+
+    // Check immediately
+    checkQuarterInput();
+
+    // Then poll every 50ms
+    const intervalId = setInterval(checkQuarterInput, 50);
+
+    return () => clearInterval(intervalId);
+  }, [activeNavType, quarterSearchQuery]);
 
   // Polling approach: Check input value every 50ms (Android WebView IME fix)
   useEffect(() => {
@@ -310,6 +401,22 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
       }
     }
   }, [searchJuzHezb, searchJuz]);
+
+  // Fetch quarter data when Hizb is selected
+  useEffect(() => {
+    if (searchJuzHezb) {
+      const fetchQuarterData = async () => {
+        const hezbNum = parseInt(searchJuzHezb);
+        const { getHizbQuarters } = await import('@/lib/quran-mapping');
+        const quarters = await getHizbQuarters(hezbNum);
+        setHizbQuartersData(quarters);
+      };
+      
+      fetchQuarterData();
+    } else {
+      setHizbQuartersData([]);
+    }
+  }, [searchJuzHezb]);
 
   const handleGoToSurah = async () => {
     if (searchSurah) {
@@ -415,6 +522,21 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
     }
   };
 
+  const handleGoToQuarter = () => {
+    if (selectedQuarter) {
+      const quarterData = allQuartersData.find(q => q.quarterNumber === parseInt(selectedQuarter));
+      if (quarterData) {
+        if (onNavigate) {
+          onNavigate(quarterData.pageNumber);
+          onClose?.();
+        } else {
+          navigate(`/page/${quarterData.pageNumber}`);
+        }
+        setSelectedQuarter('');
+      }
+    }
+  };
+
   if (isAyahDataLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -427,6 +549,7 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
     { id: 'surah', icon: BookOpen, label: isRTL ? 'سورة' : 'Surah' },
     { id: 'page', icon: FileText, label: isRTL ? 'صفحة' : 'Page' },
     { id: 'juz', icon: Hash, label: isRTL ? 'جزء' : 'Juz' },
+    { id: 'quarter', icon: Layers, label: isRTL ? 'ربع' : 'Quarter' },
   ];
   
   // Render list of navigation types
@@ -514,6 +637,44 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
         
         return nameMatch || englishNameMatch || idMatch;
       });
+
+  // Helper function to normalize Arabic text for search (remove diacritics and normalize letters)
+  const normalizeArabicForSearch = (text: string): string => {
+    if (!text) return '';
+    // Remove Arabic diacritics (tashkeel) and other marks
+    let normalized = text.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '');
+    // Normalize different forms of Alef
+    normalized = normalized.replace(/[ٱأإآا]/g, 'ا');
+    // Normalize different forms of Haa
+    normalized = normalized.replace(/ة/g, 'ه');
+    // Normalize Yaa
+    normalized = normalized.replace(/[ىي]/g, 'ي');
+    return normalized;
+  };
+
+  // Filter quarters based on search query
+  const getFilteredQuartersForJuz = (juzNum: number) => {
+    const firstQuarter = (juzNum - 1) * 8 + 1;
+    const juzQuarters = allQuartersData.slice(firstQuarter - 1, firstQuarter + 7);
+    
+    if (quarterSearchQuery.trim() === '') {
+      return juzQuarters;
+    }
+    
+    const arabicQuery = normalizeArabicForSearch(quarterSearchQuery.trim());
+    
+    return juzQuarters.filter((quarter) => {
+      // Search only by ayah text (Arabic)
+      if (!quarter.ayahText || typeof quarter.ayahText !== 'string') {
+        return false;
+      }
+      
+      const normalizedAyahText = normalizeArabicForSearch(quarter.ayahText);
+      const ayahTextMatch = normalizedAyahText.includes(arabicQuery);
+      
+      return ayahTextMatch;
+    });
+  };
   
   // Render content for specific navigation type
   const renderNavigationContent = () => {
@@ -807,6 +968,144 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
             >
               {t('goToPage')}
             </Button>
+          </motion.div>
+        );
+        
+      case 'quarter':
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col h-full max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-16rem)]"
+          >
+            {allQuartersData.length === 0 ? (
+              <div className="flex items-center justify-center p-8">
+                <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : (
+              <>
+                {/* Search Bar */}
+                <div className="mb-3 flex-shrink-0">
+                  <div className="relative">
+                    <Search className={cn(
+                      "absolute top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600",
+                      isRTL ? "right-3" : "left-3"
+                    )} />
+                    <input
+                      ref={quarterSearchInputRef}
+                      type="text"
+                      placeholder={isRTL ? 'ابحث عن ربع...' : 'Search for a quarter...'}
+                      onInput={(e) => {
+                        const input = e.target as HTMLInputElement;
+                        // Allow Arabic letters, English letters, numbers, spaces
+                        const validPattern = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z0-9\s]*$/;
+                        if (!validPattern.test(input.value)) {
+                          // Filter out invalid characters in real-time
+                          const filtered = input.value.split('').filter((char, i) => 
+                            validPattern.test(input.value.substring(0, i + 1))
+                          ).join('');
+                          input.value = filtered;
+                        }
+                        // State is updated by 50ms polling, not here
+                      }}
+                      className={cn(
+                        "w-full py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2",
+                        isRTL ? "pr-10 pl-4" : "pl-10 pr-4",
+                        textSizeClasses.text
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Scrollable Quarter List with Juz Headers */}
+                <div className="flex-1 overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent mb-3">
+                  {Array.from({ length: 30 }, (_, i) => i + 1).map((juzNum) => {
+                    // Get filtered quarters for this Juz
+                    const juzQuarters = getFilteredQuartersForJuz(juzNum);
+                    
+                    // Skip this Juz if no quarters match the search
+                    if (juzQuarters.length === 0) {
+                      return null;
+                    }
+                    
+                    return (
+                      <div key={juzNum}>
+                        {/* Juz Header */}
+                        <div className={cn(
+                          "sticky top-0 bg-emerald-700 dark:bg-emerald-800 text-[#F2E3BB] px-3 py-2 font-semibold border-b-2 border-emerald-600 dark:border-emerald-900 z-10",
+                          textSizeClasses.label
+                        )}>
+                          {isRTL ? `الجزء ${formatNumber(juzNum)}` : `Juz ${juzNum}`}
+                        </div>
+                        
+                        {/* Quarters for this Juz */}
+                        {juzQuarters.map((quarter) => {
+                          // Calculate the local index based on the original position
+                          const firstQuarter = (juzNum - 1) * 8 + 1;
+                          const localIndex = quarter.quarterNumber - firstQuarter;
+                          const isSelected = selectedQuarter === quarter.quarterNumber.toString();
+                          const surah = surahs.find(s => s.id === quarter.surahId);
+                          const localQuarterNumber = localIndex + 1; // Reset to 1-8 per Juz
+                          
+                          return (
+                            <button
+                              key={quarter.quarterNumber}
+                              onClick={() => setSelectedQuarter(quarter.quarterNumber.toString())}
+                              className={cn(
+                                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 transition-colors",
+                                isSelected && "bg-emerald-500/20 dark:bg-emerald-500/20",
+                                isRTL ? "text-right" : "text-left"
+                              )}
+                            >
+                              {/* Small text: Page number, Surah, and Ayah number */}
+                              <div className={cn(
+                                "text-xs text-emerald-600 dark:text-emerald-400 mb-2",
+                                isRTL ? "text-right" : "text-left"
+                              )}>
+                                {isRTL 
+                                  ? `صفحة ${formatNumber(quarter.pageNumber)} - ${surah?.name || ''}: آية ${formatNumber(quarter.ayahNumber)}`
+                                  : `Page ${quarter.pageNumber} - ${surah?.englishName || ''}: Ayah ${quarter.ayahNumber}`}
+                              </div>
+                              
+                              {/* Main text: Local Quarter number and Ayah text */}
+                              <div className={cn(
+                                "text-emerald-800 dark:text-emerald-200",
+                                isSelected && "font-semibold",
+                                textSizeClasses.text,
+                                isRTL ? "font-arabic" : ""
+                              )}>
+                                <span className="font-bold">
+                                  {isRTL 
+                                    ? `${formatNumber(localQuarterNumber)}. `
+                                    : `${localQuarterNumber}. `}
+                                </span>
+                                {quarter.ayahText && typeof quarter.ayahText === 'string' && (
+                                  <span className="font-arabic">
+                                    {quarter.ayahText.substring(0, 50)}
+                                    {quarter.ayahText.length > 50 ? '...' : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {/* Navigation Button - Fixed at Bottom */}
+                <div className="mt-auto pt-3 pb-4 border-t border-emerald-100 dark:border-emerald-900 bg-gradient-to-b from-transparent via-[#FBF9F4]/80 to-[#FBF9F4] dark:from-transparent dark:via-gray-900/80 dark:to-gray-900 flex-shrink-0">
+                  <Button
+                    onClick={handleGoToQuarter}
+                    disabled={!selectedQuarter}
+                    className={cn("w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
+                  >
+                    {t('goToQuarter')}
+                  </Button>
+                </div>
+              </>
+            )}
           </motion.div>
         );
         
