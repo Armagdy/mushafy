@@ -45,6 +45,45 @@ interface DownloadContextType {
 
 const DownloadContext = createContext<DownloadContextType | undefined>(undefined);
 
+// Helper function for parallel downloads with concurrency control
+async function downloadInParallel<T>(
+  items: T[],
+  downloadFn: (item: T, signal: AbortSignal) => Promise<void>,
+  signal: AbortSignal,
+  onProgress: (current: number, total: number) => void,
+  concurrency: number = 5 // Download 5 files at once
+): Promise<void> {
+  const total = items.length;
+  let completed = 0;
+  let index = 0;
+  
+  // Create worker function
+  const worker = async (): Promise<void> => {
+    while (index < items.length) {
+      if (signal.aborted) break;
+      
+      const currentIndex = index++;
+      const item = items[currentIndex];
+      
+      try {
+        await downloadFn(item, signal);
+        completed++;
+        onProgress(completed, total);
+      } catch (error) {
+        if (signal.aborted) break;
+        throw error;
+      }
+    }
+  };
+  
+  // Start workers
+  const workers = Array(Math.min(concurrency, items.length))
+    .fill(null)
+    .map(() => worker());
+  
+  await Promise.all(workers);
+}
+
 export function DownloadProvider({ children }: { children: ReactNode }) {
   const [activeDownload, setActiveDownload] = useState<DownloadJob | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -158,12 +197,20 @@ async function downloadPages(
   const mushafPath = `${ASSETS_BASE_URL}/${folder}`;
   const category = `mushaf-${mushafType}`;
 
-  for (let page = fromPage; page <= toPage; page++) {
-    if (signal.aborted) break;
-    const url = `${mushafPath}/${getPageImageFilename(page)}`;
-    await cacheAsset(url, category, signal);
-    onProgress({ current: page - fromPage + 1, total });
-  }
+  // Create array of page numbers to download
+  const pages = Array.from({ length: total }, (_, i) => fromPage + i);
+
+  // Download pages in parallel (5 at a time)
+  await downloadInParallel(
+    pages,
+    async (page, sig) => {
+      const url = `${mushafPath}/${getPageImageFilename(page)}`;
+      await cacheAsset(url, category, sig);
+    },
+    signal,
+    (current, totalCount) => onProgress({ current, total: totalCount }),
+    5 // 5 concurrent downloads
+  );
 }
 
 async function downloadEveryAyah(
@@ -180,15 +227,23 @@ async function downloadEveryAyah(
   onProgress({ current: 0, total });
 
   const category = `audio-everyayah-${reciterFolder}`;
+  const surahStr = surahNum.toString().padStart(3, '0');
 
-  for (let ayah = fromAyah; ayah <= toAyah; ayah++) {
-    if (signal.aborted) break;
-    const surahStr = surahNum.toString().padStart(3, '0');
-    const ayahStr = ayah.toString().padStart(3, '0');
-    const url = `${reciterBaseUrl}/${surahStr}${ayahStr}.mp3`;
-    await cacheAsset(url, category, signal);
-    onProgress({ current: ayah - fromAyah + 1, total });
-  }
+  // Create array of ayah numbers to download
+  const ayahs = Array.from({ length: total }, (_, i) => fromAyah + i);
+
+  // Download ayahs in parallel (5 at a time)
+  await downloadInParallel(
+    ayahs,
+    async (ayah, sig) => {
+      const ayahStr = ayah.toString().padStart(3, '0');
+      const url = `${reciterBaseUrl}/${surahStr}${ayahStr}.mp3`;
+      await cacheAsset(url, category, sig);
+    },
+    signal,
+    (current, totalCount) => onProgress({ current, total: totalCount }),
+    5 // 5 concurrent downloads
+  );
 }
 
 async function downloadMp3Quran(
@@ -206,10 +261,18 @@ async function downloadMp3Quran(
 
   const category = `audio-mp3quran-${moshaf.id}`;
 
-  for (let surahNum = fromSurah; surahNum <= toSurah; surahNum++) {
-    if (signal.aborted) break;
-    const url = getSurahAudioUrl(moshaf.server, surahNum);
-    await cacheAsset(url, category, signal);
-    onProgress({ current: surahNum - fromSurah + 1, total });
-  }
+  // Create array of surah numbers to download
+  const surahs = Array.from({ length: total }, (_, i) => fromSurah + i);
+
+  // Download surahs in parallel (3 at a time - larger files)
+  await downloadInParallel(
+    surahs,
+    async (surahNum, sig) => {
+      const url = getSurahAudioUrl(moshaf.server, surahNum);
+      await cacheAsset(url, category, sig);
+    },
+    signal,
+    (current, totalCount) => onProgress({ current, total: totalCount }),
+    3 // 3 concurrent downloads (audio files are larger)
+  );
 }
