@@ -246,9 +246,8 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
           </div>
           <Button
             onClick={performWordSearch}
-            disabled={searchWord.trim().length < 2}
             className={cn(
-              "px-4 py-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed",
+              "px-4 py-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]",
               textSizeClasses.button
             )}
           >

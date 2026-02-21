@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { HardDriveDownload, Search, ChevronDown, WifiOff, StopCircle } from "lucide-react";
+import { HardDriveDownload, Search, ChevronDown, WifiOff, StopCircle, CheckCircle2, XCircle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { MushafType } from "@/contexts/MushafContext";
+import { useDownload } from "@/contexts/DownloadContext";
 import { cn } from "@/lib/utils";
 import { surahs } from "@/data/surahs";
-import { ASSETS_BASE_URL } from "@/config/assets";
 import { getAudioData } from "@/lib/quran-data-service";
-import { getMp3QuranReciters, getSurahAudioUrl, type Mp3QuranReciter, type Mp3QuranMoshaf } from "@/lib/mp3quran-service";
-import { cacheAsset } from "@/lib/asset-cache";
-import { getPageImageFilename } from "@/lib/quran-mapping";
+import { getMp3QuranReciters, type Mp3QuranReciter, type Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { useNetwork } from "@/hooks/useNetwork";
 import { useToast } from "@/hooks/use-toast";
 
@@ -30,6 +28,7 @@ export function Download() {
   const { isOnline } = useNetwork();
   const { toast } = useToast();
   const { dialogTextSize } = useDialogTextSize();
+  const { activeDownload, startDownload, cancelDownload, clearDownload } = useDownload();
   
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   
@@ -42,8 +41,10 @@ export function Download() {
   const [downloadToSurah, setDownloadToSurah] = useState(114);
   const [downloadFromAyah, setDownloadFromAyah] = useState(1);
   const [downloadToAyah, setDownloadToAyah] = useState(7);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
+  
+  // Use context state for download progress
+  const isDownloading = activeDownload?.status === 'downloading';
+  const downloadProgress = activeDownload?.progress || { current: 0, total: 0 };
   
   // Reciter state for downloads
   const [everyAyahReciters, setEveryAyahReciters] = useState<Reciter[]>([]);
@@ -66,9 +67,6 @@ export function Download() {
   const mp3QuranInputRef = useRef<HTMLInputElement>(null);
   const everyAyahPollingRef = useRef<NodeJS.Timeout | null>(null);
   const mp3QuranPollingRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // AbortController for cancelling downloads
-  const downloadAbortControllerRef = React.useRef<AbortController | null>(null);
   
   // Get the selected reciter object
   const selectedReciterObj = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
@@ -312,13 +310,24 @@ export function Download() {
     }
   }, [selectedRecitationStyle, selectedQuality, everyAyahReciters, selectedEveryAyahReciter]);
   
-  const handleCancelDownload = () => {
-    if (downloadAbortControllerRef.current) {
-      downloadAbortControllerRef.current.abort();
-      downloadAbortControllerRef.current = null;
+  // Show toast when download completes
+  useEffect(() => {
+    if (activeDownload?.status === 'completed') {
+      toast({
+        title: t('downloadComplete'),
+        description: t('downloadCompleteMessage'),
+      });
+    } else if (activeDownload?.status === 'error') {
+      toast({
+        title: t('downloadFailed'),
+        description: activeDownload.error || 'An error occurred',
+        variant: "destructive",
+      });
     }
-    setIsDownloading(false);
-    setDownloadProgress({ current: 0, total: 0 });
+  }, [activeDownload?.status, toast, t]);
+  
+  const handleCancelDownload = () => {
+    cancelDownload();
   };
   
   const handleDownload = async () => {
@@ -332,87 +341,42 @@ export function Download() {
       return;
     }
     
-    // Create new AbortController for this download session
-    downloadAbortControllerRef.current = new AbortController();
-    const signal = downloadAbortControllerRef.current.signal;
-    
-    setIsDownloading(true);
-    
-    try {
-      if (downloadType === 'pages') {
-        // Cache mushaf pages
-        const total = downloadToPage - downloadFromPage + 1;
-        setDownloadProgress({ current: 0, total });
-        
-        // Get mushaf path based on download mushaf type
-        const folder = downloadMushafType === 'mwdoa' 
-          ? 'mushuf_mwdoa_images' 
-          : downloadMushafType === 'tashel'
-          ? 'mushaf_tashel_pages'
-          : 'mushaf_madinah_images';
-        const mushafPath = `${ASSETS_BASE_URL}/${folder}`;
-        const category = `mushaf-${downloadMushafType}`;
-        
-        for (let page = downloadFromPage; page <= downloadToPage; page++) {
-          if (signal.aborted) break;
-          const url = `${mushafPath}/${getPageImageFilename(page)}`;
-          await cacheAsset(url, category, signal);
-          setDownloadProgress({ current: page - downloadFromPage + 1, total });
-        }
-      } else if (downloadType === 'everyayah') {
-        // Cache EveryAyah audio
-        const reciter = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
-        if (!reciter) return;
-        
-        const total = downloadToAyah - downloadFromAyah + 1;
-        setDownloadProgress({ current: 0, total });
-        const category = `audio-everyayah-${reciter.folder}`;
-        
-        for (let ayah = downloadFromAyah; ayah <= downloadToAyah; ayah++) {
-          if (signal.aborted) break;
-          const surahStr = downloadFromSurah.toString().padStart(3, '0');
-          const ayahStr = ayah.toString().padStart(3, '0');
-          const url = `${reciter.baseUrl}/${surahStr}${ayahStr}.mp3`;
-          await cacheAsset(url, category, signal);
-          setDownloadProgress({ current: ayah - downloadFromAyah + 1, total });
-        }
-      } else if (downloadType === 'mp3quran') {
-        // Cache MP3Quran full surah audio
-        if (!selectedMoshaf) return;
-        
-        const total = downloadToSurah - downloadFromSurah + 1;
-        setDownloadProgress({ current: 0, total });
-        const category = `audio-mp3quran-${selectedMoshaf.id}`;
-        
-        for (let surahNum = downloadFromSurah; surahNum <= downloadToSurah; surahNum++) {
-          if (signal.aborted) break;
-          const url = getSurahAudioUrl(selectedMoshaf.server, surahNum);
-          await cacheAsset(url, category, signal);
-          setDownloadProgress({ current: surahNum - downloadFromSurah + 1, total });
-        }
-      }
+    // Prepare download job based on type
+    if (downloadType === 'pages') {
+      await startDownload({
+        type: 'pages',
+        params: {
+          mushafType: downloadMushafType,
+          fromPage: downloadFromPage,
+          toPage: downloadToPage,
+        },
+      });
+    } else if (downloadType === 'everyayah') {
+      const reciter = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
+      if (!reciter) return;
       
-      // Show success toast when download completes
-      if (!signal.aborted) {
-        toast({
-          title: t('downloadComplete'),
-          description: t('downloadCompleteMessage'),
-        });
-      }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.log('Download cancelled by user');
-      } else {
-        console.error('Download error:', error);
-        toast({
-          title: t('downloadFailed'),
-          description: error.message || 'An error occurred',
-          variant: "destructive",
-        });
-      }
-    } finally {
-      downloadAbortControllerRef.current = null;
-      setIsDownloading(false);
+      await startDownload({
+        type: 'everyayah',
+        params: {
+          reciterFolder: reciter.folder,
+          reciterName: reciter.name,
+          reciterBaseUrl: reciter.baseUrl,
+          surahNum: downloadFromSurah,
+          fromAyah: downloadFromAyah,
+          toAyah: downloadToAyah,
+        },
+      });
+    } else if (downloadType === 'mp3quran') {
+      if (!selectedMoshaf) return;
+      
+      await startDownload({
+        type: 'mp3quran',
+        params: {
+          moshaf: selectedMoshaf,
+          fromSurah: downloadFromSurah,
+          toSurah: downloadToSurah,
+        },
+      });
     }
   };
 
@@ -773,18 +737,62 @@ export function Download() {
       )}
       
       {/* Download Progress */}
-      {isDownloading && downloadProgress.total > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className={cn("flex justify-between text-emerald-700", textSizeClasses.text)}>
-            <span>{t('downloadProgress')}</span>
-            <span>{downloadProgress.current} / {downloadProgress.total}</span>
+      {activeDownload && (
+        <div className="flex flex-col gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {activeDownload.status === 'downloading' && (
+                <HardDriveDownload className="w-5 h-5 text-emerald-600 dark:text-emerald-400 animate-pulse" />
+              )}
+              {activeDownload.status === 'completed' && (
+                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+              )}
+              {activeDownload.status === 'error' && (
+                <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              )}
+              {activeDownload.status === 'cancelled' && (
+                <StopCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              )}
+              <span className={cn("font-medium text-emerald-700 dark:text-emerald-300", textSizeClasses.text)}>
+                {activeDownload.status === 'downloading' && t('downloadProgress')}
+                {activeDownload.status === 'completed' && t('downloadComplete')}
+                {activeDownload.status === 'error' && t('downloadFailed')}
+                {activeDownload.status === 'cancelled' && t('downloadCancelled')}
+              </span>
+            </div>
+            {downloadProgress.total > 0 && (
+              <span className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
+                {downloadProgress.current} / {downloadProgress.total}
+              </span>
+            )}
           </div>
-          <div className="w-full h-2 bg-emerald-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-emerald-600 transition-all duration-300"
-              style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}
-            />
-          </div>
+          
+          {activeDownload.status === 'downloading' && downloadProgress.total > 0 && (
+            <div className="w-full h-2 bg-emerald-100 dark:bg-emerald-800 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-emerald-600 dark:bg-emerald-500 transition-all duration-300"
+                style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}
+              />
+            </div>
+          )}
+          
+          {activeDownload.status === 'completed' && (
+            <div className="w-full h-2 bg-emerald-100 dark:bg-emerald-800 rounded-full overflow-hidden">
+              <div className="h-full bg-green-600 dark:bg-green-500 w-full" />
+            </div>
+          )}
+          
+          {(activeDownload.status === 'completed' || activeDownload.status === 'cancelled' || activeDownload.status === 'error') && (
+            <button
+              onClick={clearDownload}
+              className={cn(
+                "mt-1 text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-100 underline",
+                textSizeClasses.label
+              )}
+            >
+              {t('clearDownload')}
+            </button>
+          )}
         </div>
       )}
       

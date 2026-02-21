@@ -70,14 +70,14 @@ export function TopBar({
               className="flex-1 flex items-center justify-center hover:opacity-80 transition-opacity"
             >
               <div className="flex items-center gap-2">
-                <span className="text-base text-[#F2E3BB]/70 leading-none">☙</span>
+                <span className="text-base text-[#F2E3BB]/70 leading-none">﴾</span>
                 <span 
                   className="text-2xl md:text-3xl font-bold text-[#F2E3BB] leading-none"
                   style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
                 >
                   {language === 'ar' ? currentSurah.name : currentSurah.englishName}
                 </span>
-                <span className="text-base text-[#F2E3BB]/70 leading-none">❧</span>
+                <span className="text-base text-[#F2E3BB]/70 leading-none">﴿</span>
               </div>
             </button>
 
