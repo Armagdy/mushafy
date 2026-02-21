@@ -4,7 +4,7 @@ import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTe
 import { useQuranData } from "@/hooks/useQuranData";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 
@@ -31,6 +31,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
   const [wordSearchResults, setWordSearchResults] = useState<any[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null); // Direct DOM access for Android IME
 
   // Validate that text contains only Arabic characters
   const isArabicText = (text: string): boolean => {
@@ -38,6 +39,39 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
     const arabicPattern = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\s]+$/;
     return arabicPattern.test(text) || text === '';
   };
+
+  // Polling approach: Update search word from DOM every 50ms (Android IME fix)
+  useEffect(() => {
+    const checkSearchInput = () => {
+      const inputEl = searchInputRef.current;
+      if (!inputEl) {
+        return;
+      }
+
+      const value = inputEl.value;
+      
+      // Only update state if value changed (avoid unnecessary re-renders)
+      if (value !== searchWord) {
+        setSearchWord(value);
+        // Clear results when typing (search not performed yet)
+        if (wordSearchResults.length > 0) {
+          setWordSearchResults([]);
+        }
+        // Reset search state when input changes
+        if (hasSearched && value !== searchWord) {
+          setHasSearched(false);
+        }
+      }
+    };
+
+    // Check immediately
+    checkSearchInput();
+
+    // Then poll every 50ms
+    const intervalId = setInterval(checkSearchInput, 50);
+
+    return () => clearInterval(intervalId);
+  }, [searchWord, wordSearchResults.length, hasSearched]);
 
   // Number formatting for Arabic/English
   const formatNumber = (num: number | string): string => {
@@ -150,8 +184,8 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
               console.log('Arabic Text:', arabicText);
               results.push({
                 surahNumber: surahData.number,
-                surahName: surahData.name,
-                surahNameEn: surahData.englishName,
+                surahName: typeof surahData.name === 'object' ? surahData.name.ar : surahData.name,
+                surahNameEn: typeof surahData.name === 'object' ? surahData.name.en : (surahData.englishName || surahData.name),
                 ayahNumber: verse.number,
                 arabicText: verse.text?.ar,
                 englishText: verse.text?.en,
@@ -219,18 +253,20 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
               isRTL ? "right-3" : "left-3"
             )} />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder={t('searchWordPlaceholder')}
-              value={searchWord}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                // Only allow Arabic text
-                if (isArabicText(newValue)) {
-                  setSearchWord(newValue);
-                  setWordSearchResults([]); // Clear results when user types
-                  setHasSearched(false); // Reset search state when input changes
+              onInput={(e) => {
+                const input = e.target as HTMLInputElement;
+                // Filter: keep only Arabic characters in real-time
+                if (!isArabicText(input.value)) {
+                  // Find last valid Arabic substring
+                  const filtered = input.value.split('').filter((char, i) => 
+                    isArabicText(input.value.substring(0, i + 1))
+                  ).join('');
+                  input.value = filtered;
                 }
-                // If non-Arabic characters attempted, do nothing (blocks input)
+                // State is updated by 50ms polling, not here
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {

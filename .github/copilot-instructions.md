@@ -211,6 +211,180 @@ className="bg-amber-500"                        // Gold backgrounds
 </div>
 ```
 
+### Arabic Input & IME Handling (Android/Mobile)
+**CRITICAL:** Android Arabic keyboards use **Input Method Editor (IME)** which "composes" text before committing. React state updates don't synchronize properly with IME, causing buttons to stay disabled even after valid input.
+
+#### The Problem
+Standard React controlled inputs fail with Arabic keyboards on Android:
+```tsx
+// ❌ BROKEN: Button stays disabled after typing Arabic numerals
+const [value, setValue] = useState('');
+const [isValid, setIsValid] = useState(false);
+
+useEffect(() => {
+  setIsValid(validateInput(value));
+}, [value]);
+
+<input value={value} onChange={(e) => setValue(e.target.value)} />
+<Button disabled={!isValid}>Submit</Button>
+```
+
+**Issue:** React state updates (`setValue`) don't trigger re-renders immediately during IME composition, causing validation state to desync from actual input value.
+
+#### The Solution: 50ms Polling + onInput Filtering
+Use **uncontrolled input with ref** + **50ms polling for validation** + **onInput for character filtering**:
+
+```tsx
+// ✅ CORRECT: Works reliably on Android with Arabic keyboards
+const [isButtonEnabled, setIsButtonEnabled] = useState(false);
+const [validationError, setValidationError] = useState('');
+const inputRef = useRef<HTMLInputElement>(null);
+
+// Helper to convert Arabic numerals to English for parsing
+const parseArabicNumber = useCallback((str: string): string => {
+  const arabicToEnglish: { [key: string]: string } = {
+    '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+    '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+  };
+  return str.split('').map(char => arabicToEnglish[char] || char).join('');
+}, []);
+
+// Poll input value every 50ms for validation (bypasses React state issues)
+useEffect(() => {
+  const checkInput = () => {
+    const inputEl = inputRef.current;
+    if (!inputEl) return;
+
+    const value = inputEl.value.trim();
+    
+    if (!value) {
+      setIsButtonEnabled(false);
+      setValidationError('');
+      return;
+    }
+
+    // Convert Arabic numerals to English for parsing
+    const normalizedValue = parseArabicNumber(value);
+    const numValue = parseInt(normalizedValue);
+
+    // Validate (example: page number 1-604)
+    if (isNaN(numValue) || numValue < 1 || numValue > 604) {
+      setIsButtonEnabled(false);
+      setValidationError(t('pageRangeError'));
+    } else {
+      setIsButtonEnabled(true);
+      setValidationError('');
+    }
+  };
+
+  // Check immediately
+  checkInput();
+
+  // Poll every 50ms
+  const intervalId = setInterval(checkInput, 50);
+
+  return () => clearInterval(intervalId);
+}, [parseArabicNumber, t]);
+
+<input
+  ref={inputRef}
+  type="text"
+  inputMode="numeric"
+  pattern="[0-9٠-٩]*"
+  placeholder={isRTL ? `رقم الصفحة (${formatNumber(1)}-${formatNumber(604)})` : 'Page number (1-604)'}
+  onInput={(e) => {
+    const input = e.target as HTMLInputElement;
+    // Filter out non-numeric characters in real-time (keep only 0-9 and ٠-٩)
+    const filteredValue = input.value.replace(/[^0-9٠-٩]/g, '');
+    if (input.value !== filteredValue) {
+      input.value = filteredValue;
+    }
+  }}
+  className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500", textSizeClasses.text)}
+/>
+
+{validationError && (
+  <div className={cn("text-red-600 text-center font-medium bg-red-50 px-3 py-2 rounded-lg", textSizeClasses.text)}>
+    {validationError}
+  </div>
+)}
+
+<Button
+  onClick={() => {
+    const value = inputRef.current?.value || '';
+    const normalized = parseArabicNumber(value);
+    const pageNum = parseInt(normalized);
+    if (pageNum > 0 && pageNum <= 604) {
+      navigate(`/page/${pageNum}`);
+      inputRef.current.value = ''; // Clear after submit
+    }
+  }}
+  disabled={!isButtonEnabled}
+  className={cn("bg-emerald-700 hover:bg-emerald-800", textSizeClasses.button)}
+>
+  {t('goToPage')}
+</Button>
+```
+
+#### Key Implementation Points
+1. **Uncontrolled input**: No `value` prop, use `ref` for direct DOM access
+2. **50ms polling**: Check `inputRef.current.value` on interval (bypasses React state timing issues)
+3. **onInput filtering**: Real-time character filtering for user experience (e.g., allow only ٠-٩ or 0-9)
+4. **Validation in polling**: Set button enabled state and error messages during polling
+5. **Read from ref on submit**: `inputRef.current.value` gives current DOM value without state delays
+6. **Clear after submit**: `inputRef.current.value = ''` to reset input
+
+#### Arabic Text Search Pattern
+For text search (not just numerals), filter for Arabic characters only:
+
+```tsx
+const inputRef = useRef<HTMLInputElement>(null);
+
+// Validate Arabic text (allow Arabic letters, spaces, punctuation)
+const isArabicText = (text: string): boolean => {
+  const arabicPattern = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\s]+$/;
+  return arabicPattern.test(text) || text === '';
+};
+
+<input
+  ref={inputRef}
+  type="text"
+  placeholder={t('searchWordPlaceholder')}
+  onInput={(e) => {
+    const input = e.target as HTMLInputElement;
+    // Filter: keep only Arabic characters
+    if (!isArabicText(input.value)) {
+      // Find last valid Arabic substring
+      const filtered = input.value.split('').filter((char, i) => 
+        isArabicText(input.value.substring(0, i + 1))
+      ).join('');
+      input.value = filtered;
+    }
+  }}
+  className={cn("w-full px-3 py-2 rounded-lg", textSizeClasses.text)}
+/>
+```
+
+#### Why This Works
+- **Polling bypasses React state**: Reads directly from DOM, avoiding React's batched updates during IME
+- **50ms interval**: Fast enough for responsive UI, slow enough to not impact performance
+- **onInput runs immediately**: Character filtering happens before IME commits, providing instant feedback
+- **Uncontrolled input**: No value/onChange desync issues with IME composition
+
+#### Where to Apply This Pattern
+**MANDATORY for ALL Arabic input fields** in the app:
+- ✅ **NavigationView - Page input**: Number input accepting ٠-٩ and 0-9 (see [src/components/config/NavigationView.tsx](src/components/config/NavigationView.tsx) lines 730-780)
+- ✅ **NavigationView - Surah search**: Text search for Arabic surah names
+- ✅ **SearchView - Word search**: Arabic text search input
+- ✅ **Any new input** that accepts Arabic numerals or Arabic text on Android
+
+#### Common Mistakes to Avoid
+- ❌ Don't use controlled inputs (value + onChange) for Arabic input on mobile
+- ❌ Don't rely on composition events (onCompositionStart/End) - they don't fix state timing
+- ❌ Don't use useMemo or other React state optimizations for validation - they don't help with IME
+- ❌ Don't validate in onChange/onInput - validate in polling loop instead
+- ✅ Always use uncontrolled input with ref + polling for Arabic input fields
+
 ### Default Text Styles
 **Typography hierarchy:**
 ```tsx

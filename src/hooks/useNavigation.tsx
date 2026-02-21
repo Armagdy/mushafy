@@ -137,8 +137,8 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
             if (matchesArabic || matchesEnglish) {
               results.push({
                 surahNumber: surahData.number,
-                surahName: surahData.name,
-                surahNameEn: surahData.englishName,
+                surahName: typeof surahData.name === 'object' ? surahData.name.ar : surahData.name,
+                surahNameEn: typeof surahData.name === 'object' ? surahData.name.en : (surahData.englishName || surahData.name),
                 ayahNumber: verse.number,
                 arabicText: verse.text?.ar,
                 englishText: verse.text?.en,

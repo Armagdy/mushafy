@@ -4,7 +4,7 @@ import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTe
 import { useQuranData } from "@/hooks/useQuranData";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { surahs } from "@/data/surahs";
 import { BookOpen, Hash, FileText, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Search } from "lucide-react";
@@ -140,6 +140,15 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
     }
     return numStr;
   };
+
+  // Convert Arabic numerals to English numerals for parsing
+  const parseArabicNumber = useCallback((str: string): string => {
+    const arabicToEnglish: { [key: string]: string } = {
+      '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+      '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+    };
+    return str.split('').map(char => arabicToEnglish[char] || char).join('');
+  }, []);
   
   // Surah tab state
   const [searchSurah, setSearchSurah] = useState(() => {
@@ -149,6 +158,7 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   const [searchAyah, setSearchAyah] = useState(() => localStorage.getItem('quran-search-ayah') || '');
   const [selectedSurahAyahs, setSelectedSurahAyahs] = useState<any[]>([]);
   const [surahSearchQuery, setSurahSearchQuery] = useState('');
+  const surahSearchInputRef = useRef<HTMLInputElement>(null); // Direct DOM access for Android IME
   
   // Juz tab state
   const [searchJuz, setSearchJuz] = useState(() => {
@@ -159,11 +169,9 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   const [searchJuzQuarter, setSearchJuzQuarter] = useState(() => localStorage.getItem('quran-search-juz-quarter') || '');
   
   // Page tab state
-  const [searchPage, setSearchPage] = useState(() => {
-    if (initialPage && initialType === 'page') return initialPage.toString();
-    return localStorage.getItem('quran-search-page') || '';
-  });
   const [pageValidationError, setPageValidationError] = useState<string>('');
+  const [isPageButtonEnabled, setIsPageButtonEnabled] = useState(false); // Polled button state
+  const pageInputRef = useRef<HTMLInputElement>(null); // Direct DOM access
 
   // Persist navigation values
   useEffect(() => {
@@ -186,37 +194,79 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
     if (searchJuzQuarter) localStorage.setItem('quran-search-juz-quarter', searchJuzQuarter);
   }, [searchJuzQuarter]);
 
+  // Polling approach for surah search: Update search query from DOM every 50ms (Android IME fix)
   useEffect(() => {
-    if (searchPage) localStorage.setItem('quran-search-page', searchPage);
-  }, [searchPage]);
+    if (activeNavType !== 'surah') {
+      return;
+    }
 
-  // Validate page number
-  useEffect(() => {
-    if (activeNavType === 'page') {
-      const pageStr = searchPage.trim();
+    const checkSurahInput = () => {
+      const inputEl = surahSearchInputRef.current;
+      if (!inputEl) {
+        return;
+      }
+
+      const value = inputEl.value;
       
-      if (pageStr === '') {
+      // Only update state if value changed (avoid unnecessary re-renders)
+      if (value !== surahSearchQuery) {
+        setSurahSearchQuery(value);
+      }
+    };
+
+    // Check immediately
+    checkSurahInput();
+
+    // Then poll every 50ms
+    const intervalId = setInterval(checkSurahInput, 50);
+
+    return () => clearInterval(intervalId);
+  }, [activeNavType, surahSearchQuery]);
+
+  // Polling approach: Check input value every 50ms (Android WebView IME fix)
+  useEffect(() => {
+    if (activeNavType !== 'page') {
+      setIsPageButtonEnabled(false);
+      setPageValidationError('');
+      return;
+    }
+
+    const checkInput = () => {
+      const inputEl = pageInputRef.current;
+      if (!inputEl) {
+        return;
+      }
+
+      const value = inputEl.value.trim();
+      
+      if (!value) {
+        setIsPageButtonEnabled(false);
         setPageValidationError('');
         return;
       }
-      
-      const pageNum = parseInt(pageStr);
-      
-      if (isNaN(pageNum)) {
+
+      // Convert Arabic numerals to English for parsing
+      const normalizedPage = parseArabicNumber(value);
+      const pageNum = parseInt(normalizedPage);
+
+      // Valid if it's a number between 1-604
+      if (isNaN(pageNum) || pageNum < 1 || pageNum > 604) {
+        setIsPageButtonEnabled(false);
         setPageValidationError(t('pageRangeError'));
-        return;
+      } else {
+        setIsPageButtonEnabled(true);
+        setPageValidationError('');
       }
-      
-      if (pageNum < 1 || pageNum > 604) {
-        setPageValidationError(t('pageRangeError'));
-        return;
-      }
-      
-      setPageValidationError('');
-    } else {
-      setPageValidationError('');
-    }
-  }, [activeNavType, searchPage, t]);
+    };
+
+    // Check immediately
+    checkInput();
+
+    // Then poll every 50ms
+    const intervalId = setInterval(checkInput, 50);
+
+    return () => clearInterval(intervalId);
+  }, [activeNavType, parseArabicNumber, t]);
 
   // Update selected surah ayahs when surah changes
   useEffect(() => {
@@ -344,15 +394,24 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   };
 
   const handleGoToSearchPage = () => {
-    const pageNum = parseInt(searchPage);
-    if (pageNum > 0 && pageNum <= 604 && !pageValidationError) {
+    // Read from input DOM directly (consistent with polling approach)
+    const inputValue = pageInputRef.current?.value || '';
+    
+    // Convert Arabic numerals to English for parsing
+    const normalizedPage = parseArabicNumber(inputValue);
+    const pageNum = parseInt(normalizedPage);
+    
+    if (pageNum > 0 && pageNum <= 604) {
       if (onNavigate) {
         onNavigate(pageNum);
         onClose?.();
       } else {
         navigate(`/page/${pageNum}`);
       }
-      setSearchPage('');
+      // Clear input DOM (uncontrolled input)
+      if (pageInputRef.current) {
+        pageInputRef.current.value = '';
+      }
     }
   };
 
@@ -441,10 +500,18 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   const filteredSurahs = surahSearchQuery.trim() === '' 
     ? surahs 
     : surahs.filter(surah => {
-        const query = surahSearchQuery.toLowerCase();
-        const nameMatch = surah.name.includes(surahSearchQuery); // Arabic search
+        const query = surahSearchQuery.trim().toLowerCase();
+        const arabicQuery = surahSearchQuery.trim(); // Keep original for Arabic (case-sensitive)
+        
+        // Check Arabic name (case-sensitive for Arabic text)
+        const nameMatch = surah.name.includes(arabicQuery);
+        
+        // Check English name (case-insensitive)
         const englishNameMatch = surah.englishName.toLowerCase().includes(query);
+        
+        // Check ID
         const idMatch = surah.id.toString().includes(query);
+        
         return nameMatch || englishNameMatch || idMatch;
       });
   
@@ -466,10 +533,23 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
                   isRTL ? "right-3" : "left-3"
                 )} />
                 <input
+                  ref={surahSearchInputRef}
                   type="text"
                   placeholder={isRTL ? 'ابحث عن سورة...' : 'Search for a surah...'}
-                  value={surahSearchQuery}
-                  onChange={(e) => setSurahSearchQuery(e.target.value)}
+                  onInput={(e) => {
+                    const input = e.target as HTMLInputElement;
+                    // Allow Arabic letters, English letters, numbers, spaces
+                    // Arabic range: U+0600-U+06FF (basic Arabic)
+                    const validPattern = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z0-9\s]*$/;
+                    if (!validPattern.test(input.value)) {
+                      // Filter out invalid characters in real-time
+                      const filtered = input.value.split('').filter((char, i) => 
+                        validPattern.test(input.value.substring(0, i + 1))
+                      ).join('');
+                      input.value = filtered;
+                    }
+                    // State is updated by 50ms polling, not here
+                  }}
                   className={cn(
                     "w-full py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2",
                     isRTL ? "pr-10 pl-4" : "pl-10 pr-4",
@@ -530,7 +610,9 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
                           isSelected && "font-semibold",
                           textSizeClasses.text
                         )}>
-                          {isRTL ? `${formatNumber(surah.id)}. ${surah.name}` : `${surah.id}. ${surah.englishName}`}
+                          {isRTL 
+                            ? `${formatNumber(surah.id)}. ${surah.name}` 
+                            : `${surah.id}. ${surah.englishName}`}
                         </div>
                       </button>
                     );
@@ -726,13 +808,20 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
               {t('pageNumber')}
             </label>
             <input
-              type="number"
-              placeholder={isRTL ? 'رقم الصفحة (1-604)' : 'Page number (1-604)'}
-              value={searchPage}
-              onChange={(e) => setSearchPage(e.target.value)}
-              min="1"
-              max="604"
-              className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
+              ref={pageInputRef}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9٠-٩]*"
+              placeholder={isRTL ? `رقم الصفحة (${formatNumber(1)}-${formatNumber(604)})` : 'Page number (1-604)'}
+              onInput={(e) => {
+                const input = e.target as HTMLInputElement;
+                // Filter out any non-numeric characters (keep only 0-9 and ٠-٩)
+                const filteredValue = input.value.replace(/[^0-9٠-٩]/g, '');
+                if (input.value !== filteredValue) {
+                  input.value = filteredValue;
+                }
+              }}
+              className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", isRTL ? "text-right" : "text-left", textSizeClasses.text)}
             />
             
             {/* Validation Error Message */}
@@ -744,7 +833,7 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
             
             <Button
               onClick={handleGoToSearchPage}
-              disabled={!searchPage || !!pageValidationError}
+              disabled={!isPageButtonEnabled}
               className={cn("w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
             >
               {t('goToPage')}

@@ -12,9 +12,13 @@ interface AyahVerse {
 
 interface SurahData {
   number: number;
-  name: string;
-  englishName: string;
-  englishNameTranslation: string;
+  name: {
+    ar: string;
+    en: string;
+    transliteration: string;
+  };
+  englishName?: string; // Optional for backward compatibility
+  englishNameTranslation?: string; // Optional for backward compatibility
   numberOfAyahs: number;
   revelationType: string;
   verses: AyahVerse[];
