@@ -2,7 +2,6 @@ import { useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
-import { BookText } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
@@ -22,7 +21,6 @@ interface AyahSelectorDialogProps {
   onPlayAyah: (surahNum: number, ayahNum: number) => void;
   onSetCurrentPlayingAyah: (ayah: { surah: number; ayah: number }) => void;
   onSeekToAyahPosition: (surahNum: number, ayahNum: number) => void;
-  onViewTafseer?: (surahNum: number, ayahNum: number, surahName: string) => void;
   onStopAudio?: () => void;
 }
 
@@ -41,7 +39,6 @@ export function AyahSelectorDialog({
   onPlayAyah,
   onSetCurrentPlayingAyah,
   onSeekToAyahPosition,
-  onViewTafseer,
   onStopAudio,
 }: AyahSelectorDialogProps) {
   const { t, isRTL, language } = useLanguage();
@@ -49,6 +46,16 @@ export function AyahSelectorDialog({
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   const navigate = useNavigate();
   const ayahListRef = useRef<HTMLDivElement>(null);
+
+  // Helper function to convert numbers based on language
+  const formatNumber = (num: number | string): string => {
+    const numStr = num.toString();
+    if (language === 'ar') {
+      // Convert to Eastern Arabic numerals (٠-٩)
+      return numStr.replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[parseInt(d)]);
+    }
+    return numStr;
+  };
 
   const handleAyahClick = (surahNum: number, ayahNum: number, versePage: number) => {
     console.log('=== NAVIGATING FROM AYAH SELECTOR ===');
@@ -77,13 +84,7 @@ export function AyahSelectorDialog({
     onOpenChange(false);
   };
 
-  const handleTafseerClick = (e: React.MouseEvent, surahNum: number, ayahNum: number, surahName: string) => {
-    e.stopPropagation();
-    if (onViewTafseer) {
-      onViewTafseer(surahNum, ayahNum, surahName);
-      onOpenChange(false);
-    }
-  };
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -127,55 +128,29 @@ export function AyahSelectorDialog({
             
             return surahsToShow.map((surah: any) => (
               <div key={surah.number} className="border border-emerald-200 dark:border-emerald-700 rounded-lg overflow-hidden">
-                <div className="bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 flex items-center justify-between">
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2">
                   <span className={cn("font-semibold text-emerald-800 dark:text-emerald-300", textSizeClasses.text)}>
                     {language === 'ar' ? surah.name?.ar : surah.name?.en}
                   </span>
-                  {onViewTafseer && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const firstVerse = surah.verses?.[0];
-                        if (firstVerse) {
-                          handleTafseerClick(e, surah.number, firstVerse.number, language === 'ar' ? surah.name?.ar : surah.name?.en);
-                        }
-                      }}
-                      className={cn("flex items-center gap-1 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300", textSizeClasses.text)}
-                      title={t('tafseer')}
-                    >
-                      <BookText className="w-4 h-4" />
-                      <span>{t('tafseer')}</span>
-                    </button>
-                  )}
                 </div>
                 <div className="max-h-[25vh] overflow-y-auto p-2 grid grid-cols-5 gap-1">
                   {surah.verses?.map((verse: any) => (
-                    <div key={`${surah.number}-${verse.number}`} className="relative group">
-                      <motion.button
-                        data-ayah={`${surah.number}-${verse.number}`}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => handleAyahClick(surah.number, verse.number, verse.page)}
-                        className={cn(
-                          "w-full aspect-square rounded-lg flex items-center justify-center font-medium transition-all",
-                          textSizeClasses.text,
-                          currentPlayingAyah?.surah === surah.number && currentPlayingAyah?.ayah === verse.number
-                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md'
-                            : 'bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-gray-700 dark:text-gray-200'
-                        )}
-                      >
-                        {verse.number}
-                      </motion.button>
-                      {onViewTafseer && (
-                        <button
-                          onClick={(e) => handleTafseerClick(e, surah.number, verse.number, language === 'ar' ? surah.name?.ar : surah.name?.en)}
-                          className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-emerald-600 hover:bg-emerald-700 text-white rounded-full p-0.5 shadow-lg"
-                          title={t('tafseer')}
-                        >
-                          <BookText className="w-3 h-3" />
-                        </button>
+                    <motion.button
+                      key={`${surah.number}-${verse.number}`}
+                      data-ayah={`${surah.number}-${verse.number}`}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleAyahClick(surah.number, verse.number, verse.page)}
+                      className={cn(
+                        "w-full aspect-square rounded-lg flex items-center justify-center font-medium transition-all",
+                        textSizeClasses.text,
+                        currentPlayingAyah?.surah === surah.number && currentPlayingAyah?.ayah === verse.number
+                          ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md'
+                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-gray-700 dark:text-gray-200'
                       )}
-                    </div>
+                    >
+                      {formatNumber(verse.number)}
+                    </motion.button>
                   ))}
                 </div>
               </div>
