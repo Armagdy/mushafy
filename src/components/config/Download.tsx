@@ -68,6 +68,9 @@ export function Download() {
   const everyAyahPollingRef = useRef<NodeJS.Timeout | null>(null);
   const mp3QuranPollingRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Track previous download status to detect transitions
+  const prevDownloadStatusRef = useRef<string | null>(null);
+  
   // Get the selected reciter object
   const selectedReciterObj = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
   
@@ -310,21 +313,35 @@ export function Download() {
     }
   }, [selectedRecitationStyle, selectedQuality, everyAyahReciters, selectedEveryAyahReciter]);
   
-  // Show toast when download completes
+  // Initialize the ref on mount with current status (don't show toast for existing state)
   useEffect(() => {
-    if (activeDownload?.status === 'completed') {
-      toast({
-        title: t('downloadComplete'),
-        description: t('downloadCompleteMessage'),
-      });
-    } else if (activeDownload?.status === 'error') {
-      toast({
-        title: t('downloadFailed'),
-        description: activeDownload.error || 'An error occurred',
-        variant: "destructive",
-      });
+    prevDownloadStatusRef.current = activeDownload?.status || null;
+  }, []); // Run only once on mount
+  
+  // Show toast when download status transitions to completed/error (not on mount)
+  useEffect(() => {
+    const currentStatus = activeDownload?.status || null;
+    const prevStatus = prevDownloadStatusRef.current;
+    
+    // Only show toast when status CHANGES to completed or error (skip initial mount)
+    if (prevStatus !== null && currentStatus !== prevStatus) {
+      if (currentStatus === 'completed') {
+        toast({
+          title: t('downloadComplete'),
+          description: t('downloadCompleteMessage'),
+        });
+      } else if (currentStatus === 'error') {
+        toast({
+          title: t('downloadFailed'),
+          description: activeDownload?.error || 'An error occurred',
+          variant: "destructive",
+        });
+      }
     }
-  }, [activeDownload?.status, toast, t]);
+    
+    // Update the ref for next comparison
+    prevDownloadStatusRef.current = currentStatus;
+  }, [activeDownload?.status, activeDownload?.error, toast, t]);
   
   const handleCancelDownload = () => {
     cancelDownload();
