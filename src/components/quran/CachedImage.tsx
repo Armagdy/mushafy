@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, ImgHTMLAttributes } from 'react';
-import { getCachedAsset, getCachedAssetUri, cacheAsset } from '@/lib/asset-cache';
+import { getCachedAsset, getCachedAssetUri, cacheAsset, removeCachedAsset } from '@/lib/asset-cache';
 import { isNativePlatform } from '@/lib/native-storage';
 import { Capacitor } from '@capacitor/core';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -18,6 +18,9 @@ interface CachedImageProps extends ImgHTMLAttributes<HTMLImageElement> {
  * Falls back to original src if not cached and online.
  * Shows error state if not cached and offline.
  */
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+
 export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...props }: CachedImageProps) {
   const { t, isRTL } = useLanguage();
   const filename = src.split('/').pop() || 'unknown';
@@ -27,10 +30,12 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
   const [loadError, setLoadError] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [retryKey, setRetryKey] = useState<number>(0);
+  const [retryCount, setRetryCount] = useState<number>(0);
   const blobUrlRef = useRef<string | null>(null);
   const prevSrcRef = useRef<string | null>(null);
   const prevRetryKeyRef = useRef<number>(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Skip if same src and not a retry
@@ -45,11 +50,21 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
     setIsLoading(true);
     setLoadError(false);
     setImageSrc(null);
+    // Reset retry count when src changes (but not on manual retry)
+    if (prevSrcRef.current !== src) {
+      setRetryCount(0);
+    }
 
     // Cleanup previous blob URL
     if (blobUrlRef.current) {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
+    }
+
+    // Clear any pending retry timeout
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
     }
 
     let cancelled = false;
@@ -70,10 +85,11 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
           if (fileUri) {
             // Convert native file:// URI to WebView-compatible URI
             const webViewUri = Capacitor.convertFileSrc(fileUri);
-            console.log(`[CachedImage] ✅ Using cached file URI for: ${src}`);
+            console.log(`[CachedImage] ✅ Found cached file URI, attempting to use: ${src.split('/').pop()}`);
             setImageSrc(webViewUri);
             setIsLoading(false);
-            return; // IMPORTANT: Return here to avoid trying network
+            // NOTE: Don't return here - if the file URI fails to load, handleImageError will retry from network
+            return;
           }
         } else {
           // On web, load blob and create object URL
@@ -87,7 +103,7 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
             blobUrlRef.current = blobUrl;
             setImageSrc(blobUrl);
             setIsLoading(false);
-            return; // IMPORTANT: Return here to avoid trying network
+            return; // Blob URLs are reliable, safe to return
           }
         }
         
@@ -106,18 +122,7 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
         console.log(`[CachedImage] 🌐 Loading from network: ${src}`);
         setImageSrc(src);
         setIsLoading(false);
-        
-        // Auto-cache the image for offline use if enabled
-        if (autoCache && cacheCategory) {
-          // Cache in background without blocking
-          cacheAsset(src, cacheCategory).then((success) => {
-            if (success) {
-              console.log(`[CachedImage] ✅ Cached for offline: ${src}`);
-            }
-          }).catch(err => {
-            console.warn('[CachedImage] ❌ Failed to auto-cache:', err);
-          });
-        }
+        // Note: Auto-caching now happens in handleImageLoad after successful load
       } catch (error) {
         console.error('[CachedImage] ❌ Error loading image:', error);
         if (!cancelled) {
@@ -131,6 +136,11 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
 
     return () => {
       cancelled = true;
+      // Clear any pending retry timeout
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
     };
   }, [src, autoCache, cacheCategory, retryKey]);
 
@@ -139,6 +149,9 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
     return () => {
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
       }
     };
   }, []);
@@ -149,7 +162,8 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
       console.log('[CachedImage] 🌐 Network came back online');
       if (loadError) {
         console.log('[CachedImage] 🔄 Retrying failed image load...');
-        // Increment retryKey to trigger reload in main useEffect
+        // Reset retry count and increment retryKey to trigger reload
+        setRetryCount(0);
         setRetryKey(prev => prev + 1);
       }
     };
@@ -162,28 +176,101 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
   }, [loadError]);
 
   // Handle image load error
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+  const handleImageError = async (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     console.error(`[CachedImage] ❌ Image failed to load`);
     console.error(`[CachedImage] src: ${imageSrc}`);
+    console.error(`[CachedImage] original src: ${src}`);
     console.error(`[CachedImage] navigator.onLine: ${navigator.onLine}`);
+    console.error(`[CachedImage] retryCount: ${retryCount}`);
     console.error(`[CachedImage] Error event:`, e);
     
-    // If loading from network failed and we're offline, try cache again
-    if (!navigator.onLine && imageSrc === src) {
-      console.log(`[CachedImage] 🔄 Retrying from cache...`);
-      // Reset and let useEffect retry
-      setImageSrc(null);
-      setIsLoading(true);
-      prevSrcRef.current = null; // Force reload
-    } else {
+    // Check if this is a failed cached file URI (native platform)
+    const isFailedCachedUri = isNativePlatform() && 
+                               imageSrc?.includes('_capacitor_file_');
+    
+    if (isFailedCachedUri) {
+      console.warn(`[CachedImage] ⚠️ Cached file URI failed to load, removing from cache and retrying from network`);
+      
+      // Remove the corrupted/missing cached file
+      try {
+        await removeCachedAsset(src);
+        console.log(`[CachedImage] 🗑️ Removed bad cache entry`);
+      } catch (error) {
+        console.error(`[CachedImage] Failed to remove bad cache:`, error);
+      }
+      
+      // If online, try loading from network
+      if (navigator.onLine) {
+        console.log(`[CachedImage] 🌐 Retrying from network after cache failure`);
+        setImageSrc(src);
+        setIsLoading(false);
+        setRetryCount(0); // Reset retry count for network load
+        return;
+      } else {
+        // Offline and cached file is bad - show error
+        console.error(`[CachedImage] 🔴 Cached file failed and offline`);
+        setLoadError(true);
+        setIsLoading(false);
+        return;
+      }
+    }
+    
+    // If offline and not cached, show error immediately
+    if (!navigator.onLine) {
+      console.log(`[CachedImage] 🔴 Offline - cannot load image`);
       setLoadError(true);
+      setIsLoading(false);
+      return;
+    }
+    
+    // If online but failed to load from network, retry with exponential backoff
+    if (retryCount < MAX_RETRIES) {
+      const nextRetryCount = retryCount + 1;
+      const delay = RETRY_DELAY_MS * Math.pow(2, retryCount); // Exponential backoff
+      
+      console.log(`[CachedImage] 🔄 Retry ${nextRetryCount}/${MAX_RETRIES} in ${delay}ms...`);
+      
+      setRetryCount(nextRetryCount);
+      setIsLoading(true);
+      
+      // Schedule retry after delay
+      retryTimeoutRef.current = setTimeout(() => {
+        console.log(`[CachedImage] 🔄 Executing retry ${nextRetryCount}...`);
+        // Force reload by incrementing retryKey
+        setRetryKey(prev => prev + 1);
+      }, delay);
+    } else {
+      // Exhausted all retries
+      console.error(`[CachedImage] 🔴 Failed after ${MAX_RETRIES} retries`);
+      setLoadError(true);
+      setIsLoading(false);
     }
   };
 
   // Handle image load success
-  const handleImageLoad = () => {
-    console.log(`[CachedImage] ✅ Image loaded successfully from: ${imageSrc?.startsWith('blob:') ? 'CACHE (blob URL)' : 'NETWORK'}`);
+  const handleImageLoad = async () => {
+    const isFromCache = imageSrc?.startsWith('blob:') || 
+                        (isNativePlatform() && imageSrc?.includes('_capacitor_file_'));
+    
+    console.log(`[CachedImage] ✅ Image loaded successfully from: ${isFromCache ? 'CACHE' : 'NETWORK'}`);
     setLoadError(false);
+    setIsLoading(false);
+    setRetryCount(0); // Reset retry count on success
+    
+    // If loaded from network and autoCache is enabled, cache it now
+    if (!isFromCache && autoCache && cacheCategory && imageSrc === src) {
+      console.log(`[CachedImage] 📦 Caching image after successful network load: ${src}`);
+      try {
+        const success = await cacheAsset(src, cacheCategory);
+        if (success) {
+          console.log(`[CachedImage] ✅ Successfully cached: ${src}`);
+        } else {
+          console.warn(`[CachedImage] ⚠️ Failed to cache: ${src}`);
+        }
+      } catch (error) {
+        console.error(`[CachedImage] ❌ Error caching image:`, error);
+      }
+    }
   };
 
   // Show error state if offline and not cached
@@ -223,7 +310,7 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
     );
   }
 
-  // Show loading state
+  // Show loading state (including during retries)
   if (isLoading || !imageSrc) {
     return (
       <div 
@@ -232,11 +319,18 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
           backgroundColor: '#e5e7eb',
           minHeight: '200px',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          gap: '0.5rem'
         }}
       >
         <span className="text-gray-400 text-sm md:text-base">{t('loading')}</span>
+        {retryCount > 0 && (
+          <span className="text-gray-500 text-xs md:text-sm">
+            {isRTL ? `محاولة ${retryCount}/${MAX_RETRIES}` : `Retry ${retryCount}/${MAX_RETRIES}`}
+          </span>
+        )}
       </div>
     );
   }

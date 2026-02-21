@@ -101,6 +101,20 @@ export const isAssetCached = async (url: string): Promise<boolean> => {
 };
 
 /**
+ * Remove a specific cached asset
+ */
+export const removeCachedAsset = async (url: string): Promise<void> => {
+  try {
+    await assetStorage.init();
+    const key = urlToCacheKey(url);
+    await assetStorage.removeItem(key);
+    console.log(`✅ [${getPlatform()}] Removed cached asset: ${url}`);
+  } catch (error) {
+    console.error('Error removing cached asset:', error);
+  }
+};
+
+/**
  * Get cached asset as native file URI (native platforms only)
  * This is much faster than getCachedAsset() as it doesn't load the blob into memory
  * Returns null on web platforms or if not cached
