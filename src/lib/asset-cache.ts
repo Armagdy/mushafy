@@ -93,11 +93,19 @@ export const getCachedAsset = async (url: string): Promise<Blob | null> => {
 };
 
 /**
- * Check if asset is cached
+ * Check if asset is cached (fast - doesn't load the blob)
  */
 export const isAssetCached = async (url: string): Promise<boolean> => {
-  const cached = await getCachedAsset(url);
-  return cached !== null;
+  try {
+    await assetStorage.init();
+    const key = urlToCacheKey(url);
+    
+    // Use the optimized exists() method which uses stat on native
+    // and checks IndexedDB without loading blob on web
+    return await assetStorage.exists(key);
+  } catch (error) {
+    return false;
+  }
 };
 
 /**

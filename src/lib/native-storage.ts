@@ -203,6 +203,17 @@ export class NativeStorage {
       const sanitizedKey = this.sanitizeKey(key);
       const blobPath = `${sanitizedKey}.blob`;
       
+      // First check if file exists using stat
+      try {
+        await Filesystem.stat({
+          path: blobPath,
+          directory: this.directory
+        });
+      } catch (statError) {
+        // File doesn't exist
+        return null;
+      }
+      
       // Get the file URI using Capacitor's getUri method
       const result = await Filesystem.getUri({
         path: blobPath,
@@ -213,6 +224,43 @@ export class NativeStorage {
     } catch (error) {
       console.error('Error getting file URI:', error);
       return null;
+    }
+  }
+  
+  /**
+   * Check if a file exists without loading data (native only)
+   * Returns false on web or if file doesn't exist
+   */
+  async exists(key: string): Promise<boolean> {
+    if (!isNativePlatform()) {
+      // On web, check IndexedDB
+      try {
+        const db = await this.openDB();
+        const tx = db.transaction(this.storeName, 'readonly');
+        const store = tx.objectStore(this.storeName);
+        const request = store.get(key);
+        
+        return new Promise((resolve) => {
+          request.onsuccess = () => resolve(request.result !== undefined);
+          request.onerror = () => resolve(false);
+        });
+      } catch {
+        return false;
+      }
+    }
+    
+    try {
+      const sanitizedKey = this.sanitizeKey(key);
+      const blobPath = `${sanitizedKey}.blob`;
+      
+      await Filesystem.stat({
+        path: blobPath,
+        directory: this.directory
+      });
+      
+      return true;
+    } catch {
+      return false;
     }
   }
   

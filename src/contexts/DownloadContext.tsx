@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useRef, ReactNode } from 'react';
 import { MushafType } from './MushafContext';
-import { cacheAsset } from '@/lib/asset-cache';
+import { cacheAsset, isAssetCached } from '@/lib/asset-cache';
 import { getPageImageFilename } from '@/lib/quran-mapping';
 import { getSurahAudioUrl } from '@/lib/mp3quran-service';
 import { ASSETS_BASE_URL } from '@/config/assets';
@@ -48,14 +48,15 @@ const DownloadContext = createContext<DownloadContextType | undefined>(undefined
 // Helper function for parallel downloads with concurrency control
 async function downloadInParallel<T>(
   items: T[],
-  downloadFn: (item: T, signal: AbortSignal) => Promise<void>,
+  downloadFn: (item: T, signal: AbortSignal) => Promise<boolean>,
   signal: AbortSignal,
   onProgress: (current: number, total: number) => void,
-  concurrency: number = 5 // Download 5 files at once
+  concurrency: number = 10 // Download 10 files at once
 ): Promise<void> {
   const total = items.length;
   let completed = 0;
   let index = 0;
+  let lastProgressUpdate = 0;
   
   // Create worker function
   const worker = async (): Promise<void> => {
@@ -66,9 +67,16 @@ async function downloadInParallel<T>(
       const item = items[currentIndex];
       
       try {
-        await downloadFn(item, signal);
-        completed++;
-        onProgress(completed, total);
+        const wasDownloaded = await downloadFn(item, signal);
+        if (wasDownloaded || !signal.aborted) {
+          completed++;
+          
+          // Batch progress updates (update every 5 files or at end)
+          if (completed - lastProgressUpdate >= 5 || completed === total) {
+            lastProgressUpdate = completed;
+            onProgress(completed, total);
+          }
+        }
       } catch (error) {
         if (signal.aborted) break;
         throw error;
@@ -82,6 +90,11 @@ async function downloadInParallel<T>(
     .map(() => worker());
   
   await Promise.all(workers);
+  
+  // Ensure final progress update
+  if (lastProgressUpdate !== completed) {
+    onProgress(completed, total);
+  }
 }
 
 export function DownloadProvider({ children }: { children: ReactNode }) {
@@ -199,17 +212,34 @@ async function downloadPages(
 
   // Create array of page numbers to download
   const pages = Array.from({ length: total }, (_, i) => fromPage + i);
-
-  // Download pages in parallel (5 at a time)
-  await downloadInParallel(
-    pages,
-    async (page, sig) => {
+  
+  // Pre-filter: Check which pages are already cached (in parallel)
+  console.log(`[Download] Checking ${pages.length} pages for existing cache...`);
+  const cacheChecks = await Promise.all(
+    pages.map(async (page) => {
       const url = `${mushafPath}/${getPageImageFilename(page)}`;
-      await cacheAsset(url, category, sig);
+      const cached = await isAssetCached(url);
+      return { page, url, cached };
+    })
+  );
+  
+  const uncachedPages = cacheChecks.filter(p => !p.cached);
+  const cachedCount = pages.length - uncachedPages.length;
+  
+  if (cachedCount > 0) {
+    console.log(`[Download] ✓ ${cachedCount} pages already cached, downloading ${uncachedPages.length} pages`);
+  }
+
+  // Download only uncached pages in parallel (10 at a time for max speed)
+  await downloadInParallel(
+    uncachedPages,
+    async (item, sig) => {
+      await cacheAsset(item.url, category, sig);
+      return true; // Downloaded
     },
     signal,
-    (current, totalCount) => onProgress({ current, total: totalCount }),
-    5 // 5 concurrent downloads
+    (current, totalCount) => onProgress({ current: current + cachedCount, total: total }),
+    10 // 10 concurrent downloads
   );
 }
 
@@ -231,18 +261,35 @@ async function downloadEveryAyah(
 
   // Create array of ayah numbers to download
   const ayahs = Array.from({ length: total }, (_, i) => fromAyah + i);
-
-  // Download ayahs in parallel (5 at a time)
-  await downloadInParallel(
-    ayahs,
-    async (ayah, sig) => {
+  
+  // Pre-filter: Check which ayahs are already cached (in parallel)
+  console.log(`[Download] Checking ${ayahs.length} ayahs for existing cache...`);
+  const cacheChecks = await Promise.all(
+    ayahs.map(async (ayah) => {
       const ayahStr = ayah.toString().padStart(3, '0');
       const url = `${reciterBaseUrl}/${surahStr}${ayahStr}.mp3`;
-      await cacheAsset(url, category, sig);
+      const cached = await isAssetCached(url);
+      return { ayah, url, cached };
+    })
+  );
+  
+  const uncachedAyahs = cacheChecks.filter(a => !a.cached);
+  const cachedCount = ayahs.length - uncachedAyahs.length;
+  
+  if (cachedCount > 0) {
+    console.log(`[Download] ✓ ${cachedCount} ayahs already cached, downloading ${uncachedAyahs.length} ayahs`);
+  }
+
+  // Download only uncached ayahs in parallel (8 at a time for audio)
+  await downloadInParallel(
+    uncachedAyahs,
+    async (item, sig) => {
+      await cacheAsset(item.url, category, sig);
+      return true; // Downloaded
     },
     signal,
-    (current, totalCount) => onProgress({ current, total: totalCount }),
-    5 // 5 concurrent downloads
+    (current, totalCount) => onProgress({ current: current + cachedCount, total: total }),
+    8 // 8 concurrent downloads
   );
 }
 
@@ -263,16 +310,33 @@ async function downloadMp3Quran(
 
   // Create array of surah numbers to download
   const surahs = Array.from({ length: total }, (_, i) => fromSurah + i);
-
-  // Download surahs in parallel (3 at a time - larger files)
-  await downloadInParallel(
-    surahs,
-    async (surahNum, sig) => {
+  
+  // Pre-filter: Check which surahs are already cached (in parallel)
+  console.log(`[Download] Checking ${surahs.length} surahs for existing cache...`);
+  const cacheChecks = await Promise.all(
+    surahs.map(async (surahNum) => {
       const url = getSurahAudioUrl(moshaf.server, surahNum);
-      await cacheAsset(url, category, sig);
+      const cached = await isAssetCached(url);
+      return { surahNum, url, cached };
+    })
+  );
+  
+  const uncachedSurahs = cacheChecks.filter(s => !s.cached);
+  const cachedCount = surahs.length - uncachedSurahs.length;
+  
+  if (cachedCount > 0) {
+    console.log(`[Download] ✓ ${cachedCount} surahs already cached, downloading ${uncachedSurahs.length} surahs`);
+  }
+
+  // Download only uncached surahs in parallel (5 at a time - larger files but still fast)
+  await downloadInParallel(
+    uncachedSurahs,
+    async (item, sig) => {
+      await cacheAsset(item.url, category, sig);
+      return true; // Downloaded
     },
     signal,
-    (current, totalCount) => onProgress({ current, total: totalCount }),
-    3 // 3 concurrent downloads (audio files are larger)
+    (current, totalCount) => onProgress({ current: current + cachedCount, total: total }),
+    5 // 5 concurrent downloads (increased from 3)
   );
 }
