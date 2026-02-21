@@ -674,126 +674,95 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-4"
+            className="flex flex-col h-full max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-16rem)]"
           >
-            <div>
-              <label className={cn("font-medium mb-2 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
-                {t('selectJuz')}
-              </label>
-              <select
-                value={searchJuz}
-                onChange={(e) => {
-                  const juzValue = e.target.value;
-                  setSearchJuz(juzValue);
+            {/* Two Scrollable Lists Side by Side */}
+            <div className="flex gap-2 flex-1 overflow-hidden mb-3">
+              {/* Juz List - Always visible */}
+              <div className={cn(
+                "overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent",
+                searchJuz && searchJuz !== '' ? "flex-1" : "w-full"
+              )}>
+                {Array.from({ length: 30 }, (_, i) => i + 1).map(juzNum => {
+                  const isSelected = searchJuz === juzNum.toString();
                   
-                  if (juzValue) {
-                    const juzNum = parseInt(juzValue);
-                    const firstHezb = (juzNum - 1) * 2 + 1;
-                    setSearchJuzHezb(firstHezb.toString());
-                    
-                    const firstQuarter = (firstHezb - 1) * 4 + 1;
-                    setSearchJuzQuarter(firstQuarter.toString());
-                  } else {
-                    setSearchJuzHezb('');
-                    setSearchJuzQuarter('');
-                  }
-                }}
-                className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
-              >
-                <option value="">{t('selectJuz')}</option>
-                {Array.from({ length: 30 }, (_, i) => i + 1).map(num => (
-                  <option key={num} value={num}>
-                    {formatNumber(num)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className={cn("font-medium mb-2 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
-                {t('selectHezb')}
-              </label>
-              <select
-                value={searchJuzHezb}
-                onChange={(e) => {
-                  const hezbValue = e.target.value;
-                  setSearchJuzHezb(hezbValue);
-                  
-                  if (hezbValue) {
-                    const hezbNum = parseInt(hezbValue);
-                    const firstQuarter = (hezbNum - 1) * 4 + 1;
-                    setSearchJuzQuarter(firstQuarter.toString());
-                  } else {
-                    setSearchJuzQuarter('');
-                  }
-                }}
-                className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
-              >
-                <option value="">{t('selectHezb')}</option>
-                {(() => {
-                  if (searchJuz) {
+                  return (
+                    <button
+                      key={juzNum}
+                      onClick={() => {
+                        setSearchJuz(juzNum.toString());
+                        // Clear Hizb when selecting a new Juz
+                        setSearchJuzHezb('');
+                      }}
+                      className={cn(
+                        "w-full px-3 py-3 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                        isSelected && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                        "text-center",
+                        textSizeClasses.text
+                      )}
+                    >
+                      <div className="text-emerald-800 dark:text-emerald-200">
+                        {isRTL 
+                          ? `الجزء ${formatNumber(juzNum)}` 
+                          : `Juz ${juzNum}`}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* Hizb List - Only shown when Juz is selected */}
+              {searchJuz && searchJuz !== '' && (
+                <motion.div
+                  initial={{ opacity: 0, x: isRTL ? -20 : 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className={cn(
+                    "overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent",
+                    searchJuzHezb && searchJuzHezb !== '' ? "flex-1" : "flex-1"
+                  )}
+                >
+                  {(() => {
                     const juzNum = parseInt(searchJuz);
                     const firstHezb = (juzNum - 1) * 2 + 1;
                     const secondHezb = firstHezb + 1;
-                    return [
-                      <option key={firstHezb} value={firstHezb}>
-                        {formatNumber(firstHezb)}
-                      </option>,
-                      <option key={secondHezb} value={secondHezb}>
-                        {formatNumber(secondHezb)}
-                      </option>
-                    ];
-                  } else {
-                    return Array.from({ length: 60 }, (_, i) => i + 1).map(num => (
-                      <option key={num} value={num}>
-                        {formatNumber(num)}
-                      </option>
-                    ));
-                  }
-                })()}
-              </select>
-            </div>
-            
-            <div>
-              <label className={cn("font-medium mb-2 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
-                {t('selectQuarter')}
-              </label>
-              <select
-                value={searchJuzQuarter}
-                onChange={(e) => setSearchJuzQuarter(e.target.value)}
-                className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
-              >
-                <option value="">{t('selectQuarter')}</option>
-                {(() => {
-                  if (searchJuzHezb) {
-                    const hezbNum = parseInt(searchJuzHezb);
-                    const firstQuarter = (hezbNum - 1) * 4 + 1;
-                    return Array.from({ length: 4 }, (_, i) => {
-                      const quarterNum = firstQuarter + i;
+                    
+                    return [firstHezb, secondHezb].map((hezbNum) => {
+                      const isSelected = searchJuzHezb === hezbNum.toString();
+                      
                       return (
-                        <option key={quarterNum} value={quarterNum}>
-                          {formatNumber(quarterNum)}
-                        </option>
+                        <button
+                          key={hezbNum}
+                          onClick={() => {
+                            setSearchJuzHezb(hezbNum.toString());
+                          }}
+                          className={cn(
+                            "w-full px-3 py-3 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                            isSelected && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                            "text-center",
+                            textSizeClasses.text
+                          )}
+                        >
+                          {isRTL 
+                            ? `حزب ${formatNumber(hezbNum)}` 
+                            : `Hizb ${hezbNum}`}
+                        </button>
                       );
                     });
-                  } else {
-                    return Array.from({ length: 240 }, (_, i) => i + 1).map(num => (
-                      <option key={num} value={num}>
-                        {formatNumber(num)}
-                      </option>
-                    ));
-                  }
-                })()}
-              </select>
+                  })()}
+                </motion.div>
+              )}
             </div>
             
-            <Button
-              onClick={handleGoToJuz}
-              disabled={!searchJuz && !searchJuzHezb && !searchJuzQuarter}
-              className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
-            >
-              {searchJuzQuarter ? t('goToQuarter') : searchJuzHezb ? t('goToHezb') : t('goToJuz')}
-            </Button>
+            {/* Navigation Button - Fixed at Bottom Always Visible */}
+            <div className="mt-auto pt-3 pb-4 border-t border-emerald-100 dark:border-emerald-900 bg-gradient-to-b from-transparent via-[#FBF9F4]/80 to-[#FBF9F4] dark:from-transparent dark:via-gray-900/80 dark:to-gray-900 flex-shrink-0">
+              <Button
+                onClick={handleGoToJuz}
+                disabled={!searchJuz}
+                className={cn("w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
+              >
+                {searchJuzHezb ? t('goToHezb') : t('goToJuz')}
+              </Button>
+            </div>
           </motion.div>
         );
         
