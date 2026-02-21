@@ -4,7 +4,7 @@ import { ASSETS_BASE_URL } from '@/config/assets';
 import { getAudioData } from '@/lib/quran-data-service';
 import { getMp3QuranReciters, getAyahTiming, getSurahAudioUrl, getCurrentAyahFromTime, seekToAyah, type Mp3QuranReciter, type Mp3QuranMoshaf, type AyahTiming } from '@/lib/mp3quran-service';
 import { surahs } from '@/data/surahs';
-import { cacheAudio, getCachedAudio, getCachedAudioUri, cacheMp3QuranAudio, getCachedMp3QuranAudio, cacheIndividualAyah, getCachedIndividualAyah, getAllCachedAyahsForSurah, getCachedAyahTiming } from '@/lib/audio-cache';
+import { cacheAudio, getCachedAudio, getCachedAudioUri, cacheMp3QuranAudio, getCachedMp3QuranAudio, getCachedMp3QuranAudioUri, cacheIndividualAyah, getCachedIndividualAyah, getAllCachedAyahsForSurah, getCachedAyahTiming } from '@/lib/audio-cache';
 import { isNetworkError } from '@/hooks/useNetwork';
 import { debugMediaSession } from '@/lib/media-session-debug';
 import QuranMediaSession from '@/lib/quran-media-session';
@@ -1389,24 +1389,25 @@ export const useAudioPlayer = ({
         
         if (needsReload) {
           console.log(`🔄 Loading MP3Quran audio for surah ${surahNum}...`);
-          // Check cache first
-          const cachedData = await getCachedMp3QuranAudio(selectedMoshaf.id, surahNum);
+          // Check cache first - try native URI approach (instant, no OOM)
+          const cachedUri = await getCachedMp3QuranAudioUri(selectedMoshaf.id, surahNum);
           
-          if (cachedData) {
-            // Load from cache
-            console.log(`✅ Using cached MP3Quran audio for moshaf ${selectedMoshaf.id} surah ${surahNum}`);
-            // Show loading spinner while browser loads/parses the audio blob
+          if (cachedUri) {
+            // Load from native file URI (Android/iOS) - instant access, streams from disk
+            console.log(`✅ Using cached MP3Quran audio (file URI) for moshaf ${selectedMoshaf.id} surah ${surahNum}`);
+            // Show loading spinner while browser loads/parses the audio
             setIsPreloadingAyahs(true);
             
-            const blobUrl = URL.createObjectURL(cachedData.blobData);
-            audioElement.src = blobUrl;
-            setAyahTimings(cachedData.timingData);
+            // Convert native file URI to WebView-compatible URL
+            const webViewUri = Capacitor.convertFileSrc(cachedUri.uri);
+            audioElement.src = webViewUri;
+            setAyahTimings(cachedUri.timingData);
             setCurrentSurahAudio(surahNum);
             
             // Wait for audio to be ready, then seek to ayah
             audioElement.addEventListener('loadedmetadata', () => {
-              if (cachedData.timingData.length > 0) {
-                const seekSuccess = seekToAyah(audioElement, cachedData.timingData, ayahNum);
+              if (cachedUri.timingData.length > 0) {
+                const seekSuccess = seekToAyah(audioElement, cachedUri.timingData, ayahNum);
                 if (seekSuccess) {
                   // Update currentTime state immediately for instant progress bar update
                   setCurrentTime(audioElement.currentTime);
@@ -1428,85 +1429,118 @@ export const useAudioPlayer = ({
             
             audioElement.load();
           } else {
-            // Not in cache - stream directly from URL (like YouTube Music)
-            console.log(`🎵 Streaming MP3Quran audio for moshaf ${selectedMoshaf.id} surah ${surahNum}`);
+            // On web or if URI not available, try blob loading
+            const cachedData = await getCachedMp3QuranAudio(selectedMoshaf.id, surahNum);
             
-            // Show loading spinner while buffering
-            setIsPreloadingAyahs(true);
-            
-            const audioUrl = getSurahAudioUrl(selectedMoshaf.server, surahNum);
-            
-            // Fetch timing data for this surah
-            let timings: AyahTiming[] = [];
-            try {
-              timings = await getAyahTiming(surahNum, selectedMoshaf.id);
-            } catch (timingError) {
-              console.warn('Could not fetch ayah timing, playing without precise tracking:', timingError);
+            if (cachedData) {
+              // Load from cache using blob (web fallback)
+              console.log(`✅ Using cached MP3Quran audio (blob) for moshaf ${selectedMoshaf.id} surah ${surahNum}`);
+              setIsPreloadingAyahs(true);
+              
+              const blobUrl = URL.createObjectURL(cachedData.blobData);
+              audioElement.src = blobUrl;
+              setAyahTimings(cachedData.timingData);
+              setCurrentSurahAudio(surahNum);
+              
+              // Wait for audio to be ready, then seek to ayah
+              audioElement.addEventListener('loadedmetadata', () => {
+                if (cachedData.timingData.length > 0) {
+                  const seekSuccess = seekToAyah(audioElement, cachedData.timingData, ayahNum);
+                  if (seekSuccess) {
+                    setCurrentTime(audioElement.currentTime);
+                  }
+                }
+                audioElement.play().then(() => {
+                  setIsPreloadingAyahs(false);
+                }).catch(err => {
+                  console.error('Failed to play audio:', err);
+                  setIsPlaying(false);
+                  setIsPreloadingAyahs(false);
+                });
+              }, { once: true });
+              
+              audioElement.load();
+            } else {
+              // Not in cache - stream directly from URL (like YouTube Music)
+              console.log(`🎵 Streaming MP3Quran audio for moshaf ${selectedMoshaf.id} surah ${surahNum}`);
+              
+              // Show loading spinner while buffering
+              setIsPreloadingAyahs(true);
+              
+              const audioUrl = getSurahAudioUrl(selectedMoshaf.server, surahNum);
+              
+              // Fetch timing data for this surah
+              let timings: AyahTiming[] = [];
+              try {
+                timings = await getAyahTiming(surahNum, selectedMoshaf.id);
+              } catch (timingError) {
+                console.warn('Could not fetch ayah timing, playing without precise tracking:', timingError);
+              }
+              
+              // Set the remote URL directly - browser will stream it
+              audioElement.src = audioUrl;
+              setAyahTimings(timings);
+              setCurrentSurahAudio(surahNum);
+              
+              // Handle audio load error
+              const handleError = (event: Event) => {
+                const audioEl = event.target as HTMLAudioElement;
+                const error = audioEl.error;
+                
+                console.error('Failed to load audio - surah may not exist for this reciter', error);
+                console.log('Error code:', error?.code, 'Online:', navigator.onLine);
+                setIsPlaying(false);
+                setCurrentSurahAudio(null);
+                setIsPreloadingAyahs(false);
+                releaseWakeLock();
+                
+                if (onSurahUnavailable) {
+                  // Check if it's a network error
+                  // MEDIA_ERR_NETWORK (2) = network error
+                  // MEDIA_ERR_SRC_NOT_SUPPORTED (4) = file doesn't exist or format issue
+                  // But when offline, browser might report code 4 even though it's really a network issue
+                  const isNetworkIssue = !navigator.onLine || (error && error.code === 2);
+                  if (isNetworkIssue) {
+                    // Network error - offline or connection issue
+                    console.log('Detected as network error');
+                    onSurahUnavailable('network-error');
+                  } else {
+                    // File not found or other error
+                    console.log('Detected as file not available');
+                    onSurahUnavailable('unavailable');
+                  }
+                }
+              };
+              audioElement.addEventListener('error', handleError, { once: true });
+              
+              // Seek to ayah position when metadata loads
+              audioElement.addEventListener('loadedmetadata', () => {
+                if (timings.length > 0) {
+                  const seekSuccess = seekToAyah(audioElement, timings, ayahNum);
+                  if (seekSuccess) {
+                    // Update currentTime state immediately for instant progress bar update
+                    setCurrentTime(audioElement.currentTime);
+                  }
+                }
+              }, { once: true });
+              
+              // Hide spinner when playback actually starts
+              const handlePlaying = () => {
+                setIsPreloadingAyahs(false);
+                audioElement.removeEventListener('playing', handlePlaying);
+              };
+              audioElement.addEventListener('playing', handlePlaying, { once: true });
+              
+              // Start playing - this triggers progressive loading
+              audioElement.play().then(() => {
+                console.log('✅ MP3Quran streaming started');
+                audioElement.removeEventListener('error', handleError);
+              }).catch(err => {
+                console.error('Failed to start streaming:', err);
+                setIsPlaying(false);
+                setIsPreloadingAyahs(false);
+              });
             }
-            
-            // Set the remote URL directly - browser will stream it
-            audioElement.src = audioUrl;
-            setAyahTimings(timings);
-            setCurrentSurahAudio(surahNum);
-            
-            // Handle audio load error
-            const handleError = (event: Event) => {
-              const audioEl = event.target as HTMLAudioElement;
-              const error = audioEl.error;
-              
-              console.error('Failed to load audio - surah may not exist for this reciter', error);
-              console.log('Error code:', error?.code, 'Online:', navigator.onLine);
-              setIsPlaying(false);
-              setCurrentSurahAudio(null);
-              setIsPreloadingAyahs(false);
-              releaseWakeLock();
-              
-              if (onSurahUnavailable) {
-                // Check if it's a network error
-                // MEDIA_ERR_NETWORK (2) = network error
-                // MEDIA_ERR_SRC_NOT_SUPPORTED (4) = file doesn't exist or format issue
-                // But when offline, browser might report code 4 even though it's really a network issue
-                const isNetworkIssue = !navigator.onLine || (error && error.code === 2);
-                if (isNetworkIssue) {
-                  // Network error - offline or connection issue
-                  console.log('Detected as network error');
-                  onSurahUnavailable('network-error');
-                } else {
-                  // File not found or other error
-                  console.log('Detected as file not available');
-                  onSurahUnavailable('unavailable');
-                }
-              }
-            };
-            audioElement.addEventListener('error', handleError, { once: true });
-            
-            // Seek to ayah position when metadata loads
-            audioElement.addEventListener('loadedmetadata', () => {
-              if (timings.length > 0) {
-                const seekSuccess = seekToAyah(audioElement, timings, ayahNum);
-                if (seekSuccess) {
-                  // Update currentTime state immediately for instant progress bar update
-                  setCurrentTime(audioElement.currentTime);
-                }
-              }
-            }, { once: true });
-            
-            // Hide spinner when playback actually starts
-            const handlePlaying = () => {
-              setIsPreloadingAyahs(false);
-              audioElement.removeEventListener('playing', handlePlaying);
-            };
-            audioElement.addEventListener('playing', handlePlaying, { once: true });
-            
-            // Start playing - this triggers progressive loading
-            audioElement.play().then(() => {
-              console.log('✅ MP3Quran streaming started');
-              audioElement.removeEventListener('error', handleError);
-            }).catch(err => {
-              console.error('Failed to start streaming:', err);
-              setIsPlaying(false);
-              setIsPreloadingAyahs(false);
-            });
           }
           
           // Persist selected moshaf

@@ -403,6 +403,45 @@ export const getCachedMp3QuranAudio = async (
 };
 
 /**
+ * Get native file URI for cached MP3Quran audio (Android/iOS only - instant, no loading)
+ * Returns { uri, timingData } or null if not cached or on web
+ * This is MUCH faster than getCachedMp3QuranAudio() for large files and prevents OOM
+ */
+export const getCachedMp3QuranAudioUri = async (
+  moshafId: number,
+  surahNum: number
+): Promise<{ uri: string; timingData: any[] } | null> => {
+  if (!isNativePlatform()) return null;
+  
+  try {
+    await audioStorage.init();
+    
+    const key = `mp3quran-${moshafId}-${surahNum}`;
+    
+    // First check if file exists (lightweight)
+    const exists = await audioStorage.hasItem(key);
+    if (!exists) {
+      console.log(`❌ [${getPlatform()}] Cache MISS for MP3Quran moshaf ${moshafId} surah ${surahNum}`);
+      return null;
+    }
+    
+    // Get file URI (instant - no loading!)
+    const uri = await audioStorage.getFileUri(key);
+    if (!uri) return null;
+    
+    // Load metadata only (tiny JSON file - DOES NOT load 147MB blob!)
+    const metadata = await audioStorage.getMetadata(key);
+    const timingData = metadata?.timingData || [];
+    
+    console.log(`✅ [${getPlatform()}] Cache HIT (file URI) for MP3Quran moshaf ${moshafId} surah ${surahNum}`);
+    return { uri, timingData };
+  } catch (error) {
+    console.error('Error getting cached MP3Quran audio URI:', error);
+    return null;
+  }
+};
+
+/**
  * Check if MP3Quran audio is cached
  */
 export const isMp3QuranAudioCached = async (
