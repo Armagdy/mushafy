@@ -121,15 +121,25 @@ export const getJuzFirstPage = async (juzNumber: number): Promise<number> => {
     }
     
     const [juzSurahId, juzAyah] = quranData.juzs[juzNumber - 1];
+    console.log(`🔍 [getJuzFirstPage] Looking for Juz ${juzNumber}`);
+    console.log(`🔍 [getJuzFirstPage] Juz starts at: Surah ${juzSurahId}, Ayah ${juzAyah}`);
     
     // Find the first page that starts this juz
     for (let i = 0; i < quranData.pages.length; i++) {
       const [pageSurahId, pageAyah] = quranData.pages[i];
       
+      // Log pages around the target
+      if (i >= 38 && i <= 43 && juzNumber === 3) {
+        console.log(`🔍 [getJuzFirstPage] Page ${i + 1}: Surah ${pageSurahId}, Ayah ${pageAyah}`);
+      }
+      
       if (pageSurahId === juzSurahId && pageAyah >= juzAyah) {
+        console.log(`✅ [getJuzFirstPage] MATCH FOUND - Page ${i + 1}: Surah ${pageSurahId}, Ayah ${pageAyah} >= ${juzAyah}`);
+        console.log(`✅ [getJuzFirstPage] Returning page: ${i + 1}`);
         return i + 1;
       }
       if (pageSurahId > juzSurahId) {
+        console.log(`⚠️ [getJuzFirstPage] Overshot to Surah ${pageSurahId} - Returning page: ${i + 1}`);
         return i + 1;
       }
     }

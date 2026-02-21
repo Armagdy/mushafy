@@ -202,24 +202,38 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
     setSearchOpen: (open: boolean) => void
   ) => {
     const juzNum = parseInt(searchJuz);
+    console.log(`🎯 [handleGoToJuz] Navigating to Juz ${juzNum}, Hezb: ${searchJuzHezb}, Quarter: ${searchJuzQuarter}`);
+    
     if (juzNum >= 1 && juzNum <= 30) {
       let targetPage;
       
-      // If quarter is selected, navigate to that quarter
-      if (searchJuzQuarter) {
+      // Check if Quarter/Hezb were auto-populated (not manually changed by user)
+      const expectedFirstHezb = (juzNum - 1) * 2 + 1;
+      const expectedFirstQuarter = (expectedFirstHezb - 1) * 4 + 1;
+      const isAutoPopulatedHezb = searchJuzHezb === expectedFirstHezb.toString();
+      const isAutoPopulatedQuarter = searchJuzQuarter === expectedFirstQuarter.toString();
+      
+      // If quarter/hezb match auto-populated values, use getJuzFirstPage for accuracy
+      // Otherwise, user manually selected a different quarter/hezb, so use their selection
+      if (searchJuzQuarter && !isAutoPopulatedQuarter) {
+        // User manually changed quarter - use quarter calculation
         const quarterNum = parseInt(searchJuzQuarter);
         targetPage = Math.floor(((quarterNum - 1) * 604) / 240) + 1;
+        console.log(`🎯 [handleGoToJuz] Using quarter calculation (manually selected): Quarter ${quarterNum} -> Page ${targetPage}`);
       }
-      // If hezb is selected, navigate to that hezb
-      else if (searchJuzHezb) {
+      else if (searchJuzHezb && !isAutoPopulatedHezb) {
+        // User manually changed hezb - use hezb calculation
         const hezbNum = parseInt(searchJuzHezb);
         targetPage = Math.floor(((hezbNum - 1) * 604) / 60) + 1;
+        console.log(`🎯 [handleGoToJuz] Using hezb calculation (manually selected): Hezb ${hezbNum} -> Page ${targetPage}`);
       }
-      // Otherwise, navigate to the first page of the juz
       else {
+        // Navigate to first page of juz (more accurate than quarter/hezb math)
         targetPage = await getJuzFirstPage(juzNum);
+        console.log(`🎯 [handleGoToJuz] Using getJuzFirstPage (auto-populated or no quarter/hezb): Juz ${juzNum} -> Page ${targetPage}`);
       }
       
+      console.log(`🎯 [handleGoToJuz] Final navigation target: page ${targetPage}`);
       navigate(`/page/${targetPage}`);
       setSearchJuz('');
       setSearchJuzHezb('');
