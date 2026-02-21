@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { surahs } from "@/data/surahs";
-import { BookOpen, Hash, FileText, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight } from "lucide-react";
+import { BookOpen, Hash, FileText, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Search } from "lucide-react";
 
 interface NavigationViewProps {
   onNavigate?: (page: number) => void;
@@ -35,6 +35,85 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   // Active navigation type from URL
   const activeNavType = searchParams.get('type') as 'surah' | 'juz' | 'page' | null;
   
+  // Map surah ID to Juz range (based on Quran structure)
+  const getSurahJuzRange = (surahId: number): { start: number; end: number } => {
+    // Juz boundaries: which surah/ayah each juz starts with
+    const juzStarts = [
+      { juz: 1, surah: 1, ayah: 1 },      // Al-Fatiha
+      { juz: 2, surah: 2, ayah: 142 },    // Al-Baqarah continues (started in Juz 1)
+      { juz: 3, surah: 2, ayah: 253 },    // Al-Baqarah continues
+      { juz: 4, surah: 3, ayah: 93 },     // Aal-i-Imran (started in Juz 3)
+      { juz: 5, surah: 4, ayah: 24 },     // An-Nisaa
+      { juz: 6, surah: 4, ayah: 148 },    // An-Nisaa continues  
+      { juz: 7, surah: 5, ayah: 82 },     // Al-Maidah (started in Juz 6)
+      { juz: 8, surah: 6, ayah: 111 },    // Al-An'am (started in Juz 7)
+      { juz: 9, surah: 7, ayah: 88 },     // Al-A'raf (started in Juz 8)
+      { juz: 10, surah: 8, ayah: 41 },    // Al-Anfal (started in Juz 9)
+      { juz: 11, surah: 9, ayah: 93 },    // At-Tawbah (started in Juz 10)
+      { juz: 12, surah: 11, ayah: 6 },    // Hud
+      { juz: 13, surah: 12, ayah: 53 },   // Yusuf (started in Juz 12)
+      { juz: 14, surah: 15, ayah: 1 },    // Al-Hijr
+      { juz: 15, surah: 17, ayah: 1 },    // Al-Isra
+      { juz: 16, surah: 18, ayah: 75 },   // Al-Kahf (started in Juz 15)
+      { juz: 17, surah: 21, ayah: 1 },    // Al-Anbiya
+      { juz: 18, surah: 23, ayah: 1 },    // Al-Mu'minun
+      { juz: 19, surah: 25, ayah: 21 },   // Al-Furqan (started in Juz 18)
+      { juz: 20, surah: 27, ayah: 56 },   // An-Naml (started in Juz 19)
+      { juz: 21, surah: 29, ayah: 46 },   // Al-Ankabut (started in Juz 20)
+      { juz: 22, surah: 33, ayah: 31 },   // Al-Ahzab (started in Juz 21)
+      { juz: 23, surah: 36, ayah: 28 },   // Ya-Sin (started in Juz 22)
+      { juz: 24, surah: 39, ayah: 32 },   // Az-Zumar (started in Juz 23)
+      { juz: 25, surah: 41, ayah: 47 },   // Fussilat (started in Juz 24)
+      { juz: 26, surah: 46, ayah: 1 },    // Al-Ahqaf
+      { juz: 27, surah: 51, ayah: 31 },   // Adh-Dhariyat (started in Juz 26)
+      { juz: 28, surah: 58, ayah: 1 },    // Al-Mujadila
+      { juz: 29, surah: 67, ayah: 1 },    // Al-Mulk
+      { juz: 30, surah: 78, ayah: 1 },    // An-Naba
+    ];
+    
+    // Find which juz entries mention this surah
+    const juzEntriesForSurah = juzStarts.filter(j => j.surah === surahId);
+    
+    if (juzEntriesForSurah.length > 0) {
+      // If surah is explicitly mentioned, find its range
+      const firstMention = juzEntriesForSurah[0].juz;
+      
+      // Surah started in previous juz if first mention is not at ayah 1
+      const startJuz = juzEntriesForSurah[0].ayah === 1 ? firstMention : firstMention - 1;
+      
+      // Find last juz before next surah starts
+      let endJuz = 30;
+      for (let i = 0; i < juzStarts.length; i++) {
+        if (juzStarts[i].surah > surahId) {
+          endJuz = juzStarts[i].juz - 1;
+          break;
+        }
+      }
+      
+      return { start: startJuz, end: endJuz };
+    } else {
+      // Surah not explicitly mentioned - find by position
+      let startJuz = 1;
+      let endJuz = 30;
+      
+      for (let i = juzStarts.length - 1; i >= 0; i--) {
+        if (juzStarts[i].surah < surahId) {
+          startJuz = juzStarts[i].juz;
+          break;
+        }
+      }
+      
+      for (let i = 0; i < juzStarts.length; i++) {
+        if (juzStarts[i].surah > surahId) {
+          endJuz = juzStarts[i].juz - 1;
+          break;
+        }
+      }
+      
+      return { start: startJuz, end: endJuz };
+    }
+  };
+  
   // Set initial type when component mounts or initialType changes
   useEffect(() => {
     if (initialType) {
@@ -44,6 +123,13 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
       setSearchParams({});
     }
   }, [initialType]);  // Run when initialType changes
+  
+  // Clear surah/ayah selection when switching away from surah tab
+  useEffect(() => {
+    if (activeNavType !== 'surah') {
+      setSelectedSurahAyahs([]);
+    }
+  }, [activeNavType]);
   
   // Number formatting for Arabic/English
   const formatNumber = (num: number | string): string => {
@@ -62,6 +148,7 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   });
   const [searchAyah, setSearchAyah] = useState(() => localStorage.getItem('quran-search-ayah') || '');
   const [selectedSurahAyahs, setSelectedSurahAyahs] = useState<any[]>([]);
+  const [surahSearchQuery, setSurahSearchQuery] = useState('');
   
   // Juz tab state
   const [searchJuz, setSearchJuz] = useState(() => {
@@ -133,10 +220,14 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
 
   // Update selected surah ayahs when surah changes
   useEffect(() => {
-    if (searchSurah && ayahData.length > 0) {
+    if (searchSurah && searchSurah.trim() !== '' && ayahData.length > 0) {
       const surahId = parseInt(searchSurah);
-      const surahData = ayahData.find(s => s.number === surahId);
-      setSelectedSurahAyahs(surahData?.verses || []);
+      if (!isNaN(surahId)) {
+        const surahData = ayahData.find(s => s.number === surahId);
+        setSelectedSurahAyahs(surahData?.verses || []);
+      } else {
+        setSelectedSurahAyahs([]);
+      }
     } else {
       setSelectedSurahAyahs([]);
     }
@@ -346,6 +437,17 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
     );
   };
   
+  // Filter surahs based on search query
+  const filteredSurahs = surahSearchQuery.trim() === '' 
+    ? surahs 
+    : surahs.filter(surah => {
+        const query = surahSearchQuery.toLowerCase();
+        const nameMatch = surah.name.includes(surahSearchQuery); // Arabic search
+        const englishNameMatch = surah.englishName.toLowerCase().includes(query);
+        const idMatch = surah.id.toString().includes(query);
+        return nameMatch || englishNameMatch || idMatch;
+      });
+  
   // Render content for specific navigation type
   const renderNavigationContent = () => {
     switch (activeNavType) {
@@ -354,60 +456,134 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-4"
+            className="flex flex-col h-full max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-16rem)]"
           >
-            {/* Surah and Ayah Selection */}
-            <div className="grid grid-cols-2 gap-2">
-              {/* Surah Dropdown */}
-              <div>
-                <label className={cn("font-medium mb-1 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
-                  {t('chooseSurah')}
-                </label>
-                <select
-                  value={searchSurah}
-                  onChange={(e) => {
-                    setSearchSurah(e.target.value);
-                    setSearchAyah('1');
-                  }}
-                  className={cn("w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
-                >
-                  <option value="">{t('selectSurah')}</option>
-                  {surahs.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {isRTL ? `${formatNumber(s.id)}. ${s.name}` : `${s.id}. ${s.englishName}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Ayah Filter */}
-              <div>
-                <label className={cn("font-medium mb-1 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
-                  {t('chooseAyah')}
-                </label>
-                <select
-                  value={searchAyah}
-                  onChange={(e) => setSearchAyah(e.target.value)}
-                  disabled={!searchSurah || selectedSurahAyahs.length === 0}
-                  className={cn("w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed", textSizeClasses.text)}
-                >
-                  <option value="">{t('selectAyah')}</option>
-                  {searchSurah && selectedSurahAyahs.length > 0 && selectedSurahAyahs.map(ayah => (
-                    <option key={ayah.number} value={ayah.number}>
-                      {formatNumber(ayah.number)}
-                    </option>
-                  ))}
-                </select>
+            {/* Search Bar */}
+            <div className="mb-3 flex-shrink-0">
+              <div className="relative">
+                <Search className={cn(
+                  "absolute top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600",
+                  isRTL ? "right-3" : "left-3"
+                )} />
+                <input
+                  type="text"
+                  placeholder={isRTL ? 'ابحث عن سورة...' : 'Search for a surah...'}
+                  value={surahSearchQuery}
+                  onChange={(e) => setSurahSearchQuery(e.target.value)}
+                  className={cn(
+                    "w-full py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2",
+                    isRTL ? "pr-10 pl-4" : "pl-10 pr-4",
+                    textSizeClasses.text
+                  )}
+                />
               </div>
             </div>
             
-            <Button
-              onClick={handleGoToSurah}
-              disabled={!searchSurah && !searchAyah}
-              className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
-            >
-              {searchAyah ? t('goToAyah') : t('goToSurah')}
-            </Button>
+            {/* Two Scrollable Lists Side by Side */}
+            <div className="flex gap-2 flex-1 overflow-hidden mb-3">
+              {/* Surah List */}
+              <div className={cn(
+                "overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent",
+                searchSurah && searchSurah !== '' && selectedSurahAyahs.length > 0 ? "flex-1" : "w-full"
+              )}>
+                {filteredSurahs.length > 0 ? (
+                  filteredSurahs.map(surah => {
+                    const juzRange = getSurahJuzRange(surah.id);
+                    const isSelected = searchSurah === surah.id.toString();
+                    
+                    // Format Juz display
+                    let juzDisplay = '';
+                    if (juzRange.start === juzRange.end) {
+                      juzDisplay = isRTL 
+                        ? `الجزء ${formatNumber(juzRange.start)}`
+                        : `Juz ${juzRange.start}`;
+                    } else {
+                      juzDisplay = isRTL 
+                        ? `الجزء ${formatNumber(juzRange.start)}-${formatNumber(juzRange.end)}`
+                        : `Juz ${juzRange.start}-${juzRange.end}`;
+                    }
+                    
+                    return (
+                      <button
+                        key={surah.id}
+                        onClick={() => {
+                          setSearchSurah(surah.id.toString());
+                          setSearchAyah('1');
+                        }}
+                        className={cn(
+                          "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                          isSelected && "bg-emerald-500/20 dark:bg-emerald-500/20",
+                          isRTL ? "text-right" : "text-left"
+                        )}
+                      >
+                        {/* Juz number/range - small text at top */}
+                        <div className={cn(
+                          "text-xs text-emerald-600 dark:text-emerald-400 mb-0.5",
+                          isRTL ? "text-right" : "text-left"
+                        )}>
+                          {juzDisplay}
+                        </div>
+                        
+                        {/* Surah name - main text */}
+                        <div className={cn(
+                          "text-emerald-800 dark:text-emerald-200",
+                          isSelected && "font-semibold",
+                          textSizeClasses.text
+                        )}>
+                          {isRTL ? `${formatNumber(surah.id)}. ${surah.name}` : `${surah.id}. ${surah.englishName}`}
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className={cn(
+                    "p-4 text-center text-emerald-600 dark:text-emerald-400",
+                    textSizeClasses.text
+                  )}>
+                    {isRTL ? 'لا توجد نتائج' : 'No results found'}
+                  </div>
+                )}
+              </div>
+              
+              {/* Ayah List - Only shown when surah is selected */}
+              {searchSurah && searchSurah !== '' && selectedSurahAyahs.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, x: isRTL ? -20 : 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex-none w-32 overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent"
+                >
+                  {selectedSurahAyahs.map(ayah => {
+                    const isSelected = searchAyah === ayah.number.toString();
+                    
+                    return (
+                      <button
+                        key={ayah.number}
+                        onClick={() => setSearchAyah(ayah.number.toString())}
+                        className={cn(
+                          "w-full px-3 py-3 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                          isSelected && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                          isRTL ? "text-right" : "text-left",
+                          textSizeClasses.text
+                        )}
+                      >
+                        {isRTL ? `آية ${formatNumber(ayah.number)}` : `Ayah ${ayah.number}`}
+                      </button>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </div>
+            
+            {/* Navigation Button - Fixed at Bottom Always Visible */}
+            <div className="mt-auto pt-3 pb-4 border-t border-emerald-100 dark:border-emerald-900 bg-gradient-to-b from-transparent via-[#FBF9F4]/80 to-[#FBF9F4] dark:from-transparent dark:via-gray-900/80 dark:to-gray-900 flex-shrink-0">
+              <Button
+                onClick={handleGoToSurah}
+                disabled={!searchSurah}
+                className={cn("w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
+              >
+                {searchAyah ? t('goToAyah') : t('goToSurah')}
+              </Button>
+            </div>
           </motion.div>
         );
         
