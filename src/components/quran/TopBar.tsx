@@ -43,7 +43,7 @@ export function TopBar({
           <div className="absolute inset-0 bg-gradient-to-b from-emerald-700/20 to-transparent pointer-events-none" />
           
           {/* Content */}
-          <div className="relative px-4 md:px-8 py-2.5 md:py-3 flex items-center justify-between gap-2" style={{ direction: 'ltr' }}>
+          <div className="relative px-4 md:px-8 pt-2.5 pb-1.5 md:pt-3 md:pb-2 flex items-center justify-between gap-2" style={{ direction: 'ltr' }}>
             {/* Left Cell - Page Number */}
             <button
               onClick={onPageClick}
