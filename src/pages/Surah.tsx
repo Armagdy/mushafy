@@ -674,13 +674,42 @@ const Surah = () => {
           }}
           onDragEnd={() => {
             if (wasPlayingBeforeDrag.current && audioElement) {
-              console.log('Resuming audio after drag');
-              // Resume immediately - blob is already loaded, just seek in it
-              audioElement.play().then(() => {
-                console.log('Playback resumed successfully');
-              }).catch(err => {
-                console.error('Failed to resume playback:', err);
-              });
+              console.log('Drag ended, scheduling audio resume...');
+              
+              // Give page time to navigate and render (if needed) before resuming
+              // This prevents trying to play before the new page is ready
+              setTimeout(() => {
+                console.log('Attempting to resume audio, readyState:', audioElement.readyState);
+                
+                // Check if audio is ready to play
+                if (audioElement.readyState >= 2) {
+                  // HAVE_CURRENT_DATA or better - can play immediately
+                  audioElement.play().then(() => {
+                    console.log('Playback resumed successfully');
+                  }).catch(err => {
+                    console.error('Failed to resume playback:', err);
+                  });
+                } else {
+                  // Audio not ready yet - wait for it to load
+                  console.log('Audio not ready, waiting for canplay event...');
+                  const handleCanPlay = () => {
+                    console.log('Audio ready, resuming playback');
+                    audioElement.play().then(() => {
+                      console.log('Playback resumed successfully after waiting');
+                    }).catch(err => {
+                      console.error('Failed to resume playback after waiting:', err);
+                    });
+                    audioElement.removeEventListener('canplay', handleCanPlay);
+                  };
+                  audioElement.addEventListener('canplay', handleCanPlay);
+                  
+                  // Timeout fallback (5 seconds)
+                  setTimeout(() => {
+                    audioElement.removeEventListener('canplay', handleCanPlay);
+                    console.log('Timeout waiting for audio to be ready');
+                  }, 5000);
+                }
+              }, 100); // Short delay for navigation - seek only called once now at drag end
             }
             wasPlayingBeforeDrag.current = false;
           }}

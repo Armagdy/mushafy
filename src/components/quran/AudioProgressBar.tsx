@@ -82,20 +82,21 @@ export function AudioProgressBar({
     ? dragProgress 
     : (duration > 0 ? (currentTime / duration) * 100 : 0);
 
-  // Handle seeking
-  const handleSeek = (clientX: number) => {
-    if (!progressBarRef.current) return;
+  // Update drag position (visual only, doesn't seek yet)
+  const updateDragPosition = (clientX: number) => {
+    if (!progressBarRef.current) return 0;
     
     const rect = progressBarRef.current.getBoundingClientRect();
     const clickPosition = clientX - rect.left;
     const percentage = Math.max(0, Math.min(100, (clickPosition / rect.width) * 100));
+    
+    setDragProgress(percentage);
+    return percentage;
+  };
+  
+  // Actually seek to time (only called on drag end)
+  const performSeek = (percentage: number) => {
     const newTime = (percentage / 100) * duration;
-    
-    // Update drag progress immediately for visual feedback
-    if (isDragging) {
-      setDragProgress(percentage);
-    }
-    
     onSeek(newTime);
   };
 
@@ -109,7 +110,7 @@ export function AudioProgressBar({
     setWasPlayingBeforeDrag(isPlaying);
     setIsDragging(true);
     onDragStart?.();
-    handleSeek(e.clientX);
+    updateDragPosition(e.clientX); // Just update visual, don't seek yet
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -126,7 +127,7 @@ export function AudioProgressBar({
     setIsDragging(true);
     onDragStart?.();
     if (e.touches.length > 0) {
-      handleSeek(e.touches[0].clientX);
+      updateDragPosition(e.touches[0].clientX); // Just update visual, don't seek yet
     }
   };
 
@@ -140,7 +141,7 @@ export function AudioProgressBar({
     setHoverTime(time);
 
     if (isDragging) {
-      handleSeek(e.clientX);
+      updateDragPosition(e.clientX); // Just update visual during drag
     }
   };
 
@@ -157,7 +158,7 @@ export function AudioProgressBar({
       setHoverTime(time);
 
       if (isDragging) {
-        handleSeek(e.touches[0].clientX);
+        updateDragPosition(e.touches[0].clientX); // Just update visual during drag
       }
     }
   };
@@ -167,6 +168,11 @@ export function AudioProgressBar({
   };
 
   const handleTouchEnd = () => {
+    // Perform actual seek when drag ends
+    if (dragProgress !== null) {
+      performSeek(dragProgress);
+    }
+    
     setIsDragging(false);
     setHoverTime(null);
     
@@ -186,6 +192,11 @@ export function AudioProgressBar({
 
   useEffect(() => {
     const handleMouseUp = () => {
+      // Perform actual seek when drag ends
+      if (dragProgress !== null) {
+        performSeek(dragProgress);
+      }
+      
       setIsDragging(false);
       
       // Clear dragProgress after a delay to prevent visual jump
@@ -202,6 +213,11 @@ export function AudioProgressBar({
       setWasPlayingBeforeDrag(false);
     };
     const handleTouchEndGlobal = () => {
+      // Perform actual seek when drag ends
+      if (dragProgress !== null) {
+        performSeek(dragProgress);
+      }
+      
       setIsDragging(false);
       
       // Clear dragProgress after a delay to prevent visual jump

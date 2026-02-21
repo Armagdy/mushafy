@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, ImgHTMLAttributes } from 'react';
-import { getCachedAsset, cacheAsset } from '@/lib/asset-cache';
+import { getCachedAsset, getCachedAssetUri, cacheAsset } from '@/lib/asset-cache';
+import { isNativePlatform } from '@/lib/native-storage';
+import { Capacitor } from '@capacitor/core';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface CachedImageProps extends ImgHTMLAttributes<HTMLImageElement> {
@@ -59,18 +61,34 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
         
         // ALWAYS check cache first (regardless of online status)
         console.log(`[CachedImage] 🔍 Checking cache for: ${src.split('/').pop()}`);
-        const cachedBlob = await getCachedAsset(src);
         
-        if (cancelled) return;
-
-        if (cachedBlob) {
-          // Found in cache - create blob URL and use it
-          console.log(`[CachedImage] ✅ Using cached blob for: ${src}`);
-          const blobUrl = URL.createObjectURL(cachedBlob);
-          blobUrlRef.current = blobUrl;
-          setImageSrc(blobUrl);
-          setIsLoading(false);
-          return; // IMPORTANT: Return here to avoid trying network
+        // On native platforms, try to get file URI first (much faster than loading blob)
+        if (isNativePlatform()) {
+          const fileUri = await getCachedAssetUri(src);
+          if (cancelled) return;
+          
+          if (fileUri) {
+            // Convert native file:// URI to WebView-compatible URI
+            const webViewUri = Capacitor.convertFileSrc(fileUri);
+            console.log(`[CachedImage] ✅ Using cached file URI for: ${src}`);
+            setImageSrc(webViewUri);
+            setIsLoading(false);
+            return; // IMPORTANT: Return here to avoid trying network
+          }
+        } else {
+          // On web, load blob and create object URL
+          const cachedBlob = await getCachedAsset(src);
+          if (cancelled) return;
+          
+          if (cachedBlob) {
+            // Found in cache - create blob URL and use it
+            console.log(`[CachedImage] ✅ Using cached blob for: ${src}`);
+            const blobUrl = URL.createObjectURL(cachedBlob);
+            blobUrlRef.current = blobUrl;
+            setImageSrc(blobUrl);
+            setIsLoading(false);
+            return; // IMPORTANT: Return here to avoid trying network
+          }
         }
         
         // Not in cache - check if online

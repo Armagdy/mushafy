@@ -103,6 +103,45 @@ export const getCachedAudio = async (
 };
 
 /**
+ * Get native file URI for cached audio (Android/iOS only - instant, no loading)
+ * Returns { uri, timestamps } or null if not cached or on web
+ * This is MUCH faster than getCachedAudio() for large files
+ */
+export const getCachedAudioUri = async (
+  reciterFolder: string,
+  surahNum: number
+): Promise<{ uri: string; timestamps: number[] } | null> => {
+  if (!isNativePlatform()) return null;
+  
+  try {
+    await audioStorage.init();
+    
+    const key = getCacheKey(reciterFolder, surahNum);
+    
+    // First check if file exists (lightweight)
+    const exists = await audioStorage.hasItem(key);
+    if (!exists) {
+      console.log(`❌ [${getPlatform()}] Cache MISS for ${reciterFolder} surah ${surahNum}`);
+      return null;
+    }
+    
+    // Get file URI (instant - no loading!)
+    const uri = await audioStorage.getFileUri(key);
+    if (!uri) return null;
+    
+    // Load metadata only (tiny JSON file - DOES NOT load 32MB blob!)
+    const metadata = await audioStorage.getMetadata(key);
+    const timestamps = metadata?.timestamps || [];
+    
+    console.log(`✅ [${getPlatform()}] Cache HIT (file URI) for ${reciterFolder} surah ${surahNum}`);
+    return { uri, timestamps };
+  } catch (error) {
+    console.error('Error getting cached audio URI:', error);
+    return null;
+  }
+};
+
+/**
  * Check if audio is cached
  */
 export const isAudioCached = async (

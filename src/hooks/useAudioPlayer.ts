@@ -4,11 +4,12 @@ import { ASSETS_BASE_URL } from '@/config/assets';
 import { getAudioData } from '@/lib/quran-data-service';
 import { getMp3QuranReciters, getAyahTiming, getSurahAudioUrl, getCurrentAyahFromTime, seekToAyah, type Mp3QuranReciter, type Mp3QuranMoshaf, type AyahTiming } from '@/lib/mp3quran-service';
 import { surahs } from '@/data/surahs';
-import { cacheAudio, getCachedAudio, cacheMp3QuranAudio, getCachedMp3QuranAudio, cacheIndividualAyah, getCachedIndividualAyah, getAllCachedAyahsForSurah, getCachedAyahTiming } from '@/lib/audio-cache';
+import { cacheAudio, getCachedAudio, getCachedAudioUri, cacheMp3QuranAudio, getCachedMp3QuranAudio, cacheIndividualAyah, getCachedIndividualAyah, getAllCachedAyahsForSurah, getCachedAyahTiming } from '@/lib/audio-cache';
 import { isNetworkError } from '@/hooks/useNetwork';
 import { debugMediaSession } from '@/lib/media-session-debug';
 import QuranMediaSession from '@/lib/quran-media-session';
 import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
 interface CurrentAyah {
   surah: number;
@@ -91,6 +92,9 @@ export const useAudioPlayer = ({
   
   // Track if user is actively seeking (dragging progress bar)
   const isSeekingRef = useRef<boolean>(false);
+  
+  // Store pending notification update to apply when seeking completes
+  const pendingNotificationUpdateRef = useRef<{surah: number; ayah: number; playing: boolean} | null>(null);
   
   // Throttle timeupdate processing (for performance on large surahs)
   const lastTimeUpdateRef = useRef<number>(0);
@@ -475,6 +479,54 @@ export const useAudioPlayer = ({
     if (!surahData || !surahData.verses) return null;
     
     const totalAyahs = surahData.verses.length;
+    const isNative = Capacitor.isNativePlatform();
+    
+    // 🔥 NATIVE ANDROID: Check if concatenated MP3 already exists on phone storage
+    // Use getCachedAudioUri for instant file URI (no loading!)
+    if (isNative) {
+      console.log(`📱 [NATIVE] Checking for cached concatenated MP3: ${selectedReciter.folder} surah ${surahNum}`);
+      const cachedUri = await getCachedAudioUri(selectedReciter.folder, surahNum);
+      
+      if (cachedUri) {
+        // ✅ Found! Convert native file:// URI to WebView-accessible URI
+        console.log(`✅ [NATIVE] Concatenated MP3 found! Converting file URI for WebView`);
+        
+        // Verify the file is actually accessible before using it
+        try {
+          const { uri } = cachedUri;
+          // Try to read file stats to verify it exists and is accessible
+          const fileName = uri.split('/').pop() || '';
+          
+          const stat = await Filesystem.stat({
+            path: fileName,
+            directory: Directory.Data
+          });
+          
+          console.log(`✅ [NATIVE] File verified: ${(stat.size / (1024 * 1024)).toFixed(1)}MB`);
+          
+          // Revoke old blob URL if exists
+          if (concatenatedBlobUrl) {
+            URL.revokeObjectURL(concatenatedBlobUrl);
+          }
+          
+          // Convert native file:// URI to capacitor:// or http://localhost protocol that WebView allows
+          const webViewUri = Capacitor.convertFileSrc(uri);
+          console.log(`🔄 [NATIVE] Converted URI: ${webViewUri}`);
+          
+          setConcatenatedBlobUrl(webViewUri);
+          setConcatenatedSurah(surahNum);
+          setAyahTimestamps(cachedUri.timestamps);
+          
+          return { blobUrl: webViewUri, timestamps: cachedUri.timestamps };
+        } catch (verifyError) {
+          console.error(`⚠️ [NATIVE] Cached file exists in metadata but not accessible:`, verifyError);
+          console.log(`🔄 [NATIVE] Will rebuild the file...`);
+          // Fall through to rebuild the file
+        }
+      }
+      
+      console.log(`📥 [NATIVE] Concatenated MP3 not found - will build and save to phone storage`);
+    }
     
     // Check if we already have all individual ayahs cached
     const cachedAyahs = await getAllCachedAyahsForSurah(selectedReciter.folder, surahNum, totalAyahs);
@@ -594,12 +646,22 @@ export const useAudioPlayer = ({
       // Concatenate MP3 blobs directly (simple and fast!)
       const concatenatedMp3 = new Blob(mp3Blobs, { type: 'audio/mpeg' });
       const fileSizeMB = (concatenatedMp3.size / (1024 * 1024)).toFixed(1);
-      console.log(`✅ Blob created in memory: ${fileSizeMB} MB (NOT cached - will be kept until stop)`);
+      
+      // 🔥 NATIVE ANDROID: Save concatenated MP3 to phone storage
+      if (isNative) {
+        console.log(`💾 [NATIVE] Saving concatenated MP3 to phone storage: ${fileSizeMB} MB`);
+        try {
+          await cacheAudio(selectedReciter.folder, surahNum, concatenatedMp3, timestamps);
+          console.log(`✅ [NATIVE] Concatenated MP3 saved to phone storage successfully!`);
+        } catch (cacheError) {
+          console.error(`⚠️ [NATIVE] Failed to save concatenated MP3 to phone storage:`, cacheError);
+          // Continue anyway - we can still play from memory
+        }
+      } else {
+        console.log(`✅ [WEB] Blob created in memory: ${fileSizeMB} MB (NOT cached - will be kept until stop)`);
+      }
       
       const blobUrl = URL.createObjectURL(concatenatedMp3);
-      
-      // DON'T cache the concatenated blob - keep it in memory only
-      // Individual ayahs are already cached
       
       // Revoke old blob URL if exists (from previous playback)
       if (concatenatedBlobUrl && concatenatedBlobUrl !== blobUrl) {
@@ -1829,9 +1891,11 @@ export const useAudioPlayer = ({
       console.log('EveryAyah: Seeked to ayah', ayahNum, 'of surah', concatenatedSurah);
       setCurrentPlayingAyah({ surah: concatenatedSurah, ayah: ayahNum });
       updateMediaSession(concatenatedSurah, ayahNum, isPlaying);
-      updateNativeMusicControls(concatenatedSurah, ayahNum, isPlaying).catch(console.error);
       
-      // Navigate to page if needed
+      // Store pending notification update to apply when seeking completes (prevents spam)
+      pendingNotificationUpdateRef.current = { surah: concatenatedSurah, ayah: ayahNum, playing: isPlaying };
+      
+      // Navigate to page immediately (page will handle resume after load)
       const surahData = ayahData.find(s => s.number === concatenatedSurah);
       if (surahData && surahData.verses) {
         const verse = surahData.verses.find((v: any) => v.number === ayahNum);
@@ -1848,9 +1912,11 @@ export const useAudioPlayer = ({
         console.log('MP3Quran: Seeked to ayah', ayahNum, 'of surah', currentSurahAudio);
         setCurrentPlayingAyah({ surah: currentSurahAudio, ayah: ayahNum });
         updateMediaSession(currentSurahAudio, ayahNum, isPlaying);
-        updateNativeMusicControls(currentSurahAudio, ayahNum, isPlaying).catch(console.error);
         
-        // Navigate to page if needed
+        // Store pending notification update to apply when seeking completes (prevents spam)
+        pendingNotificationUpdateRef.current = { surah: currentSurahAudio, ayah: ayahNum, playing: isPlaying };
+        
+        // Navigate to page immediately (page will handle resume after load)
         const surahData = ayahData.find(s => s.number === currentSurahAudio);
         if (surahData && surahData.verses) {
           const verse = surahData.verses.find((v: any) => v.number === ayahNum);
@@ -2542,6 +2608,14 @@ export const useAudioPlayer = ({
       // This allows playback to resume without delay
       isSeekingRef.current = false;
       console.log('Seeking completed');
+      
+      // Apply pending notification update now that seeking is done
+      if (pendingNotificationUpdateRef.current) {
+        const { surah, ayah, playing } = pendingNotificationUpdateRef.current;
+        console.log('Applying pending notification update:', { surah, ayah, playing });
+        updateNativeMusicControls(surah, ayah, playing).catch(console.error);
+        pendingNotificationUpdateRef.current = null;
+      }
     };
     
     audioElement.addEventListener('timeupdate', handleTimeUpdate);

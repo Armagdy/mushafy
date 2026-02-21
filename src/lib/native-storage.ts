@@ -50,6 +50,23 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 };
 
 /**
+ * Convert a Blob chunk to base64 string
+ */
+const blobChunkToBase64 = (blobChunk: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      // Remove data URL prefix (e.g., "data:audio/wav;base64,")
+      const base64Data = base64.split(',')[1] || base64;
+      resolve(base64Data);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blobChunk);
+  });
+};
+
+/**
  * Convert base64 string back to Blob
  */
 const base64ToBlob = (base64: string, mimeType: string = 'application/octet-stream'): Blob => {
@@ -70,6 +87,13 @@ export class NativeStorage {
   private dbName: string;
   private db: IDBDatabase | null = null;
   private directory: Directory = Directory.Data;
+  
+  /**
+   * Get the Directory constant (for external use)
+   */
+  getDirectory(): Directory {
+    return this.directory;
+  }
 
   constructor(dbName: string = 'quran-native-storage') {
     this.dbName = dbName;
@@ -146,11 +170,74 @@ export class NativeStorage {
   }
 
   /**
-   * Check if item exists
+   * Check if item exists (lightweight - doesn't load data)
    */
   async hasItem(key: string): Promise<boolean> {
-    const item = await this.getItem(key);
-    return item !== null;
+    if (isNativePlatform()) {
+      try {
+        const sanitizedKey = this.sanitizeKey(key);
+        const metadataPath = `${sanitizedKey}.meta.json`;
+        await Filesystem.readFile({
+          path: metadataPath,
+          directory: this.directory,
+          encoding: Encoding.UTF8
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    } else {
+      const item = await this.getItem(key);
+      return item !== null;
+    }
+  }
+  
+  /**
+   * Get native file URI without loading data into memory (native only)
+   * Returns null on web or if file doesn't exist
+   */
+  async getFileUri(key: string): Promise<string | null> {
+    if (!isNativePlatform()) return null;
+    
+    try {
+      const sanitizedKey = this.sanitizeKey(key);
+      const blobPath = `${sanitizedKey}.blob`;
+      
+      // Get the file URI using Capacitor's getUri method
+      const result = await Filesystem.getUri({
+        path: blobPath,
+        directory: this.directory
+      });
+      
+      return result.uri;
+    } catch (error) {
+      console.error('Error getting file URI:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Get only metadata without loading blob data (native only)
+   * Returns null on web or if file doesn't exist
+   */
+  async getMetadata(key: string): Promise<Record<string, any> | null> {
+    if (!isNativePlatform()) return null;
+    
+    try {
+      const sanitizedKey = this.sanitizeKey(key);
+      const metadataPath = `${sanitizedKey}.meta.json`;
+      
+      const metadataFile = await Filesystem.readFile({
+        path: metadataPath,
+        directory: this.directory,
+        encoding: Encoding.UTF8
+      });
+
+      const metadata = JSON.parse(metadataFile.data as string);
+      return metadata.metadata || null;
+    } catch (error) {
+      return null;
+    }
   }
 
   /**
@@ -218,12 +305,72 @@ export class NativeStorage {
 
     // Store data
     if (item.data instanceof Blob) {
-      const base64Data = await blobToBase64(item.data);
-      await Filesystem.writeFile({
-        path: `${sanitizedKey}.blob`,
-        data: base64Data,
-        directory: this.directory
-      });
+      const blobPath = `${sanitizedKey}.blob`;
+      const blob = item.data;
+      
+      // For large blobs (>10MB), write in chunks to avoid OOM
+      // The issue: converting entire 125MB blob to base64 (~167MB string) causes OOM
+      // Solution: Process blob in 5MB chunks, convert each to base64, write immediately
+      const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB blob chunks
+      
+      if (blob.size > CHUNK_SIZE) {
+        const totalChunks = Math.ceil(blob.size / CHUNK_SIZE);
+        console.log(`💾 Writing large blob in ${totalChunks} chunks (${(blob.size / (1024 * 1024)).toFixed(1)}MB total)`);
+        
+        // Process first chunk
+        let offset = 0;
+        const firstChunk = blob.slice(offset, offset + CHUNK_SIZE);
+        const firstBase64 = await blobChunkToBase64(firstChunk);
+        
+        await Filesystem.writeFile({
+          path: blobPath,
+          data: firstBase64,
+          directory: this.directory
+        });
+        console.log(`💾 Chunk 1/${totalChunks} written`);
+        
+        offset += CHUNK_SIZE;
+        
+        // Process remaining chunks
+        let chunkNum = 2;
+        while (offset < blob.size) {
+          const chunk = blob.slice(offset, Math.min(offset + CHUNK_SIZE, blob.size));
+          const chunkBase64 = await blobChunkToBase64(chunk);
+          
+          await Filesystem.appendFile({
+            path: blobPath,
+            data: chunkBase64,
+            directory: this.directory
+          });
+          
+          console.log(`💾 Chunk ${chunkNum}/${totalChunks} written`);
+          offset += CHUNK_SIZE;
+          chunkNum++;
+        }
+        
+        console.log(`✅ Large file written successfully in ${totalChunks} chunks`);
+      } else {
+        // Small blob, write directly
+        const base64Data = await blobToBase64(blob);
+        await Filesystem.writeFile({
+          path: blobPath,
+          data: base64Data,
+          directory: this.directory
+        });
+      }
+      
+      // Verify the file was written successfully
+      try {
+        const stat = await Filesystem.stat({
+          path: blobPath,
+          directory: this.directory
+        });
+        const fileSizeMB = (stat.size / (1024 * 1024)).toFixed(1);
+        console.log(`✅ File verified on disk: ${fileSizeMB}MB`);
+      } catch (verifyError) {
+        console.error('⚠️ File write verification failed:', verifyError);
+        throw new Error('Failed to verify file was written');
+      }
     } else {
       await Filesystem.writeFile({
         path: `${sanitizedKey}.txt`,

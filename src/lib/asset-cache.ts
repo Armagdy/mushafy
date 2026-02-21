@@ -101,6 +101,33 @@ export const isAssetCached = async (url: string): Promise<boolean> => {
 };
 
 /**
+ * Get cached asset as native file URI (native platforms only)
+ * This is much faster than getCachedAsset() as it doesn't load the blob into memory
+ * Returns null on web platforms or if not cached
+ */
+export const getCachedAssetUri = async (url: string): Promise<string | null> => {
+  try {
+    if (!isNativePlatform()) return null;
+    
+    await assetStorage.init();
+    
+    const key = urlToCacheKey(url);
+    const fileUri = await assetStorage.getFileUri(key);
+    
+    if (fileUri) {
+      const filename = url.split('/').pop() || 'unknown';
+      console.log(`✅ [${getPlatform()}] Got file URI for ${filename}`);
+      return fileUri;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting cached asset URI:', error);
+    return null;
+  }
+};
+
+/**
  * Clear all cached assets by category
  * Uses native filesystem on Android/iOS, IndexedDB on web
  */
