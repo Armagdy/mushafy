@@ -28,6 +28,11 @@ export default function SettingsView() {
   // Active category from URL (null = show list, string = show that category's content)
   const activeCategory = searchParams.get('category');
   
+  // Reset search params on mount to always show full list
+  useEffect(() => {
+    setSearchParams({});
+  }, []);
+  
   const [selectedMushaf, setSelectedMushaf] = useState<MushafType>(mushafType);
   const hasUnsavedChanges = selectedMushaf !== mushafType;
   

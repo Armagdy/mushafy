@@ -120,10 +120,10 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
     if (initialType) {
       setSearchParams({ type: initialType });
     } else {
-      // Clear search params if no initialType
+      // Clear search params to show full list
       setSearchParams({});
     }
-  }, [initialType]);  // Run when initialType changes
+  }, []);  // Run only on mount
   
   // Clear surah/ayah selection when switching away from surah tab
   useEffect(() => {

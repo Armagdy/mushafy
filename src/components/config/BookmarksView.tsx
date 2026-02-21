@@ -82,6 +82,11 @@ export default function BookmarksView({
   
   // Active category from URL (null = show list, string = show that category's content)
   const activeCategory = searchParams.get('category');
+  
+  // Reset search params on mount to always show full list
+  useLayoutEffect(() => {
+    setSearchParams({});
+  }, []);
 
   // Update dropdowns when current page/surah changes
   useLayoutEffect(() => {
