@@ -246,11 +246,13 @@ const Surah = () => {
     }
   }, [page, navigate]);
   
-  // Listen for bottom bar text setting changes
+  // Listen for setting changes from SettingsView
   useEffect(() => {
     const handleSettingChange = (event: CustomEvent) => {
       if (event.detail.key === 'quran-show-bottom-bar-text') {
         setShowBottomBarText(event.detail.value === 'true');
+      } else if (event.detail.key === 'quran-pages-to-load') {
+        setPagesToLoad(parseInt(event.detail.value));
       }
     };
     
