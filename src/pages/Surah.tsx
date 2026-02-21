@@ -598,6 +598,7 @@ const Surah = () => {
         currentJuz={currentJuz}
         currentHezb={currentHezb}
         currentQuarter={currentQuarter}
+        currentAyah={currentPlayingAyah?.ayah || currentPageAyah}
         formatNumber={formatNumber}
         onSurahClick={() => {
           setInitialNavigationType('surah');

@@ -11,6 +11,7 @@ interface TopBarProps {
   currentJuz: number;
   currentHezb: number;
   currentQuarter: number;
+  currentAyah: number | null;
   formatNumber: (num: number | string) => string;
   onSurahClick: () => void;
   onPageClick: () => void;
@@ -21,6 +22,7 @@ export function TopBar({
   currentSurah,
   currentPageNum,
   currentJuz,
+  currentAyah,
   formatNumber,
   onSurahClick,
   onPageClick,
@@ -67,17 +69,36 @@ export function TopBar({
             {/* Center Cell - Surah Name */}
             <button
               onClick={onSurahClick}
-              className="flex-1 flex items-center justify-center hover:opacity-80 transition-opacity"
+              className="flex-1 flex flex-col items-center justify-center hover:opacity-80 transition-opacity"
             >
               <div className="flex items-center gap-2">
                 <span className="text-base text-[#F2E3BB]/70 leading-none">﴾</span>
                 <span 
-                  className="text-2xl md:text-3xl font-bold text-[#F2E3BB] leading-none"
+                  className="text-xl md:text-2xl font-bold text-[#F2E3BB] leading-none"
                   style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
                 >
                   {language === 'ar' ? currentSurah.name : currentSurah.englishName}
                 </span>
                 <span className="text-base text-[#F2E3BB]/70 leading-none">﴿</span>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                {currentAyah && (
+                  <>
+                    <span 
+                      className="text-[10px] md:text-xs text-[#F2E3BB]/70 leading-none"
+                      style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+                    >
+                      {t('ayah')} {formatNumber(currentAyah)}
+                    </span>
+                    <span className="text-[10px] text-[#F2E3BB]/50">-</span>
+                  </>
+                )}
+                <span 
+                  className="text-[10px] md:text-xs text-[#F2E3BB]/70 leading-none"
+                  style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+                >
+                  {t('surah')} {formatNumber(currentSurah.id)}
+                </span>
               </div>
             </button>
 
