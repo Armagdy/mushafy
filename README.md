@@ -87,6 +87,177 @@ A modern, multilingual Quranic reading web application with comprehensive featur
 
 *See [INDIVIDUAL_AYAH_PLAYBACK.md](INDIVIDUAL_AYAH_PLAYBACK.md) for detailed technical documentation*
 
+## 🎨 View-Based Configuration Architecture
+
+### Overview
+The application uses a **View-based architecture** instead of traditional modal dialogs for all configuration screens. This provides:
+- ✅ **Consistent UX**: Full-screen immersive experience on mobile devices
+- ✅ **Better Performance**: No backdrop/overlay rendering overhead
+- ✅ **Seamless Navigation**: Built-in bottom bar for switching between views
+- ✅ **Maintainability**: Each view is a self-contained component
+- ✅ **Mobile-First**: Optimized for touch interactions and small screens
+
+### Architecture Components
+
+#### ConfigOverlay (`src/components/config/ConfigOverlay.tsx`)
+The main container that manages all configuration views:
+- **Full-screen overlay**: Covers the entire viewport without changing the URL
+- **Persistent header**: Consistent emerald gradient header with back button
+- **Bottom navigation bar**: Quick access to all configuration views
+- **View switching**: Seamlessly transitions between different views
+- **State preservation**: Maintains parent state while switching views
+
+#### View Components (`src/components/config/`)
+Modular, self-contained configuration panels:
+
+| View Component | Purpose | Key Features |
+|---------------|---------|--------------|
+| **SettingsView** | App settings & preferences | Language, Mushaf type, view mode, page loading |
+| **BookmarksView** | Bookmark management | Three bookmark types (general, memorization, reading), color-coded tabs |
+| **NavigationView** | Jump to location | Navigate by Surah, Juz, Page, Hizb, Quarter, or specific Ayah |
+| **SearchView** | Word search | Search Quran text with highlighting and results list |
+| **ReciterView** | Audio settings | Choose reciter, filter by reading/style/quality, audio source selection |
+| **TafseerView** | Tafseer settings | Select from 20+ tafseer sources in multiple languages |
+| **RepeatView** | Repeat configuration | Set passage/ayah repeat counts for memorization |
+
+### Design Principles
+
+#### 1. No Modal Dialogs for Configuration
+❌ **Old Approach** (Deprecated):
+```tsx
+// Legacy Dialog components (no longer used)
+<NavigationDialog open={open} onOpenChange={setOpen} />
+<SettingsDialog open={open} onOpenChange={setOpen} />
+```
+
+✅ **New Approach** (Current):
+```tsx
+// ConfigOverlay with View components
+<ConfigOverlay
+  type="navigation"  // or 'settings', 'bookmarks', etc.
+  onClose={() => setConfigOverlayType(null)}
+  onChangeView={(view) => setConfigOverlayType(view)}
+/>
+```
+
+#### 2. Consistent Styling
+All view components follow standardized styling patterns:
+- **Colors**: Emerald theme (`emerald-700`, `emerald-800`) with cream text (`#F2E3BB`)
+- **Typography**: Responsive text sizing via `DialogTextSizeContext` (`text-base md:text-xl`)
+- **Spacing**: Consistent padding (`p-4`) and vertical spacing (`space-y-2 sm:space-y-3`)
+- **Buttons**: Solid emerald background with rounded corners and shadows
+- **Tabs**: Emerald background with active state highlighting
+- **Inputs**: Emerald borders with focus ring states
+
+#### 3. RTL/LTR Support
+All views automatically adapt to language direction:
+```tsx
+const { t, isRTL } = useLanguage();
+<div className={cn("space-y-3", isRTL ? "rtl" : "ltr")}>
+```
+
+#### 4. Responsive Text Sizing
+Views use centralized text sizing for consistency:
+```tsx
+const { dialogTextSize } = useDialogTextSize();
+const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+<Label className={textSizeClasses.label}>{t('label')}</Label>
+```
+
+### Usage Example
+
+```tsx
+// In parent component (e.g., Surah.tsx)
+const [configOverlayType, setConfigOverlayType] = useState<ConfigType | null>(null);
+
+// Trigger view from bottom bar
+<BottomBar
+  onSettingsClick={() => setConfigOverlayType('settings')}
+  onBookmarkClick={() => setConfigOverlayType('bookmarks')}
+  onGoToClick={() => setConfigOverlayType('navigation')}
+/>
+
+// Render overlay conditionally
+{configOverlayType && (
+  <ConfigOverlay
+    type={configOverlayType}
+    onClose={() => setConfigOverlayType(null)}
+    onChangeView={(view) => setConfigOverlayType(view)}
+    // ... other props
+  />
+)}
+```
+
+### Migration from Dialogs
+
+**Legacy Dialog components** (in `src/components/quran/`) are deprecated and should not be used for new features:
+- ❌ `NavigationDialog.tsx`
+- ❌ `SettingsDialog.tsx`
+- ❌ `BookmarksDialog.tsx`
+- ❌ `ReciterDialog.tsx`
+- ❌ `TafseerDialog.tsx`
+
+**Why the migration?**
+- Dialogs felt cramped on mobile devices
+- Modal backdrops reduced visibility of Quran pages
+- No easy way to switch between related configuration screens
+- Inconsistent UX across different settings
+- Difficult to maintain state when switching between dialogs
+
+**View components** (in `src/components/config/`) are the current standard:
+- ✅ Full-screen immersive experience
+- ✅ Integrated navigation between views
+- ✅ Consistent styling and behavior
+- ✅ Better mobile UX
+
+### Adding a New View
+
+To add a new configuration view:
+
+1. **Create view component** in `src/components/config/NewFeatureView.tsx`:
+```tsx
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
+import { cn } from "@/lib/utils";
+
+interface NewFeatureViewProps {
+  onClose: () => void;
+  // ... other props
+}
+
+export default function NewFeatureView({ onClose }: NewFeatureViewProps) {
+  const { t, isRTL } = useLanguage();
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+  
+  return (
+    <div className={cn("p-4 space-y-2 sm:space-y-3", isRTL ? "rtl" : "ltr")}>
+      {/* View content */}
+    </div>
+  );
+}
+```
+
+2. **Add to ConfigType** in `ConfigOverlay.tsx`:
+```tsx
+export type ConfigType = 'settings' | 'bookmarks' | 'navigation' | 'newfeature';
+```
+
+3. **Add to renderView()** switch statement:
+```tsx
+case 'newfeature':
+  return <NewFeatureView onClose={onClose} />;
+```
+
+4. **Add button to BottomBar** or other trigger point:
+```tsx
+<Button onClick={() => setConfigOverlayType('newfeature')}>
+  {t('newFeature')}
+</Button>
+```
+
+📚 **Full documentation**: See [VIEW_ARCHITECTURE.md](./VIEW_ARCHITECTURE.md) for complete technical details, migration guide, and best practices.
+
 ## 🛠️ Technical Stack
 
 - **Framework**: React 18 with TypeScript
@@ -98,6 +269,7 @@ A modern, multilingual Quranic reading web application with comprehensive featur
 - **Icons**: Lucide React
 - **Testing**: Vitest + React Testing Library
 - **PWA Support**: Offline-capable Progressive Web App
+- **Configuration UI**: View-based architecture (not modal dialogs)
 
 ## 🚀 Getting Started
 
@@ -458,7 +630,21 @@ export default function MyView(props: MyViewProps) {
 
 **Note**: Legacy Dialog components exist in `src/components/quran/` but new features should use View components.
 
-## 📖 Usage Guide
+## � Technical Documentation
+
+Comprehensive technical documentation is available for key architectural components:
+
+| Document | Description |
+|----------|-------------|
+| [VIEW_ARCHITECTURE.md](VIEW_ARCHITECTURE.md) | **View-based configuration system** - Complete guide to the overlay architecture that replaces modal dialogs, including component structure, styling standards, and migration guide |
+| [INDIVIDUAL_AYAH_PLAYBACK.md](INDIVIDUAL_AYAH_PLAYBACK.md) | **Audio concatenation strategy** - Technical details on how individual ayah files are concatenated for seamless playback and mobile optimization |
+| [CAPACITOR_SETUP.md](CAPACITOR_SETUP.md) | **Native Android app setup** - Complete guide for building and deploying the app as a native Android application using Capacitor |
+| [CAPACITOR_QUICK_REF.md](CAPACITOR_QUICK_REF.md) | **Capacitor command reference** - Quick reference for common Capacitor development commands |
+| [STORAGE_MIGRATION.md](STORAGE_MIGRATION.md) | **Native storage migration** - Details on the hybrid storage system that uses native filesystem on Android and IndexedDB on web |
+| [TAFSEER_IMPLEMENTATION.md](TAFSEER_IMPLEMENTATION.md) | **Tafseer system** - Implementation details for the dual-API tafseer system with 20+ sources |
+| [.github/copilot-instructions.md](.github/copilot-instructions.md) | **AI coding guide** - Comprehensive project guidelines for AI-assisted development, architectural patterns, and code standards |
+
+## �📖 Usage Guide
 
 ### Viewing Tafseer
 

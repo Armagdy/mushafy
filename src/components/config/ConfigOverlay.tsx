@@ -31,6 +31,10 @@ interface ConfigOverlayProps {
   onViewModeToggle: () => void;
   showBottomBarText: boolean;
   isMobile: boolean;
+  initialNavigationType?: 'surah' | 'juz' | 'page';
+  initialNavigationSurah?: number;
+  initialNavigationJuz?: number;
+  initialNavigationPage?: number;
   
   // Audio player props for ReciterView
   audioSource: 'everyayah' | 'mp3quran';
@@ -93,6 +97,10 @@ export default function ConfigOverlay({
   onViewModeToggle,
   showBottomBarText,
   isMobile,
+  initialNavigationType,
+  initialNavigationSurah,
+  initialNavigationJuz,
+  initialNavigationPage,
   audioSource,
   onAudioSourceChange,
   selectedReciter,
@@ -228,7 +236,16 @@ export default function ConfigOverlay({
           />
         );
       case 'navigation':
-        return <NavigationView onNavigate={onNavigate} onClose={onClose} />;
+        return (
+          <NavigationView 
+            onNavigate={onNavigate} 
+            onClose={onClose} 
+            initialType={initialNavigationType}
+            initialSurah={initialNavigationSurah}
+            initialJuz={initialNavigationJuz}
+            initialPage={initialNavigationPage}
+          />
+        );
       case 'search':
         return <SearchView onNavigate={onNavigate} onClose={onClose} />;
       case 'reciter':

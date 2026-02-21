@@ -12,13 +12,17 @@ import { BookOpen, Hash, FileText, ChevronLeft, ChevronRight, ArrowLeft, ArrowRi
 interface NavigationViewProps {
   onNavigate?: (page: number) => void;
   onClose?: () => void;
+  initialType?: 'surah' | 'juz' | 'page';
+  initialSurah?: number;
+  initialJuz?: number;
+  initialPage?: number;
 }
 
 /**
  * Navigation View - Full page navigation interface
  * Extracted from NavigationDialog.tsx for use in Configuration page
  */
-export default function NavigationView({ onNavigate, onClose }: NavigationViewProps) {
+export default function NavigationView({ onNavigate, onClose, initialType, initialSurah, initialJuz, initialPage }: NavigationViewProps) {
   const { t, isRTL, language } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
@@ -31,6 +35,16 @@ export default function NavigationView({ onNavigate, onClose }: NavigationViewPr
   // Active navigation type from URL
   const activeNavType = searchParams.get('type') as 'surah' | 'juz' | 'page' | null;
   
+  // Set initial type when component mounts or initialType changes
+  useEffect(() => {
+    if (initialType) {
+      setSearchParams({ type: initialType });
+    } else {
+      // Clear search params if no initialType
+      setSearchParams({});
+    }
+  }, [initialType]);  // Run when initialType changes
+  
   // Number formatting for Arabic/English
   const formatNumber = (num: number | string): string => {
     const numStr = num.toString();
@@ -42,17 +56,26 @@ export default function NavigationView({ onNavigate, onClose }: NavigationViewPr
   };
   
   // Surah tab state
-  const [searchSurah, setSearchSurah] = useState(() => localStorage.getItem('quran-search-surah') || '');
+  const [searchSurah, setSearchSurah] = useState(() => {
+    if (initialSurah && initialType === 'surah') return initialSurah.toString();
+    return localStorage.getItem('quran-search-surah') || '';
+  });
   const [searchAyah, setSearchAyah] = useState(() => localStorage.getItem('quran-search-ayah') || '');
   const [selectedSurahAyahs, setSelectedSurahAyahs] = useState<any[]>([]);
   
   // Juz tab state
-  const [searchJuz, setSearchJuz] = useState(() => localStorage.getItem('quran-search-juz') || '');
+  const [searchJuz, setSearchJuz] = useState(() => {
+    if (initialJuz && initialType === 'juz') return initialJuz.toString();
+    return localStorage.getItem('quran-search-juz') || '';
+  });
   const [searchJuzHezb, setSearchJuzHezb] = useState(() => localStorage.getItem('quran-search-juz-hezb') || '');
   const [searchJuzQuarter, setSearchJuzQuarter] = useState(() => localStorage.getItem('quran-search-juz-quarter') || '');
   
   // Page tab state
-  const [searchPage, setSearchPage] = useState(() => localStorage.getItem('quran-search-page') || '');
+  const [searchPage, setSearchPage] = useState(() => {
+    if (initialPage && initialType === 'page') return initialPage.toString();
+    return localStorage.getItem('quran-search-page') || '';
+  });
   const [pageValidationError, setPageValidationError] = useState<string>('');
 
   // Persist navigation values

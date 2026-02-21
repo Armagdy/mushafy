@@ -106,6 +106,10 @@ const Surah = () => {
   
   // ConfigOverlay state
   const [configOverlayType, setConfigOverlayType] = useState<ConfigType | null>(null);
+  const [initialNavigationType, setInitialNavigationType] = useState<'surah' | 'juz' | 'page' | undefined>(undefined);
+  const [initialNavigationSurah, setInitialNavigationSurah] = useState<number | undefined>(undefined);
+  const [initialNavigationJuz, setInitialNavigationJuz] = useState<number | undefined>(undefined);
+  const [initialNavigationPage, setInitialNavigationPage] = useState<number | undefined>(undefined);
   const [currentHezb, setCurrentHezb] = useState(1);
   const [currentQuarter, setCurrentQuarter] = useState(1);
   const [viewMode, setViewMode] = useState<'single' | 'double'>(
@@ -596,19 +600,25 @@ const Surah = () => {
         currentQuarter={currentQuarter}
         formatNumber={formatNumber}
         onSurahClick={() => {
-          setSearchMode('navigation');
-          setInitialNavTab('surah');
-          setSearchOpen(true);
+          setInitialNavigationType('surah');
+          setInitialNavigationSurah(currentSurahId);
+          setInitialNavigationJuz(undefined);
+          setInitialNavigationPage(undefined);
+          setConfigOverlayType('navigation');
         }}
         onPageClick={() => {
-          setSearchMode('navigation');
-          setInitialNavTab('page');
-          setSearchOpen(true);
+          setInitialNavigationType('page');
+          setInitialNavigationSurah(undefined);
+          setInitialNavigationJuz(undefined);
+          setInitialNavigationPage(currentPageNum);
+          setConfigOverlayType('navigation');
         }}
         onJuzClick={() => {
-          setSearchMode('navigation');
-          setInitialNavTab('juz');
-          setSearchOpen(true);
+          setInitialNavigationType('juz');
+          setInitialNavigationSurah(undefined);
+          setInitialNavigationJuz(currentJuz);
+          setInitialNavigationPage(undefined);
+          setConfigOverlayType('navigation');
         }}
       />
       )}
@@ -791,6 +801,11 @@ const Surah = () => {
         isMobile={isMobile}
         viewMode={viewMode}
         onGoToClick={() => {
+          // Reset navigation initial values to show main menu (no specific type selected)
+          setInitialNavigationType(undefined);
+          setInitialNavigationSurah(undefined);
+          setInitialNavigationJuz(undefined);
+          setInitialNavigationPage(undefined);
           setConfigOverlayType('navigation');
         }}
         onSearchClick={() => {
@@ -988,6 +1003,10 @@ const Surah = () => {
           currentPage={currentPageNum}
           currentSurahId={currentSurahId}
           currentPlayingAyah={currentPlayingAyah}
+          initialNavigationType={initialNavigationType}
+          initialNavigationSurah={initialNavigationSurah}
+          initialNavigationJuz={initialNavigationJuz}
+          initialNavigationPage={initialNavigationPage}
           onNavigate={(page) => {
             navigate(`/page/${page}`);
             setConfigOverlayType(null);

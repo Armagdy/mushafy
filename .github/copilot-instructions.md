@@ -74,35 +74,76 @@ Use `getMushafPath()` to build image URLs. Persists to `localStorage`.
 Add new components: `npx shadcn-ui@latest add <component-name>`
 
 ### View Components (**MANDATORY**)
-**CRITICAL:** Every new view MUST be created in a separate component file in [src/components/config/](src/components/config/).
+
+#### ConfigOverlay Architecture
+**CRITICAL:** This app uses a **View-based architecture** instead of modal dialogs for all configuration screens.
+
+**ConfigOverlay** ([src/components/config/ConfigOverlay.tsx](src/components/config/ConfigOverlay.tsx)) is the container:
+- Full-screen overlay that replaces modal dialogs
+- Consistent emerald gradient header with back button
+- Bottom navigation bar for switching between views
+- Does NOT change the URL (stays on current page/surah route)
+- Renders different View components based on `type` prop
+
+**View components** ([src/components/config/](src/components/config/)) are modular panels:
+```
+SettingsView.tsx     → App settings & preferences
+BookmarksView.tsx    → Bookmark management (3 types)
+NavigationView.tsx   → Jump to Surah/Juz/Page/Ayah
+SearchView.tsx       → Word search functionality
+ReciterView.tsx      → Audio reciter selection
+TafseerView.tsx      → Tafseer source selection  
+RepeatView.tsx       → Repeat configuration for memorization
+```
+
+#### Creating New Views
+**CRITICAL:** Every new configuration screen MUST be a View component:
+- ❌ **NEVER** create modal dialogs for configuration (deprecated pattern)
 - ❌ **NEVER** create views inline within pages or other components
-- ✅ Create dedicated files: `BookmarksView.tsx`, `SettingsView.tsx`, etc.
-- Views are full-page or panel components, NOT modal dialogs
-- Structure:
-  ```tsx
-  // src/components/config/BookmarksView.tsx
-  import { useLanguage } from "@/contexts/LanguageContext";
-  import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
-  import { cn } from "@/lib/utils";
+- ✅ Create dedicated files in [src/components/config/](src/components/config/)
+- ✅ Views are full-page panels managed by ConfigOverlay
+
+**Standard View Structure:**
+```tsx
+// src/components/config/NewFeatureView.tsx
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
+import { cn } from "@/lib/utils";
+
+interface NewFeatureViewProps {
+  onClose: () => void;  // Required for actions that should close overlay
+  // Other props for data and callbacks
+}
+
+export default function NewFeatureView({ onClose, ...props }: NewFeatureViewProps) {
+  const { t, isRTL } = useLanguage();
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   
-  interface BookmarksViewProps {
-    // Props for data and callbacks
-  }
-  
-  export default function BookmarksView(props: BookmarksViewProps) {
-    const { t, isRTL } = useLanguage();
-    const { dialogTextSize } = useDialogTextSize();
-    const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
-    
-    return (
-      <div className={cn("p-4 space-y-2 sm:space-y-3", isRTL ? "rtl" : "ltr")}>
-        {/* View content - uses Tabs, forms, lists, etc. */}
-      </div>
-    );
-  }
-  ```
-- **Rationale:** Improves code organization, reusability, testability, and prevents component bloat in main files.
-- **Note:** Legacy Dialog components exist in [src/components/quran/](src/components/quran/) but new features should use View components in [src/components/config/](src/components/config/).
+  return (
+    <div className={cn("p-4 space-y-2 sm:space-y-3", isRTL ? "rtl" : "ltr")}>
+      {/* View content - uses Tabs, forms, lists, etc. */}
+    </div>
+  );
+}
+```
+
+**Integration Steps:**
+1. Add to `ConfigType` union: `export type ConfigType = '...' | 'newfeature';`
+2. Add case to `renderView()` switch in ConfigOverlay
+3. Add trigger button: `onClick={() => setConfigOverlayType('newfeature')}`
+
+#### Why Views, Not Dialogs?
+- ✅ Full-screen immersive experience (better on mobile)
+- ✅ Integrated navigation between related config screens
+- ✅ No modal backdrop obscuring Quran pages
+- ✅ Consistent styling and behavior across all settings
+- ✅ Easier state management without multiple open/close states
+
+**Legacy Dialog components** in [src/components/quran/](src/components/quran/) are **DEPRECATED**:
+- ❌ `NavigationDialog.tsx`, `SettingsDialog.tsx`, `BookmarksDialog.tsx`, etc.
+- These are kept for reference only - do NOT use for new features
+- All new configuration UIs MUST use the View pattern
 
 ## Styling Patterns
 
