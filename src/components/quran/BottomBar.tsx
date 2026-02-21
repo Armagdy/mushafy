@@ -36,8 +36,8 @@ export function BottomBar({
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       className={cn(
-        "px-2 md:px-6 flex items-stretch justify-between pb-3 md:pb-4",
-        showBottomBarText ? "py-0.5 md:py-1" : "py-2 md:py-3"
+        "px-2 md:px-6 flex items-stretch justify-between",
+        showBottomBarText ? "pt-2 md:pt-3 pb-0.5 md:pb-1" : "pt-3 md:pt-4 pb-2 md:pb-3"
       )}
       style={{ paddingBottom: `calc(env(safe-area-inset-bottom) + 0.75rem)` }}
     >

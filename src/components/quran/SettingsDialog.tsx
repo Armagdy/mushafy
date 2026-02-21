@@ -5,18 +5,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Search, ChevronDown, WifiOff, StopCircle, Type } from "lucide-react";
+import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Search, ChevronDown, WifiOff, StopCircle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMushaf, MushafType } from "@/contexts/MushafContext";
-import { useDialogTextSize, DialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { surahs } from "@/data/surahs";
 import { ASSETS_BASE_URL } from "@/config/assets";
 import { getAudioData } from "@/lib/quran-data-service";
-import { getMp3QuranReciters, getSurahAudioUrl, getAyahTiming, type Mp3QuranReciter, type Mp3QuranMoshaf } from "@/lib/mp3quran-service";
+import { getMp3QuranReciters, getSurahAudioUrl, type Mp3QuranReciter, type Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { cacheAsset } from "@/lib/asset-cache";
-import { isMp3QuranAudioCached, cacheMp3QuranAudio } from "@/lib/audio-cache";
 import { getPageImageFilename } from "@/lib/quran-mapping";
 import { useNetwork } from "@/hooks/useNetwork";
 import { useToast } from "@/hooks/use-toast";
@@ -58,10 +56,6 @@ export function SettingsDialog({
   const { mushafType, setMushafType } = useMushaf();
   const { isOnline } = useNetwork();
   const { toast } = useToast();
-  const { dialogTextSize, setDialogTextSize } = useDialogTextSize();
-  
-  // Get text size classes based on current setting
-  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   
   const [activeTab, setActiveTab] = useState<string>(() => {
     const saved = localStorage.getItem('quran-settings-tab');
@@ -75,9 +69,8 @@ export function SettingsDialog({
   // Download state
   const [downloadType, setDownloadType] = useState<'pages' | 'everyayah' | 'mp3quran'>('pages');
   const [downloadMushafType, setDownloadMushafType] = useState<MushafType>(mushafType);
-  const [downloadFromPage, setDownloadFromPage] = useState<string | number>(1);
-  const [downloadToPage, setDownloadToPage] = useState<string | number>(604);
-  const [pageValidationError, setPageValidationError] = useState<string>('');
+  const [downloadFromPage, setDownloadFromPage] = useState(1);
+  const [downloadToPage, setDownloadToPage] = useState(604);
   const [downloadFromSurah, setDownloadFromSurah] = useState(1);
   const [downloadToSurah, setDownloadToSurah] = useState(114);
   const [downloadFromAyah, setDownloadFromAyah] = useState(1);
@@ -267,51 +260,12 @@ export function SettingsDialog({
     };
   }, [showMp3QuranDropdown, mp3QuranSearch]);
   
-  // Validate page range
-  React.useEffect(() => {
-    if (downloadType === 'pages') {
-      const fromStr = String(downloadFromPage).trim();
-      const toStr = String(downloadToPage).trim();
-      
-      // Allow empty values while typing
-      if (fromStr === '' || toStr === '') {
-        setPageValidationError(t('pageRangeError'));
-        return;
-      }
-      
-      const fromNum = parseInt(fromStr);
-      const toNum = parseInt(toStr);
-      
-      // Check if values are valid numbers
-      if (isNaN(fromNum) || isNaN(toNum)) {
-        setPageValidationError(t('pageRangeError'));
-        return;
-      }
-      
-      // Check range (1-604)
-      if (fromNum < 1 || fromNum > 604 || toNum < 1 || toNum > 604) {
-        setPageValidationError(t('pageRangeError'));
-        return;
-      }
-      
-      // Check order
-      if (fromNum > toNum) {
-        setPageValidationError(t('pageOrderError'));
-        return;
-      }
-      
-      setPageValidationError('');
-    } else {
-      setPageValidationError('');
-    }
-  }, [downloadType, downloadFromPage, downloadToPage, t]);
-  
   // Determine if download button should be enabled
   const isDownloadEnabled = (() => {
     if (isDownloading) return false;
     
     if (downloadType === 'pages') {
-      return pageValidationError === ''; // Pages need valid range
+      return true; // Pages just need a range
     } else if (downloadType === 'everyayah') {
       // Need reciter, style, and quality all selected (not __all__)
       return selectedEveryAyahReciter !== '' && 
@@ -442,7 +396,7 @@ export function SettingsDialog({
     try {
       if (downloadType === 'pages') {
         // Cache mushaf pages
-        const total = parseInt(String(downloadToPage)) - parseInt(String(downloadFromPage)) + 1;
+        const total = downloadToPage - downloadFromPage + 1;
         setDownloadProgress({ current: 0, total });
         
         // Get mushaf path based on download mushaf type
@@ -454,11 +408,11 @@ export function SettingsDialog({
         const mushafPath = `${ASSETS_BASE_URL}/${folder}`;
         const category = `mushaf-${downloadMushafType}`;
         
-        for (let page = parseInt(String(downloadFromPage)); page <= parseInt(String(downloadToPage)); page++) {
+        for (let page = downloadFromPage; page <= downloadToPage; page++) {
           if (signal.aborted) break;
           const url = `${mushafPath}/${getPageImageFilename(page)}`;
           await cacheAsset(url, category, signal);
-          setDownloadProgress({ current: page - parseInt(String(downloadFromPage)) + 1, total });
+          setDownloadProgress({ current: page - downloadFromPage + 1, total });
         }
       } else if (downloadType === 'everyayah') {
         // Cache EveryAyah audio
@@ -487,40 +441,8 @@ export function SettingsDialog({
         
         for (let surahNum = downloadFromSurah; surahNum <= downloadToSurah; surahNum++) {
           if (signal.aborted) break;
-          
-          // Check if this surah is already cached
-          const isCached = await isMp3QuranAudioCached(selectedMoshaf.id, surahNum);
-          if (isCached) {
-            console.log(`⏭️ Skipping surah ${surahNum} - already cached for moshaf ${selectedMoshaf.id}`);
-            setDownloadProgress({ current: surahNum - downloadFromSurah + 1, total });
-            continue;
-          }
-          
-          console.log(`📥 Downloading surah ${surahNum} for moshaf ${selectedMoshaf.id}`);
-          
-          try {
-            // Download audio file
-            const url = getSurahAudioUrl(selectedMoshaf.server, surahNum);
-            const response = await fetch(url, { signal });
-            if (!response.ok) throw new Error(`Failed to download surah ${surahNum}`);
-            const audioBlob = await response.blob();
-            
-            // Fetch timing data
-            let timingData = [];
-            try {
-              timingData = await getAyahTiming(surahNum, selectedMoshaf.id);
-            } catch (timingError) {
-              console.warn(`No timing data for surah ${surahNum}, caching without timing`);
-            }
-            
-            // Cache using audio-cache (not asset-cache)
-            await cacheMp3QuranAudio(selectedMoshaf.id, surahNum, audioBlob, timingData);
-            console.log(`✅ Cached surah ${surahNum} with ${timingData.length} ayah timings`);
-          } catch (error: any) {
-            if (error.name === 'AbortError') throw error;
-            console.error(`Failed to cache surah ${surahNum}:`, error);
-          }
-          
+          const url = getSurahAudioUrl(selectedMoshaf.server, surahNum);
+          await cacheAsset(url, category, signal);
           setDownloadProgress({ current: surahNum - downloadFromSurah + 1, total });
         }
       }
@@ -560,7 +482,7 @@ export function SettingsDialog({
         style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
       >
         <DialogHeader className="bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-t-xl px-4 py-3">
-          <DialogTitle className={cn("text-center font-bold text-[#F2E3BB]", textSizeClasses.title)}>
+          <DialogTitle className="text-center text-base md:text-xl font-bold text-[#F2E3BB]">
             {t('settings')}
           </DialogTitle>
         </DialogHeader>
@@ -570,28 +492,28 @@ export function SettingsDialog({
             <TabsList className="grid w-full grid-cols-4 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
               <TabsTrigger 
                 value="mushaf" 
-                className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1", textSizeClasses.text)}
+                className="text-sm md:text-base data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1"
               >
                 <BookOpen className="w-3 h-3 md:w-4 md:h-4 mr-0.5 md:mr-1" />
                 {isRTL ? 'المصحف' : 'Mushaf'}
               </TabsTrigger>
               <TabsTrigger 
                 value="download" 
-                className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1", textSizeClasses.text)}
+                className="text-sm md:text-base data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1"
               >
                 <HardDriveDownload className="w-3 h-3 md:w-4 md:h-4 mr-0.5 md:mr-1" />
                 {t('download')}
               </TabsTrigger>
               <TabsTrigger 
                 value="test" 
-                className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1", textSizeClasses.text)}
+                className="text-sm md:text-base data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1"
               >
                 <GraduationCap className="w-3 h-3 md:w-4 md:h-4 mr-0.5 md:mr-1" />
                 {isRTL ? 'اختبار' : 'Test'}
               </TabsTrigger>
               <TabsTrigger 
                 value="style" 
-                className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1", textSizeClasses.text)}
+                className="text-sm md:text-base data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB] px-1"
               >
                 <Palette className="w-3 h-3 md:w-4 md:h-4 mr-0.5 md:mr-1" />
                 {isRTL ? 'العرض' : 'Style'}
@@ -603,16 +525,16 @@ export function SettingsDialog({
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>{t('mushafType')}</span>
+                  <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">{t('mushafType')}</span>
                 </div>
                 <Select value={selectedMushaf} onValueChange={(value) => setSelectedMushaf(value as MushafType)}>
-                  <SelectTrigger className={cn("w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}>
+                  <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                    <SelectItem value="mwdoa" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100", textSizeClasses.text)}>{t('mushafMwdoa')}</SelectItem>
-                    <SelectItem value="tashel" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100", textSizeClasses.text)}>{t('mushafTashel')}</SelectItem>
-                    <SelectItem value="madinah" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100", textSizeClasses.text)}>{t('mushafMadinah')}</SelectItem>
+                    <SelectItem value="mwdoa" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafMwdoa')}</SelectItem>
+                    <SelectItem value="tashel" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafTashel')}</SelectItem>
+                    <SelectItem value="madinah" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100">{t('mushafMadinah')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -623,7 +545,7 @@ export function SettingsDialog({
                 disabled={!hasUnsavedChanges}
                 className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 md:px-4 h-10 md:h-12 border border-emerald-600 shadow-md transition-all"
               >
-                <span className={cn("text-[#F2E3BB] font-bold", textSizeClasses.button)}>
+                <span className="text-[#F2E3BB] text-base md:text-xl font-bold">
                   {isRTL ? 'حفظ' : 'Save'}
                 </span>
               </button>
@@ -636,13 +558,13 @@ export function SettingsDialog({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 sm:gap-3">
                     <Book className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>{isRTL ? 'وضع العرض' : 'View Mode'}</span>
+                    <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">{isRTL ? 'وضع العرض' : 'View Mode'}</span>
                   </div>
                   <button
                     onClick={() => onViewModeChange(viewMode === 'single' ? 'double' : 'single')}
-                    className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg px-3 md:px-4 h-8 md:h-10 border border-emerald-600 shadow-md transition-all"
+                    className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg px-3 md:px-4 h-8 md:h-10 border border-emerald-600 shadow-md transition-all text-base md:text-xl"
                   >
-                    <span className={cn("text-[#F2E3BB] font-bold", textSizeClasses.button)}>
+                    <span className="text-[#F2E3BB] font-bold">
                       {viewMode === 'single' ? (isRTL ? 'صفحتين' : '2 Pages') : (isRTL ? 'صفحة' : '1 Page')}
                     </span>
                   </button>
@@ -654,7 +576,7 @@ export function SettingsDialog({
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2 sm:gap-3">
                     <Navigation className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
+                    <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">
                       {isRTL ? 'الصفحات المحملة' : 'Swipe Sensitivity'}
                     </span>
                   </div>
@@ -665,11 +587,11 @@ export function SettingsDialog({
                         disabled={pagesToLoad <= 1}
                         className="flex items-center justify-center bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg h-10 md:h-12 w-10 md:w-12 border border-emerald-600 shadow-md transition-all"
                       >
-                        <span className={cn("text-[#F2E3BB] font-bold", textSizeClasses.text)}>-</span>
+                        <span className="text-[#F2E3BB] text-xl md:text-2xl font-bold">-</span>
                       </button>
                       <div className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 bg-white dark:bg-emerald-950 rounded-md border border-emerald-300 dark:border-emerald-700">
-                        <span className={cn("font-medium text-emerald-800 dark:text-emerald-200", textSizeClasses.text)}>{pagesToLoad}</span>
-                        <span className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
+                        <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-200">{pagesToLoad}</span>
+                        <span className="text-base md:text-xl text-emerald-600 dark:text-emerald-400">
                           {pagesToLoad === 1 ? (isRTL ? 'صفحة' : 'page') : (isRTL ? 'صفحات' : 'pages')}
                         </span>
                       </div>
@@ -678,10 +600,10 @@ export function SettingsDialog({
                         disabled={pagesToLoad >= 5}
                         className="flex items-center justify-center bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg h-10 md:h-12 w-10 md:w-12 border border-emerald-600 shadow-md transition-all"
                       >
-                        <span className={cn("text-[#F2E3BB] font-bold", textSizeClasses.text)}>+</span>
+                        <span className="text-[#F2E3BB] text-xl md:text-2xl font-bold">+</span>
                       </button>
                     </div>
-                    <p className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
+                    <p className="text-base md:text-xl text-emerald-600 dark:text-emerald-400">
                       {isRTL 
                         ? 'يحدد عدد الصفحات التي يمكنك التمرير إليها بحركة واحدة' 
                         : 'Controls how many pages you can swipe at once'}
@@ -694,7 +616,7 @@ export function SettingsDialog({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 sm:gap-3">
                   <Menu className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
+                  <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">
                     {isRTL ? 'إظهار نص الشريط السفلي' : 'Show Bottom Bar Text'}
                   </span>
                 </div>
@@ -708,59 +630,6 @@ export function SettingsDialog({
                   />
                 </div>
               </div>
-
-              {/* Dialog Text Size Control */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Type className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-                    {t('dialogTextSize')}
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => setDialogTextSize('small')}
-                    className={cn(
-                      "flex items-center justify-center px-3 py-2 rounded-lg border transition-all font-medium",
-                      textSizeClasses.text,
-                      dialogTextSize === 'small'
-                        ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
-                        : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900"
-                    )}
-                  >
-                    {t('textSizeSmall')}
-                  </button>
-                  <button
-                    onClick={() => setDialogTextSize('medium')}
-                    className={cn(
-                      "flex items-center justify-center px-3 py-2 rounded-lg border transition-all font-medium",
-                      textSizeClasses.text,
-                      dialogTextSize === 'medium'
-                        ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
-                        : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900"
-                    )}
-                  >
-                    {t('textSizeMedium')}
-                  </button>
-                  <button
-                    onClick={() => setDialogTextSize('large')}
-                    className={cn(
-                      "flex items-center justify-center px-3 py-2 rounded-lg border transition-all font-medium",
-                      textSizeClasses.text,
-                      dialogTextSize === 'large'
-                        ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
-                        : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900"
-                    )}
-                  >
-                    {t('textSizeLarge')}
-                  </button>
-                </div>
-                <p className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
-                  {isRTL 
-                    ? 'يتحكم في حجم النصوص في جميع النوافذ المنبثقة' 
-                    : 'Controls text size in all dialog windows'}
-                </p>
-              </div>
             </TabsContent>
 
             {/* Download Tab */}
@@ -770,10 +639,10 @@ export function SettingsDialog({
                 <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg">
                   <WifiOff className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                   <div className="flex flex-col gap-0.5">
-                    <span className={cn("font-medium text-amber-800 dark:text-amber-300", textSizeClasses.text)}>
+                    <span className="text-sm md:text-base font-medium text-amber-800 dark:text-amber-300">
                       {t('networkOffline')}
                     </span>
-                    <span className={cn("text-amber-700 dark:text-amber-400", textSizeClasses.text)}>
+                    <span className="text-xs md:text-sm text-amber-700 dark:text-amber-400">
                       {t('networkOfflineMessage')}
                     </span>
                   </div>
@@ -784,16 +653,16 @@ export function SettingsDialog({
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <HardDriveDownload className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
+                  <span className="text-base md:text-xl font-medium text-emerald-800 dark:text-emerald-300">
                     {t('downloadType')}
                   </span>
                 </div>
                 <Select value={downloadType} onValueChange={(value) => setDownloadType(value as 'pages' | 'everyayah' | 'mp3quran')}>
-                  <SelectTrigger className={cn("w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}>
+                  <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                    <SelectItem value="pages" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>
+                    <SelectItem value="pages" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900">
                       {t('downloadMushafPages')}
                     </SelectItem>
                     {/* Temporarily hidden - EveryAyah download option
@@ -801,7 +670,7 @@ export function SettingsDialog({
                       {t('downloadEveryAyahAudio')}
                     </SelectItem>
                     */}
-                    <SelectItem value="mp3quran" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>
+                    <SelectItem value="mp3quran" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900">
                       {t('downloadMp3QuranAudio')}
                     </SelectItem>
                   </SelectContent>
@@ -812,39 +681,39 @@ export function SettingsDialog({
               {downloadType === 'pages' && (
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-2">
-                    <label className={cn("text-emerald-700 dark:text-emerald-300", textSizeClasses.label)}>{t('mushafType')}</label>
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('mushafType')}</label>
                     <Select value={downloadMushafType} onValueChange={(value) => setDownloadMushafType(value as MushafType)}>
-                      <SelectTrigger className={cn("w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}>
+                      <SelectTrigger className="w-full text-base md:text-lg border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                        <SelectItem value="mwdoa" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>{t('mushafMwdoa')}</SelectItem>
-                        <SelectItem value="tashel" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>{t('mushafTashel')}</SelectItem>
-                        <SelectItem value="madinah" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>{t('mushafMadinah')}</SelectItem>
+                        <SelectItem value="mwdoa" className="text-base focus:bg-emerald-100 focus:text-emerald-900">{t('mushafMwdoa')}</SelectItem>
+                        <SelectItem value="tashel" className="text-base focus:bg-emerald-100 focus:text-emerald-900">{t('mushafTashel')}</SelectItem>
+                        <SelectItem value="madinah" className="text-base focus:bg-emerald-100 focus:text-emerald-900">{t('mushafMadinah')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
-                      <label className={cn("text-emerald-700 dark:text-emerald-300 block mb-1", textSizeClasses.label)}>{t('fromPage')}</label>
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('fromPage')}</label>
                       <input
                         type="number"
                         min={1}
                         max={604}
                         value={downloadFromPage}
-                        onChange={(e) => setDownloadFromPage(e.target.value)}
-                        className={cn("w-full px-3 py-2 border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}
+                        onChange={(e) => setDownloadFromPage(Math.min(604, Math.max(1, parseInt(e.target.value) || 1)))}
+                        className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
                       />
                     </div>
                     <div className="flex-1">
-                      <label className={cn("text-emerald-700 dark:text-emerald-300 block mb-1", textSizeClasses.label)}>{t('toPage')}</label>
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('toPage')}</label>
                       <input
                         type="number"
                         min={1}
                         max={604}
                         value={downloadToPage}
-                        onChange={(e) => setDownloadToPage(e.target.value)}
-                        className={cn("w-full px-3 py-2 border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}
+                        onChange={(e) => setDownloadToPage(Math.min(604, Math.max(1, parseInt(e.target.value) || 604)))}
+                        className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
                       />
                     </div>
                   </div>
@@ -856,7 +725,7 @@ export function SettingsDialog({
                 <div className="flex flex-col gap-3">
                   {/* Reciter Name Search Box */}
                   <div className="flex flex-col gap-2" ref={everyAyahContainerRef}>
-                    <label className={cn("text-emerald-700 dark:text-emerald-300", textSizeClasses.label)}>{t('reciter')}</label>
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('reciter')}</label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400 z-10" />
                       <Input
@@ -881,7 +750,7 @@ export function SettingsDialog({
                           setEveryAyahSearch('');
                           setShowEveryAyahDropdown(true);
                         }}
-                        className={cn("pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-emerald-50 dark:bg-emerald-900/20", textSizeClasses.text)}
+                        className="pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg bg-emerald-50 dark:bg-emerald-900/20"
                       />
                       <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                     
@@ -911,7 +780,7 @@ export function SettingsDialog({
                                 setShowEveryAyahDropdown(false);
                               }}
                             >
-                              <div className={cn("flex items-center gap-2 w-full", language === 'ar' && "flex-row-reverse text-right", textSizeClasses.text)}>
+                              <div className={cn("flex items-center gap-2 w-full text-base md:text-xl", language === 'ar' && "flex-row-reverse text-right")}>
                                 <span className="text-emerald-600 dark:text-emerald-400 font-medium">{index + 1}.</span>
                                 <span className="flex-1">{language === 'ar' ? reciter.nameAr : reciter.name}</span>
                               </div>
@@ -924,21 +793,21 @@ export function SettingsDialog({
                   
                   {/* Recitation Style */}
                   <div className="flex flex-col gap-2">
-                    <label className={cn("text-emerald-700 dark:text-emerald-300", textSizeClasses.label)}>{t('recitationStyle')}</label>
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('recitationStyle')}</label>
                     <Select value={selectedRecitationStyle} onValueChange={(v) => {
                       setSelectedRecitationStyle(v);
                       // Reset quality selection when style changes (reciter stays)
                       setSelectedQuality('__all__');
                     }}>
-                      <SelectTrigger className={cn("w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation", textSizeClasses.text)}>
+                      <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
                         <SelectValue placeholder={isRTL ? 'الكل' : 'All'} />
                       </SelectTrigger>
                       <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60 z-[100]" position="popper" sideOffset={5}>
-                        <SelectItem value="__all__" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>
+                        <SelectItem value="__all__" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
                           {isRTL ? 'الكل' : 'All'}
                         </SelectItem>
                         {uniqueStyles.map((style) => (
-                          <SelectItem key={style} value={style} className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>
+                          <SelectItem key={style} value={style} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
                             {style === 'murattal' ? (isRTL ? 'مرتل' : 'Murattal') : 
                              style === 'mujawwad' ? (isRTL ? 'مجود' : 'Mujawwad') :
                              style === 'muallim' ? (isRTL ? 'معلم' : 'Muallim') : style}
@@ -950,17 +819,17 @@ export function SettingsDialog({
                   
                   {/* Quality */}
                   <div className="flex flex-col gap-2">
-                    <label className={cn("text-emerald-700 dark:text-emerald-300", textSizeClasses.label)}>{t('quality')}</label>
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('quality')}</label>
                     <Select value={selectedQuality} onValueChange={setSelectedQuality}>
-                      <SelectTrigger className={cn("w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation", textSizeClasses.text)}>
+                      <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
                         <SelectValue placeholder={isRTL ? 'الكل' : 'All'} />
                       </SelectTrigger>
                       <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60 z-[100]" position="popper" sideOffset={5}>
-                        <SelectItem value="__all__" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>
+                        <SelectItem value="__all__" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
                           {isRTL ? 'الكل' : 'All'}
                         </SelectItem>
                         {uniqueQualities.map((quality) => (
-                          <SelectItem key={quality} value={quality} className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>
+                          <SelectItem key={quality} value={quality} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
                             {quality}
                           </SelectItem>
                         ))}
@@ -969,14 +838,14 @@ export function SettingsDialog({
                   </div>
                   
                   <div className="flex flex-col gap-2">
-                    <label className={cn("text-emerald-700 dark:text-emerald-300", textSizeClasses.label)}>{t('selectSurah')}</label>
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('selectSurah')}</label>
                     <Select value={String(downloadFromSurah)} onValueChange={(v) => setDownloadFromSurah(parseInt(v))}>
-                      <SelectTrigger className={cn("w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation", textSizeClasses.text)}>
+                      <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60 z-[100]" position="popper" sideOffset={5}>
                         {surahs.map((surah) => (
-                          <SelectItem key={surah.id} value={String(surah.id)} className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>
+                          <SelectItem key={surah.id} value={String(surah.id)} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
                             {surah.id}. {isRTL ? surah.name : surah.englishName}
                           </SelectItem>
                         ))}
@@ -985,25 +854,25 @@ export function SettingsDialog({
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
-                      <label className={cn("text-emerald-700 dark:text-emerald-300 block mb-1", textSizeClasses.label)}>{t('fromAyah')}</label>
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('fromAyah')}</label>
                       <input
                         type="number"
                         min={1}
                         max={surahs.find(s => s.id === downloadFromSurah)?.numberOfAyahs || 7}
                         value={downloadFromAyah}
                         onChange={(e) => setDownloadFromAyah(Math.max(1, parseInt(e.target.value) || 1))}
-                        className={cn("w-full px-3 py-2 border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}
+                        className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
                       />
                     </div>
                     <div className="flex-1">
-                      <label className={cn("text-emerald-700 dark:text-emerald-300 block mb-1", textSizeClasses.label)}>{t('toAyah')}</label>
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('toAyah')}</label>
                       <input
                         type="number"
                         min={1}
                         max={surahs.find(s => s.id === downloadFromSurah)?.numberOfAyahs || 7}
                         value={downloadToAyah}
                         onChange={(e) => setDownloadToAyah(Math.max(1, parseInt(e.target.value) || 1))}
-                        className={cn("w-full px-3 py-2 border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}
+                        className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
                       />
                     </div>
                   </div>
@@ -1015,7 +884,7 @@ export function SettingsDialog({
                 <div className="flex flex-col gap-3">
                   {/* Reciter Name Search Box */}
                   <div className="flex flex-col gap-2" ref={mp3QuranContainerRef}>
-                    <label className={cn("text-emerald-700 dark:text-emerald-300", textSizeClasses.label)}>{t('reciter')}</label>
+                    <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('reciter')}</label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400 z-10" />
                       <Input
@@ -1040,7 +909,7 @@ export function SettingsDialog({
                           setMp3QuranSearch('');
                           setShowMp3QuranDropdown(true);
                         }}
-                        className={cn("pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-emerald-50 dark:bg-emerald-900/20", textSizeClasses.text)}
+                        className="pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg bg-emerald-50 dark:bg-emerald-900/20"
                       />
                       <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                     
@@ -1067,7 +936,7 @@ export function SettingsDialog({
                                 setShowMp3QuranDropdown(false);
                               }}
                             >
-                              <div className={cn("flex items-center gap-2 w-full flex-row-reverse text-right", textSizeClasses.text)}>
+                              <div className="flex items-center gap-2 w-full flex-row-reverse text-right text-base md:text-xl">
                                 <span className="text-emerald-600 dark:text-emerald-400 font-medium">{index + 1}.</span>
                                 <span className="flex-1">{getMp3QuranReciterName(reciter)}</span>
                               </div>
@@ -1079,14 +948,14 @@ export function SettingsDialog({
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
-                      <label className={cn("text-emerald-700 dark:text-emerald-300 block mb-1", textSizeClasses.label)}>{t('toSurah')}</label>
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('toSurah')}</label>
                       <Select value={String(downloadToSurah)} onValueChange={(v) => setDownloadToSurah(parseInt(v))}>
-                        <SelectTrigger className={cn("w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation", textSizeClasses.text)}>
+                        <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60 z-[100]" position="popper" sideOffset={5}>
                           {surahs.filter(surah => surah.id >= downloadFromSurah).map((surah) => (
-                            <SelectItem key={surah.id} value={String(surah.id)} className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>
+                            <SelectItem key={surah.id} value={String(surah.id)} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
                               {surah.id}. {isRTL ? surah.name : surah.englishName}
                             </SelectItem>
                           ))}
@@ -1094,7 +963,7 @@ export function SettingsDialog({
                       </Select>
                     </div>
                     <div className="flex-1">
-                      <label className={cn("text-emerald-700 dark:text-emerald-300 block mb-1", textSizeClasses.label)}>{t('fromSurah')}</label>
+                      <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('fromSurah')}</label>
                       <Select value={String(downloadFromSurah)} onValueChange={(v) => {
                         const newFromSurah = parseInt(v);
                         setDownloadFromSurah(newFromSurah);
@@ -1103,12 +972,12 @@ export function SettingsDialog({
                           setDownloadToSurah(newFromSurah);
                         }
                       }}>
-                        <SelectTrigger className={cn("w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation", textSizeClasses.text)}>
+                        <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60 z-[100]" position="popper" sideOffset={5}>
                           {surahs.map((surah) => (
-                            <SelectItem key={surah.id} value={String(surah.id)} className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>
+                            <SelectItem key={surah.id} value={String(surah.id)} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
                               {surah.id}. {isRTL ? surah.name : surah.englishName}
                             </SelectItem>
                           ))}
@@ -1121,7 +990,8 @@ export function SettingsDialog({
               
               {/* Download Progress */}
               {isDownloading && downloadProgress.total > 0 && (
-                <div className="flex flex-col gap-2">                  <div className={cn("flex justify-between text-emerald-700", textSizeClasses.text)}>
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between text-sm md:text-base text-emerald-700">
                     <span>{t('downloadProgress')}</span>
                     <span>{downloadProgress.current} / {downloadProgress.total}</span>
                   </div>
@@ -1131,13 +1001,6 @@ export function SettingsDialog({
                       style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}
                     />
                   </div>
-                </div>
-              )}
-              
-              {/* Validation Error Message */}
-              {pageValidationError && (
-                <div className={cn("text-red-600 dark:text-red-400 text-center font-medium bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800", textSizeClasses.text)}>
-                  {pageValidationError}
                 </div>
               )}
               
@@ -1153,7 +1016,7 @@ export function SettingsDialog({
                   ) : (
                     <HardDriveDownload className="w-5 h-5 text-[#F2E3BB]" />
                   )}
-                  <span className={cn("text-[#F2E3BB] font-bold", textSizeClasses.button)}>
+                  <span className="text-[#F2E3BB] text-base md:text-xl font-bold">
                     {!isOnline ? t('networkRequired') : (isDownloading ? t('downloadProgress') : t('startDownload'))}
                   </span>
                 </button>
@@ -1164,7 +1027,7 @@ export function SettingsDialog({
                     className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-red-500 shadow-md transition-all"
                   >
                     <StopCircle className="w-5 h-5 text-white" />
-                    <span className={cn("text-white font-bold", textSizeClasses.button)}>
+                    <span className="text-white text-base md:text-xl font-bold">
                       {t('cancelDownload')}
                     </span>
                   </button>
@@ -1175,7 +1038,7 @@ export function SettingsDialog({
             {/* Test Tab */}
             <TabsContent value="test" className="space-y-4 mt-4">
               <div className="flex flex-col gap-3">
-                <p className={cn("text-emerald-700 dark:text-emerald-300", textSizeClasses.text)}>
+                <p className="text-base md:text-xl text-emerald-700 dark:text-emerald-300">
                   {isRTL 
                     ? 'اختبر حفظك للقرآن الكريم من خلال تمارين تفاعلية.'
                     : 'Test your Quran memorization with interactive exercises.'}
@@ -1186,7 +1049,7 @@ export function SettingsDialog({
                     className="w-full flex items-center justify-center gap-2 sm:gap-3 bg-emerald-700 hover:bg-emerald-800 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-emerald-600 shadow-md transition-all"
                   >
                     <GraduationCap className="w-5 h-5 md:w-6 md:h-6 text-[#F2E3BB]" />
-                    <span className={cn("text-[#F2E3BB] font-bold", textSizeClasses.button)}>
+                    <span className="text-[#F2E3BB] text-base md:text-xl font-bold">
                       {t('testFeature')}
                     </span>
                   </button>

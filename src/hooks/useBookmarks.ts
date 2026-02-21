@@ -25,6 +25,7 @@ interface UseBookmarksReturn {
   addReadingBookmark: (page: number) => void;
   removeReadingBookmark: (page: number) => void;
   addBookmarkByType: (type: string, surahId: number, ayahNum: number) => Promise<void>;
+  updateBookmark: (oldPage: number, newPage: number, surahId: number, ayahNum: number, type: string) => Promise<void>;
   
   // Helper functions
   getSurahNameForPage: (page: number) => Promise<string>;
@@ -208,6 +209,80 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
     }
   };
 
+  // Update bookmark to new page
+  const updateBookmark = async (oldPage: number, newPage: number, surahId: number, ayahNum: number, type: string) => {
+    console.log('🔄 updateBookmark called with:', {
+      oldPage,
+      newPage,
+      surahId,
+      ayahNum,
+      type
+    });
+
+    // Get surah info for new page
+    const surah = surahs.find(s => s.id === surahId);
+    if (!surah) return;
+
+    const name = language === 'ar' ? surah.name : surah.englishName;
+    const targetPage = newPage; // Use the selected page directly from dropdown
+    
+    if (!targetPage) return;
+
+    // Update metadata for new page
+    setBookmarkPageSurahs(prev => {
+      const updated = { ...prev };
+      delete updated[oldPage];
+      updated[targetPage] = name;
+      return updated;
+    });
+
+    setBookmarkPageAyahs(prev => {
+      const updated = { ...prev };
+      delete updated[oldPage];
+      updated[targetPage] = ayahNum;
+      return updated;
+    });
+
+    setBookmarkPageSurahIds(prev => {
+      const updated = { ...prev };
+      delete updated[oldPage];
+      updated[targetPage] = surahId;
+      return updated;
+    });
+
+    // Move bookmark from old page to new page
+    if (type === 'bookmark') {
+      setBookmarks(prev => {
+        const updated = prev.filter(p => p !== oldPage);
+        if (!updated.includes(targetPage)) {
+          updated.push(targetPage);
+          updated.sort((a, b) => a - b);
+        }
+        return updated;
+      });
+    } else if (type === 'memorization') {
+      setMemorizationBookmarks(prev => {
+        const updated = prev.filter(p => p !== oldPage);
+        if (!updated.includes(targetPage)) {
+          updated.push(targetPage);
+          updated.sort((a, b) => a - b);
+        }
+        return updated;
+      });
+    } else if (type === 'reading') {
+      setReadingBookmarks(prev => {
+        const updated = prev.filter(p => p !== oldPage);
+        if (!updated.includes(targetPage)) {
+          updated.push(targetPage);
+          updated.sort((a, b) => a - b);
+        }
+        return updated;
+      });
+    }
+
+    console.log('💾 Bookmark updated from page', oldPage, 'to page', targetPage);
+  };
+
   // Get total bookmark count (all types)
   const getTotalBookmarks = (): number => {
     return bookmarks.length + memorizationBookmarks.length + readingBookmarks.length;
@@ -238,6 +313,7 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
     addReadingBookmark,
     removeReadingBookmark,
     addBookmarkByType,
+    updateBookmark,
     
     // Helpers
     getSurahNameForPage,

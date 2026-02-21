@@ -68,8 +68,6 @@ export function NavigationDialog({
   // Surah tab state
   const [searchSurah, setSearchSurah] = useState(() => localStorage.getItem('quran-search-surah') || '');
   const [searchAyah, setSearchAyah] = useState(() => localStorage.getItem('quran-search-ayah') || '');
-  const [filterJuz, setFilterJuz] = useState('');
-  const [filterHezb, setFilterHezb] = useState('');
   const [selectedSurahAyahs, setSelectedSurahAyahs] = useState<any[]>([]);
   
   // Juz tab state
@@ -204,10 +202,6 @@ export function NavigationDialog({
       if (currentAyah) {
         setSearchAyah(currentAyah.toString());
       }
-      
-      // Keep Juz and Hezb filters empty in Surah tab
-      setFilterJuz('');
-      setFilterHezb('');
       
       // Prefill Juz tab with current juz, hezb, and quarter
       if (currentJuz) {
@@ -564,58 +558,8 @@ export function NavigationDialog({
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-4"
               >
-                {/* Filter Dropdowns Row */}
+                {/* Surah and Ayah Selectors */}
                 <div className="grid grid-cols-2 gap-2">
-                  {/* Juz Filter */}
-                  <div>
-                    <label className={cn("font-medium mb-1 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
-                      {t('filterByJuz')}
-                    </label>
-                    <select
-                      value={filterJuz}
-                      onChange={(e) => {
-                        const juzValue = e.target.value;
-                        setFilterJuz(juzValue);
-                        
-                        // Auto-select first surah of the Juz (don't change Hezb)
-                        if (juzValue) {
-                          const juzNum = parseInt(juzValue);
-                          const juzRanges: Record<number, number[]> = {
-                            1: [1, 2], 2: [2], 3: [2, 3], 4: [3, 4], 5: [4],
-                            6: [4, 5], 7: [5, 6], 8: [6, 7], 9: [7, 8],
-                            10: [8, 9], 11: [9, 10, 11], 12: [11, 12, 13],
-                            13: [13, 14, 15], 14: [15, 16], 15: [17],
-                            16: [18], 17: [21], 18: [23], 19: [25, 26, 27],
-                            20: [27, 28, 29], 21: [29, 30, 31, 32, 33],
-                            22: [33, 34, 35, 36], 23: [36, 37, 38, 39],
-                            24: [39, 40, 41], 25: [41, 42, 43, 44, 45],
-                            26: [46, 47, 48, 49, 50, 51], 27: [51, 52, 53, 54, 55, 56, 57],
-                            28: [58, 59, 60, 61, 62, 63, 64, 65, 66],
-                            29: [67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77],
-                            30: [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114]
-                          };
-                          
-                          const firstSurahId = juzRanges[juzNum]?.[0];
-                          if (firstSurahId) {
-                            setSearchSurah(firstSurahId.toString());
-                            setSearchAyah('1');
-                          }
-                        } else {
-                          setSearchSurah('');
-                          setSearchAyah('');
-                        }
-                      }}
-                      className={cn("w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
-                    >
-                      <option value="">{t('all')}</option>
-                      {Array.from({ length: 30 }, (_, i) => i + 1).map(num => (
-                        <option key={num} value={num}>
-                          {formatNumber(num)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
                   {/* Surah Dropdown */}
                   <div>
                     <label className={cn("font-medium mb-1 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
@@ -630,135 +574,15 @@ export function NavigationDialog({
                       className={cn("w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
                     >
                       <option value="">{t('selectSurah')}</option>
-                      {(() => {
-                        let filteredSurahs = surahs;
-                        
-                        if (filterHezb) {
-                          const hezbNum = parseInt(filterHezb);
-                          const hezbRanges: Record<number, number[]> = {
-                            1: [1, 2], 2: [2], 3: [2], 4: [2, 3], 5: [3], 6: [3],
-                            7: [3], 8: [3, 4], 9: [4], 10: [4], 11: [4, 5], 12: [5],
-                            13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [7, 8],
-                            19: [8, 9], 20: [9], 21: [9, 10], 22: [10, 11], 23: [11], 24: [11, 12],
-                            25: [12, 13], 26: [13, 14, 15], 27: [15, 16], 28: [16, 17], 29: [17, 18], 30: [18, 19, 20],
-                            31: [20, 21], 32: [21, 22], 33: [22, 23], 34: [23, 24], 35: [24, 25], 36: [25, 26],
-                            37: [26, 27], 38: [27, 28], 39: [28, 29], 40: [29, 30, 31], 41: [31, 32, 33], 42: [33],
-                            43: [33, 34], 44: [34, 35, 36], 45: [36, 37], 46: [37, 38, 39], 47: [39, 40], 48: [40, 41],
-                            49: [41, 42, 43], 50: [43, 44, 45, 46], 51: [46, 47, 48], 52: [48, 49, 50, 51], 53: [51, 52, 53, 54, 55], 54: [55, 56, 57, 58],
-                            55: [58, 59, 60, 61, 62], 56: [62, 63, 64, 65, 66, 67], 57: [67, 68, 69, 70, 71, 72], 58: [72, 73, 74, 75, 76, 77, 78],
-                            59: [78, 79, 80, 81, 82, 83, 84, 85, 86, 87], 60: [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114],
-                          };
-                          
-                          let allowedSurahs = hezbRanges[hezbNum] || [];
-                          
-                          if (hezbNum % 2 === 0 && hezbNum !== 60 && allowedSurahs.length > 1) {
-                            allowedSurahs = allowedSurahs.slice(0, -1);
-                          }
-                          
-                          filteredSurahs = filteredSurahs.filter(s => allowedSurahs.includes(s.id));
-                        } else if (filterJuz) {
-                          const juzNum = parseInt(filterJuz);
-                          const juzRanges: Record<number, number[]> = {
-                            1: [1, 2], 2: [2], 3: [2, 3], 4: [3, 4], 5: [4],
-                            6: [4, 5], 7: [5, 6], 8: [6, 7], 9: [7, 8],
-                            10: [8, 9], 11: [9, 10, 11], 12: [11, 12, 13],
-                            13: [13, 14, 15], 14: [15, 16], 15: [17],
-                            16: [18], 17: [21], 18: [23], 19: [25, 26, 27],
-                            20: [27, 28, 29], 21: [29, 30, 31, 32, 33],
-                            22: [33, 34, 35, 36], 23: [36, 37, 38, 39],
-                            24: [39, 40, 41], 25: [41, 42, 43, 44, 45],
-                            26: [46, 47, 48, 49, 50, 51], 27: [51, 52, 53, 54, 55, 56, 57],
-                            28: [58, 59, 60, 61, 62, 63, 64, 65, 66],
-                            29: [67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77],
-                            30: [78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114]
-                          };
-                          
-                          const allowedSurahs = juzRanges[juzNum] || [];
-                          filteredSurahs = filteredSurahs.filter(s => allowedSurahs.includes(s.id));
-                        }
-                        
-                        return filteredSurahs.map(s => (
-                          <option key={s.id} value={s.id}>
-                            {isRTL ? `${formatNumber(s.id)}. ${s.name}` : `${s.id}. ${s.englishName}`}
-                          </option>
-                        ));
-                      })()}
+                      {surahs.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {isRTL ? `${formatNumber(s.id)}. ${s.name}` : `${s.id}. ${s.englishName}`}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
-                  {/* Hizb Filter */}
-                  <div>
-                    <label className={cn("font-medium mb-1 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
-                      {t('filterByHezb')}
-                    </label>
-                    <select
-                      value={filterHezb}
-                      onChange={(e) => {
-                        const hezbValue = e.target.value;
-                        setFilterHezb(hezbValue);
-                        
-                        // Auto-select first surah of the Hezb
-                        if (hezbValue) {
-                          const hezbNum = parseInt(hezbValue);
-                          
-                          const hezbRanges: Record<number, number[]> = {
-                            1: [1, 2], 2: [2], 3: [2], 4: [2, 3], 5: [3], 6: [3],
-                            7: [3], 8: [3, 4], 9: [4], 10: [4], 11: [4, 5], 12: [5],
-                            13: [5, 6], 14: [6], 15: [6, 7], 16: [7], 17: [7], 18: [7, 8],
-                            19: [8, 9], 20: [9], 21: [9, 10], 22: [10, 11], 23: [11], 24: [11, 12],
-                            25: [12, 13], 26: [13, 14, 15], 27: [15, 16], 28: [16, 17], 29: [17, 18], 30: [18, 19, 20],
-                            31: [20, 21], 32: [21, 22], 33: [22, 23], 34: [23, 24], 35: [24, 25], 36: [25, 26],
-                            37: [26, 27], 38: [27, 28], 39: [28, 29], 40: [29, 30, 31], 41: [31, 32, 33], 42: [33],
-                            43: [33, 34], 44: [34, 35, 36], 45: [36, 37], 46: [37, 38, 39], 47: [39, 40], 48: [40, 41],
-                            49: [41, 42, 43], 50: [43, 44, 45, 46], 51: [46, 47, 48], 52: [48, 49, 50, 51], 53: [51, 52, 53, 54, 55], 54: [55, 56, 57, 58],
-                            55: [58, 59, 60, 61, 62], 56: [62, 63, 64, 65, 66, 67], 57: [67, 68, 69, 70, 71, 72], 58: [72, 73, 74, 75, 76, 77, 78],
-                            59: [78, 79, 80, 81, 82, 83, 84, 85, 86, 87], 60: [87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114],
-                          };
-                          
-                          let allowedSurahs = hezbRanges[hezbNum] || [];
-                          
-                          if (hezbNum % 2 === 0 && hezbNum !== 60 && allowedSurahs.length > 1) {
-                            allowedSurahs = allowedSurahs.slice(0, -1);
-                          }
-                          
-                          const firstSurahId = allowedSurahs[0];
-                          if (firstSurahId) {
-                            setSearchSurah(firstSurahId.toString());
-                            setSearchAyah('1');
-                          }
-                        } else {
-                          setSearchSurah('');
-                          setSearchAyah('');
-                        }
-                      }}   
-                      className={cn("w-full px-2 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", textSizeClasses.text)}
-                    >
-                      <option value="">{t('all')}</option>
-                      {(() => {
-                        if (filterJuz) {
-                          const juzNum = parseInt(filterJuz);
-                          const firstHezb = (juzNum - 1) * 2 + 1;
-                          const secondHezb = firstHezb + 1;
-                          return [
-                            <option key={firstHezb} value={firstHezb}>
-                              {formatNumber(firstHezb)}
-                            </option>,
-                            <option key={secondHezb} value={secondHezb}>
-                              {formatNumber(secondHezb)}
-                            </option>
-                          ];
-                        } else {
-                          return Array.from({ length: 60 }, (_, i) => i + 1).map(num => (
-                            <option key={num} value={num}>
-                              {formatNumber(num)}
-                            </option>
-                          ));
-                        }
-                      })()}
-                    </select>
-                  </div>
-
-                  {/* Ayah Filter */}
+                  {/* Ayah Selector */}
                   <div>
                     <label className={cn("font-medium mb-1 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
                       {t('chooseAyah')}

@@ -69,24 +69,24 @@ export function getDialogTextSizeClasses(size: DialogTextSize) {
   switch (size) {
     case 'small':
       return {
-        text: 'text-sm md:text-base',
-        title: 'text-base md:text-lg',
-        label: 'text-sm md:text-base',
-        button: 'text-sm md:text-base',
-      };
-    case 'medium':
-      return {
         text: 'text-base md:text-xl',
         title: 'text-base md:text-xl',
         label: 'text-base md:text-xl',
         button: 'text-base md:text-xl',
       };
-    case 'large':
+    case 'medium':
       return {
         text: 'text-lg md:text-2xl',
         title: 'text-xl md:text-3xl',
         label: 'text-lg md:text-2xl',
         button: 'text-lg md:text-2xl',
+      };
+    case 'large':
+      return {
+        text: 'text-xl md:text-3xl',
+        title: 'text-2xl md:text-4xl',
+        label: 'text-xl md:text-3xl',
+        button: 'text-xl md:text-3xl',
       };
   }
 }

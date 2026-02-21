@@ -80,7 +80,7 @@ export function PlayBar({
   };
 
   return (
-    <div className="flex justify-center px-2 md:px-0 pt-2 pb-1">
+    <div className="flex justify-center px-2 md:px-0 pt-0 pb-0">
       <motion.div 
         initial={{ y: 100 }}
         animate={{ y: 0 }}

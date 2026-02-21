@@ -12,8 +12,6 @@ import { AudioProgressBar } from '@/components/quran/AudioProgressBar';
 import { ReciterDialog } from '@/components/quran/ReciterDialog';
 import { AyahSelectorDialog } from '@/components/quran/AyahSelectorDialog';
 import { RepeatDialog } from '@/components/quran/RepeatDialog';
-import { BookmarksDialog } from '@/components/quran/BookmarksDialog';
-import { SettingsDialog } from '@/components/quran/SettingsDialog';
 import { NavigationDialog } from '@/components/quran/NavigationDialog';
 import { TafseerDialog } from '@/components/quran/TafseerDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -94,14 +92,12 @@ const Surah = () => {
   // Repeat dialog
   const [showRepeatDialog, setShowRepeatDialog] = useState(false);
 
-  // Bookmark dialog
-  const [showBookmarkDialog, setShowBookmarkDialog] = useState(false);
+  // Navigation tracking
   const [initialNavTab, setInitialNavTab] = useState<'surah' | 'juz' | 'page'>('surah');
   
   const [currentSurahId, setCurrentSurahId] = useState(1);
   const [currentJuz, setCurrentJuz] = useState(1);
   const [currentPageAyah, setCurrentPageAyah] = useState<number | null>(null);
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showTafseerDialog, setShowTafseerDialog] = useState(false);
   const [tafseerSurahNumber, setTafseerSurahNumber] = useState(1);
   const [tafseerAyahNumber, setTafseerAyahNumber] = useState(1);
@@ -241,6 +237,21 @@ const Surah = () => {
       }
     }
   }, [page, navigate]);
+  
+  // Listen for bottom bar text setting changes
+  useEffect(() => {
+    const handleSettingChange = (event: CustomEvent) => {
+      if (event.detail.key === 'quran-show-bottom-bar-text') {
+        setShowBottomBarText(event.detail.value === 'true');
+      }
+    };
+    
+    window.addEventListener('quran-setting-changed' as any, handleSettingChange as any);
+    
+    return () => {
+      window.removeEventListener('quran-setting-changed' as any, handleSettingChange as any);
+    };
+  }, []);
   
   // In double page mode, ensure we're always on an odd page number (1, 3, 5, etc.)
   // This ensures proper pairing: 1-2, 3-4, 5-6, etc.
@@ -775,44 +786,35 @@ const Surah = () => {
         totalBookmarks={getTotalBookmarks()}
         isMobile={isMobile}
         viewMode={viewMode}
-        onGoToClick={() => {
-          setSearchMode('navigation');
-          setSearchOpen(true);
-        }}
-        onSearchClick={() => {
-          setSearchMode('word');
-          setSearchOpen(true);
-        }}
+        onGoToClick={() => navigate('/config/navigation')}
+        onSearchClick={() => navigate('/config/search')}
         onBookmarkClick={() => {
-          setShowBookmarkDialog(true);
+          // Store current page/surah temporarily for Configuration page
+          console.log('📖 Surah: Storing currentPage and currentSurahId:', { currentPageNum, currentSurahId });
+          localStorage.setItem('temp-current-page', currentPageNum.toString());
+          localStorage.setItem('temp-current-surah', currentSurahId.toString());
+          navigate('/config/bookmarks');
         }}
-        onSettingsClick={() => setShowSettingsDialog(true)}
+        onSettingsClick={() => navigate('/config/settings')}
         onTafseerClick={async () => {
           // Use currently playing/selected ayah if available, otherwise use first ayah of page
+          let tafseerSurah = currentSurahId;
+          let tafseerAyah = currentPageAyah || 1;
+
           if (currentPlayingAyah) {
-            const surah = surahs.find(s => s.id === currentPlayingAyah.surah);
-            setTafseerSurahNumber(currentPlayingAyah.surah);
-            setTafseerAyahNumber(currentPlayingAyah.ayah);
-            setTafseerSurahName(surah ? (language === 'ar' ? surah.name : surah.englishName) : '');
-            setShowTafseerDialog(true);
+            tafseerSurah = currentPlayingAyah.surah;
+            tafseerAyah = currentPlayingAyah.ayah;
           } else {
             // Fallback: Get first ayah of current page
             const pageInfo = await getPageSurahInfo(currentPageNum);
             if (pageInfo && pageInfo.surahId) {
-              const surah = surahs.find(s => s.id === pageInfo.surahId);
-              setTafseerSurahNumber(pageInfo.surahId);
-              setTafseerAyahNumber(pageInfo.ayah || 1);
-              setTafseerSurahName(surah ? (language === 'ar' ? surah.name : surah.englishName) : '');
-              setShowTafseerDialog(true);
-            } else {
-              // Final fallback to current surah
-              const surah = surahs.find(s => s.id === currentSurahId);
-              setTafseerSurahNumber(currentSurahId);
-              setTafseerAyahNumber(currentPageAyah || 1);
-              setTafseerSurahName(surah ? (language === 'ar' ? surah.name : surah.englishName) : '');
-              setShowTafseerDialog(true);
+              tafseerSurah = pageInfo.surahId;
+              tafseerAyah = pageInfo.ayah || 1;
             }
           }
+
+          // Navigate to tafseer view
+          navigate('/config/tafseer');
         }}
         onViewModeToggle={() => setViewMode(viewMode === 'single' ? 'double' : 'single')}
       />
@@ -839,19 +841,6 @@ const Surah = () => {
           setCurrentPlayingAyah(ayah);
           isAyahNavigation.current = true;
         }}
-      />
-
-      {/* Settings Dialog */}
-      <SettingsDialog
-        open={showSettingsDialog}
-        onOpenChange={setShowSettingsDialog}
-        isMobile={isMobile}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        pagesToLoad={pagesToLoad}
-        onPagesToLoadChange={setPagesToLoad}
-        showBottomBarText={showBottomBarText}
-        onShowBottomBarTextChange={setShowBottomBarText}
       />
 
       {/* Tafseer Dialog */}
@@ -978,33 +967,6 @@ const Surah = () => {
         onRepeatPassageCountChange={setRepeatPassageCount}
         onRepeatAyahCountChange={setRepeatAyahCount}
         onStartRepeat={startRepeat}
-      />
-
-      {/* Bookmark Dialog */}
-      <BookmarksDialog
-        open={showBookmarkDialog}
-        onOpenChange={setShowBookmarkDialog}
-        bookmarks={bookmarks}
-        memorizationBookmarks={memorizationBookmarks}
-        readingBookmarks={readingBookmarks}
-        bookmarkPageSurahs={bookmarkPageSurahs}
-        bookmarkPageAyahs={bookmarkPageAyahs}
-        bookmarkPageSurahIds={bookmarkPageSurahIds}
-        currentSurahId={currentSurahId}
-        currentAyahNum={currentPageAyah ?? 1}
-        currentPage={currentPageNum}
-        currentPlayingAyah={currentPlayingAyah}
-        onNavigate={(page, surahId, ayahNum) => {
-          if (surahId !== undefined && ayahNum !== undefined) {
-            isAyahNavigation.current = true;
-            setCurrentPlayingAyah({ surah: surahId, ayah: ayahNum });
-          }
-          navigate(`/page/${page}`);
-        }}
-        onToggleBookmark={(page) => toggleBookmark(page)}
-        onRemoveMemorizationBookmark={removeMemorizationBookmark}
-        onRemoveReadingBookmark={removeReadingBookmark}
-        onAddBookmarkByType={addBookmarkByType}
       />
     </div>
   );

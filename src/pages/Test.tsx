@@ -4,7 +4,12 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useQuranData } from '@/hooks/useQuranData';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TestSettingsDialog, TestRange, TestMode } from '@/components/quran/TestSettingsDialog';
+import { TestViewSettings } from '@/components/quran/TestViewSettings';
 import { surahs } from '@/data/surahs';
 import { Settings, Eye, ArrowRight, ArrowLeft, Lightbulb, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -45,6 +50,11 @@ export default function Test() {
   const [testRange, setTestRange] = useState<TestRange | null>(null);
   const [testMode, setTestMode] = useState<TestMode>('hifz');
   const [difficult, setDifficult] = useState(false);
+  const [rangeType, setRangeType] = useState<'surah' | 'juz'>('surah');
+  const [startSurah, setStartSurah] = useState(1);
+  const [endSurah, setEndSurah] = useState(114);
+  const [startJuz, setStartJuz] = useState(1);
+  const [endJuz, setEndJuz] = useState(30);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [currentTikrar, setCurrentTikrar] = useState<TikrarQuestion | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -661,6 +671,31 @@ export default function Test() {
     setAllTestsCompleted(false);
   };
 
+  const handleStartInlineTest = () => {
+    const range: TestRange = {
+      type: rangeType,
+      start: rangeType === 'surah' ? startSurah : startJuz,
+      end: rangeType === 'surah' ? endSurah : endJuz,
+      testMode,
+      difficult,
+      maxQuestions: maxQuestions > 0 ? maxQuestions : 20,
+    };
+    handleStartTest(range);
+  };
+
+  // Validate ranges
+  useEffect(() => {
+    if (startSurah > endSurah) {
+      setEndSurah(startSurah);
+    }
+  }, [startSurah, endSurah]);
+
+  useEffect(() => {
+    if (startJuz > endJuz) {
+      setEndJuz(startJuz);
+    }
+  }, [startJuz, endJuz]);
+
   const handleNextQuestion = () => {
     setHintLevel(0);
     
@@ -729,12 +764,25 @@ export default function Test() {
             {t('testFeature')}
           </h1>
           <div className="flex items-center gap-3">
-            <Button
-              onClick={() => setSettingsOpen(true)}
-              className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
-            >
-              <Settings className="w-5 h-5" />
-            </Button>
+            {testRange && (
+              <Button
+                onClick={() => {
+                  setTestRange(null);
+                  setCurrentQuestion(null);
+                  setCurrentTikrar(null);
+                  setShowAnswer(false);
+                  setHintLevel(0);
+                  setQuestionsCount(0);
+                  setUsedHifzKeys(new Set());
+                  setUsedTikrarPhrases(new Set());
+                  setUsedTikrarAyahs(new Set());
+                  setAllTestsCompleted(false);
+                }}
+                className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
+              >
+                <Settings className="w-5 h-5" />
+              </Button>
+            )}
             <Button
               onClick={() => navigate('/')}
               className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
@@ -746,14 +794,166 @@ export default function Test() {
 
         {/* Test Content */}
         {!testRange ? (
-          <Card className="p-8 text-center space-y-4 bg-white dark:bg-gray-800 border-0 shadow-md">
-            <Button
-              onClick={() => setSettingsOpen(true)}
-              className="bg-emerald-700 hover:bg-emerald-800 text-[#F2E3BB] text-base md:text-xl rounded-lg border border-emerald-600 shadow-md"
-            >
-              <Settings className={cn("w-5 h-5", isRTL ? "ml-2" : "mr-2")} />
-              {t('testSettings')}
-            </Button>
+          <Card className="p-8 bg-white dark:bg-gray-800 border-0 shadow-md">
+            <div className="space-y-4">
+              {/* Test Type Selector */}
+              <div className="space-y-2">
+                <Label className="text-base md:text-lg font-medium text-emerald-800 dark:text-emerald-300">{t('testType')}</Label>
+                <Select
+                  value={testMode}
+                  onValueChange={(v) => setTestMode(v as TestMode)}
+                >
+                  <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-lg", isRTL && "text-right")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
+                    <SelectItem value="hifz" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">{t('testTypeHifz')}</SelectItem>
+                    <SelectItem value="tikrar" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">{t('testTypeTikrar')}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm md:text-base text-emerald-600 dark:text-emerald-400">
+                  {testMode === 'hifz' ? t('testTypeHifzDesc') : t('testTypeTikrarDesc')}
+                </p>
+              </div>
+
+              {/* Max Questions Input */}
+              <div className="space-y-2">
+                <Label className="text-base md:text-lg font-medium text-emerald-800 dark:text-emerald-300">{t('maxQuestions')}</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={maxQuestions}
+                  onChange={(e) => setMaxQuestions(parseInt(e.target.value) || 20)}
+                  className="border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg"
+                />
+              </div>
+
+              <Tabs value={rangeType} onValueChange={(v) => setRangeType(v as 'surah' | 'juz')}>
+                <TabsList className="grid w-full grid-cols-2 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
+                  <TabsTrigger value="surah" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">{t('surahRange')}</TabsTrigger>
+                  <TabsTrigger value="juz" className="text-base md:text-xl data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]">{t('juzRange')}</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="surah" className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label className="text-base md:text-lg font-medium text-emerald-800 dark:text-emerald-300">{t('startSurah')}</Label>
+                    <Select
+                      value={startSurah.toString()}
+                      onValueChange={(v) => setStartSurah(parseInt(v))}
+                    >
+                      <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-lg", isRTL && "text-right")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
+                        {surahs.map((surah) => (
+                          <SelectItem key={surah.id} value={surah.id.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">
+                            {formatNumber(surah.id)}. {language === 'ar' ? surah.name : surah.englishName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-base md:text-lg font-medium text-emerald-800 dark:text-emerald-300">{t('endSurah')}</Label>
+                    <Select
+                      value={endSurah.toString()}
+                      onValueChange={(v) => setEndSurah(parseInt(v))}
+                    >
+                      <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-lg", isRTL && "text-right")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
+                        {surahs.filter(s => s.id >= startSurah).map((surah) => (
+                          <SelectItem key={surah.id} value={surah.id.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">
+                            {formatNumber(surah.id)}. {language === 'ar' ? surah.name : surah.englishName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="juz" className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label className="text-base md:text-lg font-medium text-emerald-800 dark:text-emerald-300">{t('startJuz')}</Label>
+                    <Select
+                      value={startJuz.toString()}
+                      onValueChange={(v) => setStartJuz(parseInt(v))}
+                    >
+                      <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-lg", isRTL && "text-right")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
+                        {Array.from({ length: 30 }, (_, i) => i + 1).map((juz) => (
+                          <SelectItem key={juz} value={juz.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">
+                            {t('juz')} {formatNumber(juz)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-base md:text-lg font-medium text-emerald-800 dark:text-emerald-300">{t('endJuz')}</Label>
+                    <Select
+                      value={endJuz.toString()}
+                      onValueChange={(v) => setEndJuz(parseInt(v))}
+                    >
+                      <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-lg", isRTL && "text-right")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
+                        {Array.from({ length: 30 }, (_, i) => i + 1)
+                          .filter(juz => juz >= startJuz)
+                          .map((juz) => (
+                            <SelectItem key={juz} value={juz.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">
+                              {t('juz')} {formatNumber(juz)}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </TabsContent>
+              </Tabs>
+
+              {/* Difficult Mode Toggle */}
+              <div
+                className={cn(
+                  "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors",
+                  difficult
+                    ? "border-orange-400 bg-orange-50 dark:bg-orange-900/20"
+                    : "border-gray-200 bg-gray-50 dark:bg-gray-800"
+                )}
+                onClick={() => setDifficult(prev => !prev)}
+              >
+                <div className="space-y-0.5">
+                  <p className={cn(
+                    "font-medium text-base md:text-lg",
+                    difficult ? "text-orange-700 dark:text-orange-300" : "text-gray-700 dark:text-gray-300"
+                  )}>
+                    {t('difficultMode')}
+                  </p>
+                </div>
+                <div className={cn(
+                  "w-10 h-6 rounded-full transition-colors relative",
+                  difficult ? "bg-orange-500" : "bg-gray-300 dark:bg-gray-600"
+                )}>
+                  <div className={cn(
+                    "w-4 h-4 bg-white rounded-full absolute top-1 transition-all",
+                    difficult ? (isRTL ? "left-1" : "right-1") : (isRTL ? "right-1" : "left-1")
+                  )} />
+                </div>
+              </div>
+
+              <Button
+                onClick={handleStartInlineTest}
+                className="w-full bg-emerald-700 hover:bg-emerald-800 text-[#F2E3BB] rounded-lg border border-emerald-600 shadow-md text-base md:text-xl"
+              >
+                {t('startTest')}
+              </Button>
+            </div>
           </Card>
         ) : (currentQuestion || currentTikrar) ? (
           <div className="flex flex-col h-[calc(100vh-12rem)] md:h-auto md:space-y-6">
@@ -1083,6 +1283,13 @@ export default function Test() {
               {t('loadingTafseer')}...
             </p>
           </Card>
+        ) : testRange ? (
+          <TestViewSettings
+            testRange={testRange}
+            testMode={testMode}
+            difficult={difficult}
+            maxQuestions={maxQuestions}
+          />
         ) : (
           <Card className="p-8 text-center border-0 bg-white dark:bg-gray-800 shadow-md">
             <p className="text-base md:text-xl text-emerald-800 dark:text-emerald-300">

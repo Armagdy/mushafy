@@ -41,9 +41,8 @@ A modern, multilingual Quranic reading web application with comprehensive featur
   - Fallback: Original Tafseer API for reliability
   - Embedded static data for offline resilience
 - **Easy Access**: View tafseer via:
-  - Bottom bar tafseer button (shows tafseer for current page's first ayah)
-  - Ayah selector dialog (hover over any ayah number to see tafseer icon)
-  - Surah header tafseer button
+  - Configuration page tafseer view
+  - Ayah selector (legacy component with tafseer icons)
 - **Language-Based Selection**: Auto-selects appropriate tafseer based on interface language
 - **Persistent Selection**: Your tafseer choice is saved for future sessions
 - **Rich Display**: Beautiful, readable tafseer presentation with:
@@ -350,20 +349,22 @@ If you previously installed the PWA, the old `assetlinks.json` may be cached:
 ```
 src/
 ├── components/
+│   ├── config/          # Configuration view components
+│   │   ├── BookmarksView.tsx
+│   │   ├── NavigationView.tsx
+│   │   ├── ReciterView.tsx
+│   │   ├── RepeatView.tsx
+│   │   ├── SettingsView.tsx
+│   │   └── TafseerView.tsx
 │   ├── quran/           # Quran-specific components
 │   │   ├── TopBar.tsx
 │   │   ├── BottomBar.tsx
 │   │   ├── PageDisplay.tsx
 │   │   ├── PlayBar.tsx
-│   │   ├── TafseerDialog.tsx     # NEW: Tafseer display
-│   │   ├── AyahSelectorDialog.tsx
-│   │   ├── BookmarksDialog.tsx
-│   │   ├── NavigationDialog.tsx
-│   │   ├── ReciterDialog.tsx
-│   │   ├── RepeatDialog.tsx
-│   │   └── SettingsDialog.tsx
+│   │   └── AyahSelectorDialog.tsx  # Legacy dialog (use Views for new features)
 │   └── ui/              # shadcn/ui components (auto-generated)
 ├── contexts/
+│   ├── DialogTextSizeContext.tsx
 │   ├── LanguageContext.tsx
 │   └── MushafContext.tsx
 ├── hooks/
@@ -426,48 +427,44 @@ export const translations = {
 };
 ```
 
-### Creating New Dialogs
-**IMPORTANT**: All dialogs MUST be created as separate components in `src/components/` or `src/components/quran/`:
+### Creating New Views
+**IMPORTANT**: All views MUST be created as separate components in `src/components/config/`:
 
 ```typescript
-// src/components/quran/MyDialog.tsx
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+// src/components/config/MyView.tsx
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
 
-interface MyDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface MyViewProps {
+  // Props for data and callbacks
 }
 
-export function MyDialog({ open, onOpenChange }: MyDialogProps) {
+export default function MyView(props: MyViewProps) {
   const { t, isRTL } = useLanguage();
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+  
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn(
-        "sm:max-w-md max-w-[90vw] max-h-[85vh] overflow-y-auto",
-        "rounded-xl border border-emerald-500",
-        isRTL ? "rtl" : "ltr"
-      )}>
-        <DialogTitle>{t('myDialog')}</DialogTitle>
-        {/* Content */}
-      </DialogContent>
-    </Dialog>
+    <div className={cn(
+      "p-4 space-y-2 sm:space-y-3",
+      isRTL ? "rtl" : "ltr"
+    )}>
+      {/* View content - uses Tabs, forms, lists, etc. */}
+    </div>
   );
 }
 ```
+
+**Note**: Legacy Dialog components exist in `src/components/quran/` but new features should use View components.
 
 ## 📖 Usage Guide
 
 ### Viewing Tafseer
 
-1. **From Bottom Bar**: Click the tafseer icon (📖) to view interpretation of the first ayah on the current page
-2. **From Ayah Selector**: 
-   - Open ayah selector (play control)
-   - Click tafseer button next to surah name for first ayah
-   - Hover over any ayah number and click the small tafseer icon
-3. **Change Tafseer Source**: Use the dropdown in the tafseer dialog to select different interpretations
-4. **Language Support**: The app automatically suggests tafseers in your selected language
+1. **From Configuration**: Navigate to tafseer view to browse interpretations by surah and ayah
+2. **Change Tafseer Source**: Use the dropdown in the tafseer view to select different interpretations
+3. **Language Support**: The app automatically suggests tafseers in your selected language
 
 ### Audio Playback
 1. Click the reciter icon to select a reciter
@@ -478,7 +475,7 @@ export function MyDialog({ open, onOpenChange }: MyDialogProps) {
 ### Bookmarking
 1. Click the bookmark icon in the bottom bar
 2. Select bookmark type (general/memorization/reading)
-3. Manage bookmarks from the bookmarks dialog
+3. Manage bookmarks from the configuration page
 4. Visual indicators appear on bookmarked pages
 
 ## 🤝 Contributing

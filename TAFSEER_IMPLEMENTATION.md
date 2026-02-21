@@ -1,5 +1,7 @@
 # Tafseer Feature Implementation Summary
 
+> **⚠️ HISTORICAL DOCUMENT**: This document describes the original dialog-based implementation. The application has since migrated to a **View-based architecture** (see [src/components/config/](src/components/config/)). Legacy Dialog components remain in [src/components/quran/](src/components/quran/) but new features should use View components.
+
 ## Overview
 Successfully integrated comprehensive Quranic tafseer (interpretation) support into the Mushafy application. The implementation now uses **Quran.com API** as the primary source with automatic fallback to the [Quran Tafseer API](https://github.com/Quran-Tafseer/tafseer_api), providing access to 20+ authentic tafseers in multiple languages.
 

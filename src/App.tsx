@@ -11,6 +11,7 @@ import { useAppKeepAwake } from "@/hooks/useAppKeepAwake";
 import Index from "./pages/Index";
 import Surah from "./pages/Surah";
 import Test from "./pages/Test";
+import Configuration from "./pages/Configuration";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,10 @@ function AppContent() {
           <Route path="/page/:page" element={<Surah />} />
           <Route path="/surah/:id" element={<Surah />} />
           <Route path="/surah/:id/:page" element={<Surah />} />
+          <Route path="/config/:type" element={<Configuration />} />
+          {/* Legacy routes - redirect to config */}
+          <Route path="/settings" element={<Configuration />} />
+          <Route path="/bookmarks" element={<Configuration />} />
           <Route path="/test" element={<Test />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
