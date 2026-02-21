@@ -60,9 +60,12 @@ export function useTafseer() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch available tafseers list on mount
+  // Fetch available tafseers list on mount - defer to avoid blocking render
   useEffect(() => {
     const fetchTafseers = async () => {
+      // Defer fetch to next tick to ensure component renders first
+      await new Promise(resolve => setTimeout(resolve, 0));
+      
       try {
         // Try Quran.com API first - use language parameter (arabic/english)
         const languageName = language === 'ar' ? 'arabic' : 'english';

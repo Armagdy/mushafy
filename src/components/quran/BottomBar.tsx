@@ -32,9 +32,7 @@ export function BottomBar({
   const { isRTL, t } = useLanguage();
 
   return (
-    <motion.div 
-      initial={{ y: 100 }}
-      animate={{ y: 0 }}
+    <div 
       className={cn(
         "px-2 md:px-6 flex items-stretch justify-between",
         showBottomBarText ? "pt-2 md:pt-3 pb-0.5 md:pb-1" : "pt-3 md:pt-4 pb-2 md:pb-3"
@@ -147,6 +145,6 @@ export function BottomBar({
           </motion.button>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }

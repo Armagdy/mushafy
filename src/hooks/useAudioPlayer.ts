@@ -4,7 +4,7 @@ import { ASSETS_BASE_URL } from '@/config/assets';
 import { getAudioData } from '@/lib/quran-data-service';
 import { getMp3QuranReciters, getAyahTiming, getSurahAudioUrl, getCurrentAyahFromTime, seekToAyah, type Mp3QuranReciter, type Mp3QuranMoshaf, type AyahTiming } from '@/lib/mp3quran-service';
 import { surahs } from '@/data/surahs';
-import { cacheAudio, getCachedAudio, getCachedAudioUri, cacheMp3QuranAudio, getCachedMp3QuranAudio, getCachedMp3QuranAudioUri, cacheIndividualAyah, getCachedIndividualAyah, getAllCachedAyahsForSurah, getCachedAyahTiming } from '@/lib/audio-cache';
+import { cacheAudio, getCachedAudio, getCachedAudioUri, cacheMp3QuranAudio, getCachedMp3QuranAudio, getCachedMp3QuranAudioUri, cacheIndividualAyah, getCachedIndividualAyah, getAllCachedAyahsForSurah, getCachedAyahTiming, cacheAyahTiming } from '@/lib/audio-cache';
 import { isNetworkError } from '@/hooks/useNetwork';
 import { debugMediaSession } from '@/lib/media-session-debug';
 import QuranMediaSession from '@/lib/quran-media-session';
@@ -2840,9 +2840,13 @@ export const useAudioPlayer = ({
   
   // Auto-select first moshaf when MP3Quran reciter is selected
   useEffect(() => {
+    console.log('[useAudioPlayer] 🔄 selectedMp3QuranReciter changed:', selectedMp3QuranReciter?.name, 'ID:', selectedMp3QuranReciter?.id);
+    console.log('[useAudioPlayer] 📚 Current selectedMoshaf:', selectedMoshaf?.name, 'ID:', selectedMoshaf?.id);
+    
     if (selectedMp3QuranReciter && selectedMp3QuranReciter.moshaf.length > 0) {
       // If no moshaf is selected or the current moshaf doesn't belong to this reciter, select the first one
       if (!selectedMoshaf || !selectedMp3QuranReciter.moshaf.find(m => m.id === selectedMoshaf.id)) {
+        console.log('[useAudioPlayer] ⚙️ Auto-selecting first moshaf:', selectedMp3QuranReciter.moshaf[0].name);
         setSelectedMoshaf(selectedMp3QuranReciter.moshaf[0]);
       }
     }
@@ -2850,30 +2854,62 @@ export const useAudioPlayer = ({
 
   // Load cached timing data when MP3Quran moshaf is selected
   // This enables ayah picker and repeat dialog BEFORE playback starts
+  // If no cached timing, proactively fetch from API
   useEffect(() => {
     if (audioSource !== 'mp3quran' || !selectedMoshaf || !currentSurahId) {
       return;
     }
 
-    const loadCachedTiming = async () => {
+    const loadOrFetchTiming = async () => {
       try {
+        // First, check for cached timing
         const cachedTiming = await getCachedAyahTiming(selectedMoshaf.id, currentSurahId);
         
         if (cachedTiming && cachedTiming.length > 0) {
-          console.log(`✅ Loaded cached timing for moshaf ${selectedMoshaf.id} surah ${currentSurahId} (${cachedTiming.length} ayahs)`);
+          console.log(`[useAudioPlayer] ✅ Loaded cached timing for moshaf ${selectedMoshaf.id} surah ${currentSurahId} (${cachedTiming.length} ayahs)`);
+          console.log(`[useAudioPlayer] 📊 Setting ayahTimings state with ${cachedTiming.length} items`);
           setAyahTimings(cachedTiming);
         } else {
-          console.log(`❌ No cached timing for moshaf ${selectedMoshaf.id} surah ${currentSurahId}`);
-          setAyahTimings([]);
+          // No cached timing - try to fetch from API
+          console.log(`[useAudioPlayer] 🌐 No cached timing, fetching from API for moshaf ${selectedMoshaf.id} surah ${currentSurahId}`);
+          
+          try {
+            const { checkAyahTiming } = await import('@/lib/mp3quran-service');
+            const result = await checkAyahTiming(currentSurahId, selectedMoshaf.id);
+            
+            if (result.success && result.timings.length > 0) {
+              console.log(`[useAudioPlayer] ✅ Fetched timing from API (${result.timings.length} ayahs)`);
+              // Cache the timing for future use
+              await cacheAyahTiming(selectedMoshaf.id, currentSurahId, result.timings);
+              setAyahTimings(result.timings);
+            } else {
+              console.log(`[useAudioPlayer] ❌ No timing available from API: ${result.error || 'unknown'}`);
+              setAyahTimings([]);
+            }
+          } catch (fetchError) {
+            console.log('[useAudioPlayer] ⚠️ Could not fetch timing from API (offline or error):', fetchError);
+            setAyahTimings([]);
+          }
         }
       } catch (error) {
-        console.error('Error loading cached timing:', error);
+        console.error('Error loading/fetching timing:', error);
         setAyahTimings([]);
       }
     };
 
-    loadCachedTiming();
+    loadOrFetchTiming();
   }, [audioSource, selectedMoshaf, currentSurahId]);
+  
+  // Track ayahTimings changes for debugging
+  useEffect(() => {
+    const hasTimings = ayahTimings.length > 0;
+    console.log('[useAudioPlayer] 📊 ayahTimings state changed:');
+    console.log('[useAudioPlayer]    - Length:', ayahTimings.length);
+    console.log('[useAudioPlayer]    - hasAyahTimings:', hasTimings);
+    console.log('[useAudioPlayer]    - selectedMoshaf:', selectedMoshaf?.name, 'ID:', selectedMoshaf?.id);
+    console.log('[useAudioPlayer]    - currentSurahId:', currentSurahId);
+    console.log('[useAudioPlayer]    - audioSource:', audioSource);
+  }, [ayahTimings, selectedMoshaf, currentSurahId, audioSource]);
   
   // Update audio element event listener when handleAudioEnded changes
   useEffect(() => {

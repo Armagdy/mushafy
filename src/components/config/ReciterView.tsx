@@ -317,7 +317,8 @@ export default function ReciterView({
         const cachedTiming = await getCachedAyahTiming(selectedMoshaf.id, selectedSurahForPlayback);
         
         if (cachedTiming && cachedTiming.length > 0) {
-          console.log(`✅ Timing available from cache for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
+          console.log(`[ReciterView] ✅ Timing available from cache for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
+          console.log('[ReciterView] ✅ Setting timingAvailable to TRUE (from cache)');
           setTimingAvailable(true);
           setIsCheckingTiming(false);
           return;
@@ -326,7 +327,8 @@ export default function ReciterView({
         // Fallback: if MP3Quran audio is already cached and has embedded timing metadata, use it
         const cachedMp3Audio = await getCachedMp3QuranAudio(selectedMoshaf.id, selectedSurahForPlayback);
         if (cachedMp3Audio && cachedMp3Audio.timingData && cachedMp3Audio.timingData.length > 0) {
-          console.log(`✅ Timing available from cached MP3Quran audio for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
+          console.log(`[ReciterView] ✅ Timing available from cached MP3Quran audio for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
+          console.log('[ReciterView] ✅ Setting timingAvailable to TRUE (from cached MP3)');
           // Persist to dedicated timing cache for faster future checks
           await cacheAyahTiming(selectedMoshaf.id, selectedSurahForPlayback, cachedMp3Audio.timingData);
           setTimingAvailable(true);
@@ -337,11 +339,15 @@ export default function ReciterView({
         // Not in cache, fetch from API
         console.log(`🔍 Checking timing from API for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
         const result = await checkAyahTiming(selectedSurahForPlayback, selectedMoshaf.id);
+        
+        console.log('[ReciterView] ⏱️ Timing check result:', result);
+        console.log('[ReciterView] 📊 Surah:', selectedSurahForPlayback, 'Moshaf ID:', selectedMoshaf.id);
 
         if (result.success && result.timings.length > 0) {
           // Save to cache
           await cacheAyahTiming(selectedMoshaf.id, selectedSurahForPlayback, result.timings);
-          console.log(`✅ Timing fetched and cached for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
+          console.log(`[ReciterView] ✅ Timing fetched and cached for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
+          console.log('[ReciterView] ✅ Setting timingAvailable to TRUE');
           setTimingAvailable(true);
         } else {
           // Handle errors
@@ -839,6 +845,9 @@ export default function ReciterView({
                         key={reciter.id}
                         className="px-4 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-800 cursor-pointer border-b border-emerald-100 last:border-none"
                         onClick={() => {
+                          console.log('[ReciterView] 🎤 Reciter selected:', reciter.name, 'ID:', reciter.id);
+                          console.log('[ReciterView] 📋 Reciter object:', reciter);
+                          console.log('[ReciterView] ⏱️ Current timingAvailable state:', timingAvailable);
                           onMp3QuranReciterChange(reciter);
                           setShowMp3QuranDropdown(false);
                         }}
@@ -868,6 +877,9 @@ export default function ReciterView({
                     onValueChange={(value) => {
                       const moshaf = selectedMp3QuranReciter.moshaf.find(m => m.id.toString() === value);
                       if (moshaf) {
+                        console.log('[ReciterView] 📖 Moshaf selected:', moshaf.name, 'ID:', moshaf.id);
+                        console.log('[ReciterView] 📋 Moshaf object:', moshaf);
+                        console.log('[ReciterView] ⏱️ Current timingAvailable state:', timingAvailable);
                         onMoshafChange(moshaf);
                       }
                     }}

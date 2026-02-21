@@ -43,6 +43,14 @@ export function PlayBar({
   onTogglePlayPause,
 }: PlayBarProps) {
   const { language, t } = useLanguage();
+  
+  // Debug logging for props
+  console.log('[PlayBar] 🎵 PlayBar props:');
+  console.log('[PlayBar]    - audioSource:', audioSource);
+  console.log('[PlayBar]    - hasAyahTimings:', hasAyahTimings);
+  console.log('[PlayBar]    - selectedMp3QuranReciter:', selectedMp3QuranReciter?.name, 'ID:', selectedMp3QuranReciter?.id);
+  console.log('[PlayBar]    - currentSurahName:', currentSurahName);
+  console.log('[PlayBar]    - currentPlayingAyah:', currentPlayingAyah);
 
   // Clean reciter name by removing style indicators
   const cleanReciterName = (name: string): string => {
@@ -81,11 +89,7 @@ export function PlayBar({
 
   return (
     <div className="flex justify-center px-2 md:px-0 pt-0 pb-0">
-      <motion.div 
-        initial={{ y: 100 }}
-        animate={{ y: 0 }}
-        className="w-[98%] md:max-w-4xl lg:max-w-5xl rounded-full"
-      >
+      <div className="w-[98%] md:max-w-4xl lg:max-w-5xl rounded-full">
         <div className="flex items-center py-2 px-2 md:py-3 md:px-7 gap-1 md:gap-0 md:justify-between w-full">
           {/* Ayah Selection - Left */}
           <div className="flex items-center gap-1.5 md:gap-3">
@@ -96,7 +100,11 @@ export function PlayBar({
               title={(audioSource === 'mp3quran' && !hasAyahTimings) ? t('ayahSelectionNotAvailable') : ''}
             >
               <span className="text-[#F2E3BB] text-base md:text-xl font-bold" style={{ fontFamily: "'Amiri', serif" }}>
-                {currentPlayingAyah ? formatNumber(currentPlayingAyah.ayah) : '--'}
+                {(audioSource === 'mp3quran' && !hasAyahTimings) 
+                  ? '--' 
+                  : currentPlayingAyah 
+                    ? formatNumber(currentPlayingAyah.ayah) 
+                    : '--'}
               </span>
             </button>
             
@@ -160,7 +168,7 @@ export function PlayBar({
             </motion.button>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

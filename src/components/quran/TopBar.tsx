@@ -26,7 +26,7 @@ export function TopBar({
   onPageClick,
   onJuzClick,
 }: TopBarProps) {
-  const { isRTL, language } = useLanguage();
+  const { t, isRTL, language } = useLanguage();
 
   return (
     <div className="w-full flex justify-center bg-gradient-to-b from-emerald-800 to-emerald-600" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -35,40 +35,76 @@ export function TopBar({
         animate={{ y: 0 }}
         className="w-full max-w-[1600px]"
       >
-        <div className="px-4 md:px-8 py-1.5 md:py-2 flex items-center justify-between gap-3 md:gap-6 relative">
-        {/* Surah Button */}
-        <button
-          onClick={onSurahClick}
-          className="group relative bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-2 md:px-3 py-1.5 md:py-2 border border-[#F2E3BB]/30 shadow-md cursor-pointer transition-all min-w-[80px] md:min-w-[100px] text-center"
-        >
-          <span className="text-[#F2E3BB] text-base md:text-xl font-bold" style={{ fontFamily: "'Amiri', serif" }}>
-            {language === 'ar' 
-              ? `${currentSurah.name} ${formatNumber(currentSurah.id)}`
-              : `${formatNumber(currentSurah.id)}. ${currentSurah.englishName}`}
-          </span>
-        </button>
+        {/* Main Header */}
+        <div className="relative">
+          {/* Subtle background gradient */}
+          <div className="absolute inset-0 bg-gradient-to-b from-emerald-700/20 to-transparent pointer-events-none" />
+          
+          {/* Content */}
+          <div className="relative px-4 md:px-8 py-2.5 md:py-3 flex items-center justify-between gap-2" style={{ direction: 'ltr' }}>
+            {/* Left Cell - Page Number */}
+            <button
+              onClick={onPageClick}
+              className="flex flex-col items-center gap-0 min-w-[70px] hover:opacity-80 transition-opacity"
+            >
+              <span 
+                className="text-xs text-[#F2E3BB]/70 tracking-wide leading-none"
+                style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+              >
+                {t('page')}
+              </span>
+              <span 
+                className="text-xl md:text-2xl font-bold text-[#F2E3BB] leading-none mt-0.5"
+                style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+              >
+                {formatNumber(currentPageNum)}
+              </span>
+            </button>
 
-        {/* Page Display - Centered */}
-        <button
-          onClick={onPageClick}
-          className="group absolute left-1/2 -translate-x-1/2 bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-2 md:px-3 py-1.5 md:py-2 border border-[#F2E3BB]/30 shadow-md cursor-pointer transition-all min-w-[80px] md:min-w-[100px] text-center"
-        >
-          <span className="text-[#F2E3BB] text-base md:text-xl font-bold" style={{ fontFamily: "'Amiri', serif" }}>
-            ص {formatNumber(currentPageNum)}
-          </span>
-        </button>
+            {/* Separator */}
+            <div className="w-[1px] h-9 bg-gradient-to-b from-transparent via-emerald-400/50 to-transparent" />
 
-        {/* Juz Button */}
-        <button
-          onClick={onJuzClick}
-          className="group relative bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-2 md:px-3 py-1.5 md:py-2 border border-[#F2E3BB]/30 shadow-md cursor-pointer transition-all min-w-[80px] md:min-w-[100px] text-center"
-        >
-          <span className="text-[#F2E3BB] text-base md:text-xl font-bold" style={{ fontFamily: "'Amiri', serif" }}>
-            {isRTL ? `الجزء ${formatNumber(currentJuz)}` : `Juz ${formatNumber(currentJuz)}`}
-          </span>
-        </button>
-      </div>
-    </motion.header>
+            {/* Center Cell - Surah Name */}
+            <button
+              onClick={onSurahClick}
+              className="flex-1 flex items-center justify-center hover:opacity-80 transition-opacity"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base text-[#F2E3BB]/70 leading-none">☙</span>
+                <span 
+                  className="text-2xl md:text-3xl font-bold text-[#F2E3BB] leading-none"
+                  style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+                >
+                  {language === 'ar' ? currentSurah.name : currentSurah.englishName}
+                </span>
+                <span className="text-base text-[#F2E3BB]/70 leading-none">❧</span>
+              </div>
+            </button>
+
+            {/* Separator */}
+            <div className="w-[1px] h-9 bg-gradient-to-b from-transparent via-emerald-400/50 to-transparent" />
+
+            {/* Right Cell - Juz Number */}
+            <button
+              onClick={onJuzClick}
+              className="flex flex-col items-center gap-0 min-w-[70px] hover:opacity-80 transition-opacity"
+            >
+              <span 
+                className="text-xs text-[#F2E3BB]/70 tracking-wide leading-none"
+                style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+              >
+                {t('juz')}
+              </span>
+              <span 
+                className="text-xl md:text-2xl font-bold text-[#F2E3BB] leading-none mt-0.5"
+                style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+              >
+                {formatNumber(currentJuz)}
+              </span>
+            </button>
+          </div>
+        </div>
+      </motion.header>
     </div>
   );
 }

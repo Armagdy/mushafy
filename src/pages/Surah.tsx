@@ -14,6 +14,7 @@ import { AyahSelectorDialog } from '@/components/quran/AyahSelectorDialog';
 import { RepeatDialog } from '@/components/quran/RepeatDialog';
 import { NavigationDialog } from '@/components/quran/NavigationDialog';
 import { TafseerDialog } from '@/components/quran/TafseerDialog';
+import ConfigOverlay, { type ConfigType } from '@/components/config/ConfigOverlay';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -102,6 +103,9 @@ const Surah = () => {
   const [tafseerSurahNumber, setTafseerSurahNumber] = useState(1);
   const [tafseerAyahNumber, setTafseerAyahNumber] = useState(1);
   const [tafseerSurahName, setTafseerSurahName] = useState('');
+  
+  // ConfigOverlay state
+  const [configOverlayType, setConfigOverlayType] = useState<ConfigType | null>(null);
   const [currentHezb, setCurrentHezb] = useState(1);
   const [currentQuarter, setCurrentQuarter] = useState(1);
   const [viewMode, setViewMode] = useState<'single' | 'double'>(
@@ -773,9 +777,9 @@ const Surah = () => {
             // Prefill repeat counts with 1 if they're empty/0
             if (repeatPassageCount === 0) setRepeatPassageCount(1);
             if (repeatAyahCount === 0) setRepeatAyahCount(1);
-            setShowRepeatDialog(true);
+            setConfigOverlayType('repeat');
           }}
-          onReciterClick={() => setShowReciterDialog(true)}
+          onReciterClick={() => setConfigOverlayType('reciter')}
           onStop={stopAudio}
           onTogglePlayPause={togglePlayPause}
         />
@@ -786,35 +790,29 @@ const Surah = () => {
         totalBookmarks={getTotalBookmarks()}
         isMobile={isMobile}
         viewMode={viewMode}
-        onGoToClick={() => navigate('/config/navigation')}
-        onSearchClick={() => navigate('/config/search')}
-        onBookmarkClick={() => {
-          // Store current page/surah temporarily for Configuration page
-          console.log('📖 Surah: Storing currentPage and currentSurahId:', { currentPageNum, currentSurahId });
-          localStorage.setItem('temp-current-page', currentPageNum.toString());
-          localStorage.setItem('temp-current-surah', currentSurahId.toString());
-          navigate('/config/bookmarks');
+        onGoToClick={() => {
+          setConfigOverlayType('navigation');
         }}
-        onSettingsClick={() => navigate('/config/settings')}
-        onTafseerClick={async () => {
-          // Use currently playing/selected ayah if available, otherwise use first ayah of page
-          let tafseerSurah = currentSurahId;
-          let tafseerAyah = currentPageAyah || 1;
-
+        onSearchClick={() => {
+          setConfigOverlayType('search');
+        }}
+        onBookmarkClick={() => {
+          // Save current page/surah to localStorage for Bookmarks view
+          localStorage.setItem('quran-current-page', currentPageNum.toString());
+          localStorage.setItem('quran-current-surah', currentSurahId.toString());
+          setConfigOverlayType('bookmarks');
+        }}
+        onSettingsClick={() => setConfigOverlayType('settings')}
+        onTafseerClick={() => {
+          // Save current playing ayah or page ayah for TafseerView
           if (currentPlayingAyah) {
-            tafseerSurah = currentPlayingAyah.surah;
-            tafseerAyah = currentPlayingAyah.ayah;
+            localStorage.setItem('quran-tafseer-surah', currentPlayingAyah.surah.toString());
+            localStorage.setItem('quran-tafseer-ayah', currentPlayingAyah.ayah.toString());
           } else {
-            // Fallback: Get first ayah of current page
-            const pageInfo = await getPageSurahInfo(currentPageNum);
-            if (pageInfo && pageInfo.surahId) {
-              tafseerSurah = pageInfo.surahId;
-              tafseerAyah = pageInfo.ayah || 1;
-            }
+            localStorage.setItem('quran-tafseer-surah', currentSurahId.toString());
+            localStorage.setItem('quran-tafseer-ayah', (currentPageAyah || 1).toString());
           }
-
-          // Navigate to tafseer view
-          navigate('/config/tafseer');
+          setConfigOverlayType('tafseer');
         }}
         onViewModeToggle={() => setViewMode(viewMode === 'single' ? 'double' : 'single')}
       />
@@ -872,8 +870,20 @@ const Surah = () => {
         mp3QuranRecitersAr={mp3QuranRecitersAr}
         selectedMp3QuranReciter={selectedMp3QuranReciter}
         selectedMoshaf={selectedMoshaf}
-        onMp3QuranReciterChange={setSelectedMp3QuranReciter}
-        onMoshafChange={setSelectedMoshaf}
+        onMp3QuranReciterChange={(reciter) => {
+          console.log('[Surah] 🎤 Reciter changed in Surah.tsx:', reciter.name, 'ID:', reciter.id);
+          console.log('[Surah] 📋 Reciter object received:', reciter);
+          console.log('[Surah] 📊 Current hasAyahTimings:', hasAyahTimings);
+          console.log('[Surah] 📊 Current ayahTimings length:', ayahTimings?.length || 0);
+          setSelectedMp3QuranReciter(reciter);
+        }}
+        onMoshafChange={(moshaf) => {
+          console.log('[Surah] 📖 Moshaf changed in Surah.tsx:', moshaf.name, 'ID:', moshaf.id);
+          console.log('[Surah] 📋 Moshaf object received:', moshaf);
+          console.log('[Surah] 📊 Current hasAyahTimings:', hasAyahTimings);
+          console.log('[Surah] 📊 Current ayahTimings length:', ayahTimings?.length || 0);
+          setSelectedMoshaf(moshaf);
+        }}
         currentPlayingAyah={currentPlayingAyah}
         currentSurahId={currentSurahId}
         onFilterReciterNameChange={setFilterReciterName}
@@ -968,6 +978,86 @@ const Surah = () => {
         onRepeatAyahCountChange={setRepeatAyahCount}
         onStartRepeat={startRepeat}
       />
+
+      {/* ConfigOverlay for Settings, Bookmarks, Tafseer, etc. */}
+      {configOverlayType && (
+        <ConfigOverlay
+          type={configOverlayType}
+          onClose={() => setConfigOverlayType(null)}
+          onChangeView={(view) => setConfigOverlayType(view)}
+          currentPage={currentPageNum}
+          currentSurahId={currentSurahId}
+          currentPlayingAyah={currentPlayingAyah}
+          onNavigate={(page) => {
+            navigate(`/page/${page}`);
+            setConfigOverlayType(null);
+          }}
+          viewMode={viewMode}
+          onViewModeToggle={() => setViewMode(viewMode === 'single' ? 'double' : 'single')}
+          showBottomBarText={showBottomBarText}
+          isMobile={isMobile}
+          audioSource={audioSource}
+          onAudioSourceChange={setAudioSource}
+          selectedReciter={selectedReciter}
+          filteredReciters={filteredReciters}
+          uniqueReciterNames={uniqueReciterNames}
+          filterReciterName={filterReciterName}
+          filterReading={filterReading}
+          filterStyle={filterStyle}
+          filterQuality={filterQuality}
+          availableReadings={availableReadings}
+          availableStyles={availableStyles}
+          availableQualities={availableQualities}
+          onFilterReciterNameChange={setFilterReciterName}
+          onFilterReadingChange={setFilterReading}
+          onFilterStyleChange={setFilterStyle}
+          onFilterQualityChange={setFilterQuality}
+          mp3QuranReciters={mp3QuranReciters}
+          mp3QuranRecitersAr={mp3QuranRecitersAr}
+          selectedMp3QuranReciter={selectedMp3QuranReciter}
+          selectedMoshaf={selectedMoshaf}
+          onMp3QuranReciterChange={setSelectedMp3QuranReciter}
+          onMoshafChange={setSelectedMoshaf}
+          onReciterListen={() => {
+            if (audioSource === 'everyayah' && filteredReciters.length > 0) {
+              const reciterToApply = selectedReciter || filteredReciters[0];
+              setSelectedReciter(reciterToApply);
+              if (reciterToApply?.folder) {
+                localStorage.setItem('quran-last-reciter', reciterToApply.folder);
+              }
+            }
+          }}
+          onReciterNavigateToSurah={async (surahId) => {
+            stopAudio();
+            setCurrentPlayingAyah({ surah: surahId, ayah: 1 });
+            isAyahNavigation.current = true;
+            const firstPage = await getAyahPage(surahId, 1);
+            if (firstPage) {
+              navigate(`/page/${firstPage}`);
+            }
+            setConfigOverlayType(null);
+          }}
+          onStopAudio={stopAudio}
+          ayahData={ayahData}
+          repeatStartSurah={repeatStartSurah}
+          repeatStartAyah={repeatStartAyah}
+          repeatEndSurah={repeatEndSurah}
+          repeatEndAyah={repeatEndAyah}
+          repeatPassageCount={repeatPassageCount}
+          repeatAyahCount={repeatAyahCount}
+          hasAyahTimings={hasAyahTimings}
+          onRepeatStartSurahChange={setRepeatStartSurah}
+          onRepeatStartAyahChange={setRepeatStartAyah}
+          onRepeatEndSurahChange={setRepeatEndSurah}
+          onRepeatEndAyahChange={setRepeatEndAyah}
+          onRepeatPassageCountChange={setRepeatPassageCount}
+          onRepeatAyahCountChange={setRepeatAyahCount}
+          onStartRepeat={() => {
+            startRepeat();
+            setConfigOverlayType(null);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Bookmark, BookMarked, BookOpen } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useMushaf } from '@/contexts/MushafContext';
 import { getPageImageFilename } from '@/lib/quran-mapping';
@@ -68,15 +68,10 @@ export function PageDisplay({
       {/* Page Display Container */}
       <div className="flex-1 flex items-center justify-center gap-6 max-w-7xl">
         {viewMode === 'double' && !isMobile ? (
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div 
-              key={`${currentPageNum}-${secondPageNum}`}
-              initial={{ x: isRTL ? -100 : 100, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: isRTL ? 100 : -100, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="flex-1 flex items-center justify-center gap-6 max-w-7xl"
-            >
+          <div 
+            key={`${currentPageNum}-${secondPageNum}`}
+            className="flex-1 flex items-center justify-center gap-6 max-w-7xl"
+          >
               {/* In LTR: show left page first, then right */}
               {/* In RTL: show right page first, then left (for RTL flex direction) */}
               {!isRTL ? (
@@ -198,14 +193,13 @@ export function PageDisplay({
                   )}
                 </>
               )}
-            </motion.div>
-          </AnimatePresence>
+          </div>
         ) : (
           /* Horizontal Scroll View - Single Page Mode */
           <div 
             ref={scrollContainerRef}
             onScroll={onScroll}
-            className="flex-1 w-full h-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth flex"
+            className="flex-1 w-full h-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory flex"
             style={{ 
               scrollbarWidth: 'none', 
               msOverflowStyle: 'none',

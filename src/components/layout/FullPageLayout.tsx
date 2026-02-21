@@ -1,4 +1,5 @@
 import React from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -34,9 +35,12 @@ export function FullPageLayout({
       style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
     >
       {/* Top Bar with title and back button */}
-      <div 
+      <motion.div 
         className="bg-gradient-to-b from-emerald-800 to-emerald-600 px-4 pb-3 flex items-center gap-3 sticky top-0 z-50"
         style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
+        initial={{ y: -60, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
       >
         <button
           onClick={() => navigate('/')}
@@ -54,7 +58,7 @@ export function FullPageLayout({
         </h1>
         {/* Placeholder for symmetry */}
         <div className="w-9" />
-      </div>
+      </motion.div>
       
       {/* Main Content Area */}
       <div className={cn(

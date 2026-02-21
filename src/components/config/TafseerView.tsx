@@ -67,41 +67,52 @@ export default function TafseerView() {
     setCurrentAyahNumber(newAyahNumber);
   };
 
-  // Fetch ayah text from Quran.com API
+  // Fetch ayah text from Quran.com API - defer to avoid blocking render
   useEffect(() => {
     if (currentSurahNumber && currentAyahNumber) {
-      setIsLoadingAyah(true);
-      setAyahText(""); // Reset ayah text
+      // Defer fetch to next tick to allow view to render first
+      const timeoutId = setTimeout(() => {
+        setIsLoadingAyah(true);
+        setAyahText(""); // Reset ayah text
+        
+        // Use Quran.com API to get verse text
+        fetch(`https://api.quran.com/api/v4/verses/by_key/${currentSurahNumber}:${currentAyahNumber}?fields=text_uthmani`)
+          .then(res => {
+            if (!res.ok) {
+              throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            return res.json();
+          })
+          .then(data => {
+            if (data && data.verse && data.verse.text_uthmani) {
+              console.log('Ayah text loaded from Quran.com API:', data.verse.text_uthmani);
+              setAyahText(data.verse.text_uthmani);
+            } else {
+              console.warn('Verse text not found in response');
+            }
+            setIsLoadingAyah(false);
+          })
+          .catch(err => {
+            console.error('Failed to load ayah text from Quran.com API:', err);
+            setIsLoadingAyah(false);
+          });
+      }, 0);
       
-      // Use Quran.com API to get verse text
-      fetch(`https://api.quran.com/api/v4/verses/by_key/${currentSurahNumber}:${currentAyahNumber}?fields=text_uthmani`)
-        .then(res => {
-          if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`);
-          }
-          return res.json();
-        })
-        .then(data => {
-          if (data && data.verse && data.verse.text_uthmani) {
-            console.log('Ayah text loaded from Quran.com API:', data.verse.text_uthmani);
-            setAyahText(data.verse.text_uthmani);
-          } else {
-            console.warn('Verse text not found in response');
-          }
-          setIsLoadingAyah(false);
-        })
-        .catch(err => {
-          console.error('Failed to load ayah text from Quran.com API:', err);
-          setIsLoadingAyah(false);
-        });
+      return () => clearTimeout(timeoutId);
     }
   }, [currentSurahNumber, currentAyahNumber]);
 
-  // Fetch tafseer when ayah changes
+  // Fetch tafseer when ayah changes - defer to avoid blocking render
   useEffect(() => {
     if (currentSurahNumber && currentAyahNumber && selectedTafseerId) {
-      fetchTafseerForAyah(currentSurahNumber, currentAyahNumber);
+      // Defer fetch to next tick to allow view to render first
+      const timeoutId = setTimeout(() => {
+        fetchTafseerForAyah(currentSurahNumber, currentAyahNumber);
+      }, 0);
+      
+      return () => clearTimeout(timeoutId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSurahNumber, currentAyahNumber, selectedTafseerId]);
 
   // Navigation handlers

@@ -8,12 +8,17 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 
+interface SearchViewProps {
+  onNavigate?: (page: number) => void;
+  onClose?: () => void;
+}
+
 /**
  * Search View - Word search in Quran text
  * Self-contained view that loads its own data and handles navigation
  * Route: /config/search
  */
-export default function SearchView() {
+export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
   const navigate = useNavigate();
   
   // Load Quran data
@@ -26,6 +31,13 @@ export default function SearchView() {
   const [wordSearchResults, setWordSearchResults] = useState<any[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // Validate that text contains only Arabic characters
+  const isArabicText = (text: string): boolean => {
+    // Allow Arabic letters (U+0600-U+06FF), Arabic numerals, spaces, and common punctuation
+    const arabicPattern = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\s]+$/;
+    return arabicPattern.test(text) || text === '';
+  };
 
   // Number formatting for Arabic/English
   const formatNumber = (num: number | string): string => {
@@ -121,28 +133,25 @@ export default function SearchView() {
       
       // Use setTimeout to allow UI to update with loading state
       setTimeout(() => {
-        // Search for the full text phrase
+        // Search for the full text phrase in Arabic only
         const normalizedSearchFull = normalizeArabic(searchWord);
-        const searchFullLower = searchWord.toLowerCase();
         const results: any[] = [];
         
         ayahData.forEach(surahData => {
           surahData.verses?.forEach((verse: any) => {
             const arabicText = verse.text?.ar || '';
             const normalizedArabic = normalizeArabic(arabicText);
-            const englishText = (verse.text?.en || '').toLowerCase();
             
-            // Check if the full phrase matches
+            // Check if the full phrase matches in Arabic
             const matchesArabic = normalizedArabic.includes(normalizedSearchFull);
-            const matchesEnglish = englishText.includes(searchFullLower);
             
-            if (matchesArabic || matchesEnglish) {
+            if (matchesArabic) {
               console.log('Found match in Surah', surahData.number, 'Ayah', verse.number);
               console.log('Arabic Text:', arabicText);
               results.push({
                 surahNumber: surahData.number,
-                surahName: surahData.name?.ar,
-                surahNameEn: surahData.name?.en,
+                surahName: surahData.name,
+                surahNameEn: surahData.englishName,
                 ayahNumber: verse.number,
                 arabicText: verse.text?.ar,
                 englishText: verse.text?.en,
@@ -167,7 +176,12 @@ export default function SearchView() {
   };
 
   const handleResultClick = (page: number) => {
-    navigate(`/page/${page}`);
+    if (onNavigate) {
+      onNavigate(page);
+      onClose?.();
+    } else {
+      navigate(`/page/${page}`);
+    }
   };
 
   // Show loading state while data is loading
@@ -209,9 +223,14 @@ export default function SearchView() {
               placeholder={t('searchWordPlaceholder')}
               value={searchWord}
               onChange={(e) => {
-                setSearchWord(e.target.value);
-                setWordSearchResults([]); // Clear results when user types
-                setHasSearched(false); // Reset search state when input changes
+                const newValue = e.target.value;
+                // Only allow Arabic text
+                if (isArabicText(newValue)) {
+                  setSearchWord(newValue);
+                  setWordSearchResults([]); // Clear results when user types
+                  setHasSearched(false); // Reset search state when input changes
+                }
+                // If non-Arabic characters attempted, do nothing (blocks input)
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -227,8 +246,9 @@ export default function SearchView() {
           </div>
           <Button
             onClick={performWordSearch}
+            disabled={searchWord.trim().length < 2}
             className={cn(
-              "px-4 py-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]",
+              "px-4 py-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed",
               textSizeClasses.button
             )}
           >
@@ -244,10 +264,10 @@ export default function SearchView() {
           )}>
             <Search className="w-12 h-12 mx-auto mb-3 text-emerald-600 dark:text-emerald-400" />
             <p className="text-emerald-800 dark:text-emerald-300 font-medium mb-2">
-              {isRTL ? 'ابحث عن كلمة أو عبارة' : 'Search for a word or phrase'}
+              {isRTL ? 'ابحث فى نصوص الايات' : 'Search for a word or phrase'}
             </p>
             <p className="text-emerald-600 dark:text-emerald-400 text-sm">
-              {isRTL ? 'أدخل كلمة عربية أو إنجليزية للبحث في القرآن' : 'Enter an Arabic or English word to search in the Quran'}
+              {isRTL ? '(البحث بالعربية فقط)' : '(Arabic text only)'}
             </p>
           </div>
         )}
@@ -294,13 +314,10 @@ export default function SearchView() {
                     className={cn(
                       "p-3 border border-emerald-300 dark:border-emerald-600 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20",
                       textSizeClasses.text,
-                      isRTL ? "text-right text-emerald-900 dark:text-emerald-100 leading-[2.2] font-arabic" : "text-left text-emerald-900 dark:text-emerald-100 leading-relaxed"
+                      "text-right text-emerald-900 dark:text-emerald-100 leading-[2.2] font-arabic"
                     )}
                   >
-                    {isRTL 
-                      ? highlightText(result.arabicText, searchWord, true)
-                      : highlightText(result.englishText, searchWord, false)
-                    }
+                    {highlightText(result.arabicText, searchWord, true)}
                   </div>
                 </motion.button>
               ))}

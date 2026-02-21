@@ -9,11 +9,16 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { surahs } from "@/data/surahs";
 import { BookOpen, Hash, FileText, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight } from "lucide-react";
 
+interface NavigationViewProps {
+  onNavigate?: (page: number) => void;
+  onClose?: () => void;
+}
+
 /**
  * Navigation View - Full page navigation interface
  * Extracted from NavigationDialog.tsx for use in Configuration page
  */
-export default function NavigationView() {
+export default function NavigationView({ onNavigate, onClose }: NavigationViewProps) {
   const { t, isRTL, language } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
@@ -151,13 +156,23 @@ export default function NavigationView() {
         const ayahNumber = parseInt(searchAyah);
         const ayahInfo = selectedSurahAyahs.find(v => v.number === ayahNumber);
         if (ayahInfo && ayahInfo.page) {
-          navigate(`/page/${ayahInfo.page}`);
+          if (onNavigate) {
+            onNavigate(ayahInfo.page);
+            onClose?.();
+          } else {
+            navigate(`/page/${ayahInfo.page}`);
+          }
         }
       } else {
         // Otherwise, navigate to the first page of the surah
         const { getSurahFirstPage } = await import('@/lib/quran-mapping');
         const firstPage = await getSurahFirstPage(surahId);
-        navigate(`/page/${firstPage}`);
+        if (onNavigate) {
+          onNavigate(firstPage);
+          onClose?.();
+        } else {
+          navigate(`/page/${firstPage}`);
+        }
       }
       
       setSearchSurah('');
@@ -186,7 +201,12 @@ export default function NavigationView() {
         targetPage = await getJuzFirstPage(juzNum);
       }
       
-      navigate(`/page/${targetPage}`);
+      if (onNavigate) {
+        onNavigate(targetPage);
+        onClose?.();
+      } else {
+        navigate(`/page/${targetPage}`);
+      }
       setSearchJuz('');
       setSearchJuzHezb('');
       setSearchJuzQuarter('');
@@ -196,7 +216,12 @@ export default function NavigationView() {
   const handleGoToSearchPage = () => {
     const pageNum = parseInt(searchPage);
     if (pageNum > 0 && pageNum <= 604 && !pageValidationError) {
-      navigate(`/page/${pageNum}`);
+      if (onNavigate) {
+        onNavigate(pageNum);
+        onClose?.();
+      } else {
+        navigate(`/page/${pageNum}`);
+      }
       setSearchPage('');
     }
   };
