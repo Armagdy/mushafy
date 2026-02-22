@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface TopBarProps {
@@ -32,11 +31,7 @@ export function TopBar({
 
   return (
     <div className="w-full flex justify-center bg-gradient-to-b from-emerald-800 to-emerald-600" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <motion.header 
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="w-full max-w-[1600px]"
-      >
+      <header className="w-full max-w-[1600px]">
         {/* Main Header */}
         <div className="relative">
           {/* Subtle background gradient */}
@@ -125,7 +120,7 @@ export function TopBar({
             </button>
           </div>
         </div>
-      </motion.header>
+      </header>
     </div>
   );
 }

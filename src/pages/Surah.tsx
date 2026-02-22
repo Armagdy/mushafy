@@ -1043,8 +1043,10 @@ const Surah = () => {
       />
 
       {/* ConfigOverlay for Settings, Bookmarks, Tafseer, etc. */}
+      <AnimatePresence>
       {configOverlayType && (
         <ConfigOverlay
+          key="config-overlay"
           type={configOverlayType}
           onClose={() => setConfigOverlayType(null)}
           onChangeView={(view) => setConfigOverlayType(view)}
@@ -1125,6 +1127,7 @@ const Surah = () => {
           }}
         />
       )}
+      </AnimatePresence>
     </div>
   );
 };

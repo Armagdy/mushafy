@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useEffect } from "react";
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { motion } from 'framer-motion';
 
 // Import different configuration views
 import SettingsView from "@/components/config/SettingsView";
@@ -309,38 +310,51 @@ export default function ConfigOverlay({
   };
   
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#FBF9F4] dark:bg-emerald-950">
-      {/* Header with close button */}
-      <div 
-        className="sticky top-0 z-10 bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-lg"
-        style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
+    <>
+      {/* Sliding content (header + main view) */}
+      <motion.div
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{
+          type: 'spring',
+          stiffness: 300,
+          damping: 30,
+        }}
+        className="fixed inset-0 z-50 flex flex-col bg-[#FBF9F4] dark:bg-emerald-950"
       >
-        <div className="flex items-center justify-between px-4 py-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="text-[#F2E3BB] hover:bg-emerald-700/50"
-          >
-            <X className="w-6 h-6" />
-          </Button>
-          
-          <h1 className="text-xl md:text-2xl font-bold text-[#F2E3BB]">
-            {getTitle()}
-          </h1>
-          
-          {/* Empty div for centering title */}
-          <div className="w-10" />
+        {/* Header with close button */}
+        <div 
+          className="sticky top-0 z-10 bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-lg"
+          style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
+        >
+          <div className="flex items-center justify-between px-4 py-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="text-[#F2E3BB] hover:bg-emerald-700/50"
+            >
+              <X className="w-6 h-6" />
+            </Button>
+            
+            <h1 className="text-xl md:text-2xl font-bold text-[#F2E3BB]">
+              {getTitle()}
+            </h1>
+            
+            {/* Empty div for centering title */}
+            <div className="w-10" />
+          </div>
         </div>
-      </div>
-      
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto pb-20">
-        {renderView()}
-      </div>
-      
-      {/* Bottom Navigation Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-emerald-800 to-emerald-600 z-40 pt-2">
+        
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto pb-20">
+          {renderView()}
+        </div>
+      </motion.div>
+
+      {/* Bottom Navigation Bar - Fixed, doesn't slide */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-emerald-800 to-emerald-600 z-[60] pt-2">
         <BottomBar
           showBottomBarText={showBottomBarText}
           totalBookmarks={getTotalBookmarks()}
@@ -354,6 +368,6 @@ export default function ConfigOverlay({
           onViewModeToggle={onViewModeToggle}
         />
       </div>
-    </div>
+    </>
   );
 }
