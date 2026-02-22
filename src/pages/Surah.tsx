@@ -439,6 +439,19 @@ const Surah = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Tab key handler to toggle fullscreen
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        setIsFullscreen(prev => !prev);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Scroll to current page when it changes - with virtualized loading
   useEffect(() => {
     // Don't scroll if the page change came from the scroll handler
@@ -593,7 +606,18 @@ const Surah = () => {
   return (
     <div className="w-full h-screen max-h-screen bg-white dark:bg-gray-900 flex flex-col overflow-hidden" style={{ height: '100dvh', maxHeight: '100dvh' }}>
       {/* Enhanced Islamic Top Header */}
-      {!isFullscreen && (
+      <motion.div
+        initial={false}
+        animate={{
+          y: isFullscreen ? '-100%' : '0%',
+        }}
+        transition={{
+          type: 'spring',
+          stiffness: 300,
+          damping: 30,
+        }}
+        className={cn(isFullscreen && "pointer-events-none")}
+      >
       <TopBar
         currentSurah={currentSurah}
         currentPageNum={currentPageNum}
@@ -624,7 +648,7 @@ const Surah = () => {
           setConfigOverlayType('navigation');
         }}
       />
-      )}
+      </motion.div>
 
       {/* Main Content - Two Page Display */}
       <PageDisplay
@@ -668,7 +692,19 @@ const Surah = () => {
       )}
 
       {/* Audio Progress Bar - between page and controls */}
-      {!isFullscreen && currentPlayingAyah && (
+      <motion.div
+        initial={false}
+        animate={{
+          y: isFullscreen || !currentPlayingAyah ? '100%' : '0%',
+          opacity: isFullscreen || !currentPlayingAyah ? 0 : 1,
+        }}
+        transition={{
+          type: 'spring',
+          stiffness: 300,
+          damping: 30,
+        }}
+        className={cn((isFullscreen || !currentPlayingAyah) && "pointer-events-none")}
+      >
         <AudioProgressBar
             currentTime={currentTime}
             duration={duration}
@@ -742,11 +778,21 @@ const Surah = () => {
             wasPlayingBeforeDrag.current = false;
           }}
         />
-      )}
+        </motion.div>
 
       {/* Combined Audio & Navigation Bar */}
-      {!isFullscreen && (
-      <div className="w-full bg-gradient-to-t from-emerald-800 to-emerald-600">
+      <motion.div
+        initial={false}
+        animate={{
+          y: isFullscreen ? '100%' : '0%',
+        }}
+        transition={{
+          type: 'spring',
+          stiffness: 300,
+          damping: 30,
+        }}
+        className={cn("w-full bg-gradient-to-t from-emerald-800 to-emerald-600", isFullscreen && "pointer-events-none")}
+      >
         <div className="w-full max-w-[1600px] mx-auto rounded-t-2xl">
         {/* Audio Player Bottom Bar */}
         <PlayBar
@@ -835,8 +881,7 @@ const Surah = () => {
         onViewModeToggle={() => setViewMode(viewMode === 'single' ? 'double' : 'single')}
       />
         </div>
-      </div>
-      )}
+      </motion.div>
 
       {/* Search/Navigation Dialog */}
       <NavigationDialog
