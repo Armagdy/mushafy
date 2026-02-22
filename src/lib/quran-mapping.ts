@@ -1,5 +1,15 @@
 import { ASSETS_BASE_URL } from '@/config/assets';
 import { getQuranMetaData } from './quran-data-service';
+import { surahs } from '@/data/surahs';
+
+// Helper function to convert relative surah ayah to absolute ayah index
+const getAbsoluteAyahIndex = (surahId: number, ayahNumber: number): number => {
+  const surah = surahs.find(s => s.id === surahId);
+  if (!surah) return 0;
+  // startingAyah is 0-based absolute index of the surah's first ayah
+  // ayahNumber is 1-based relative ayah within the surah
+  return surah.startingAyah + (ayahNumber - 1);
+};
 
 // Generate surah to image filename mapping from quran-meta-data.json
 export const generateSurahImageMap = async (): Promise<Record<number, string>> => {
@@ -40,7 +50,7 @@ export const getSurahPages = async (surahId: number): Promise<number[]> => {
     quranData.pages.forEach((page: number[], index: number) => {
       const [pagesurahId] = page;
       if (pagesurahId === surahId) {
-        const pageNumber = index ; // Pages start at 1
+        const pageNumber = index + 1; // Pages start at 1
         pages.push(pageNumber);
       }
     });
@@ -151,15 +161,55 @@ export const getJuzFirstPage = async (juzNumber: number): Promise<number> => {
   }
 };
 
-// Get first page of a surah
+/**
+ * Get the page number where a surah's first ayah is located.
+ * 
+ * This function accurately handles multi-surah pages by using absolute ayah indices.
+ * For example, page 568 contains the end of Surah 69 and the beginning of Surah 70.
+ * When you request Surah 70, this function correctly returns page 568 (not 569).
+ * 
+ * @param surahId - The surah ID (1-114)
+ * @returns Promise resolving to the 1-indexed page number where the surah's first ayah appears
+ * 
+ * @example
+ * // Surah 70 (Al-Ma'aarij) starts on page 568 (shared with end of Surah 69)
+ * const page = await getSurahFirstPage(70);
+ * console.log(page); // 568
+ * 
+ * @remarks
+ * This function uses absolute ayah indexing from surahs.ts to determine which page
+ * contains a given ayah by checking the range of ayahs on each page. This is more
+ * accurate than simply finding the first page that starts with a surah ID.
+ */
 export const getSurahFirstPage = async (surahId: number): Promise<number> => {
   try {
     const quranData = await getQuranMetaData();
+    const targetSurah = surahs.find(s => s.id === surahId);
     
+    if (!targetSurah) return 1;
+    
+    // Get the absolute ayah index of the target surah's first ayah
+    const targetAyahIndex = targetSurah.startingAyah;
+    
+    // Iterate through pages to find which page contains this ayah
     for (let i = 0; i < quranData.pages.length; i++) {
-      const [pageSurahId] = quranData.pages[i];
-      if (pageSurahId === surahId) {
-        return i + 1;
+      const [pageSurahId, pageAyahNum] = quranData.pages[i];
+      const pageFirstAyahIndex = getAbsoluteAyahIndex(pageSurahId, pageAyahNum);
+      
+      // Check if target ayah is on this page
+      // It's on this page if it's >= this page's first ayah and < next page's first ayah
+      if (i < quranData.pages.length - 1) {
+        const [nextPageSurahId, nextPageAyahNum] = quranData.pages[i + 1];
+        const nextPageFirstAyahIndex = getAbsoluteAyahIndex(nextPageSurahId, nextPageAyahNum);
+        
+        if (targetAyahIndex >= pageFirstAyahIndex && targetAyahIndex < nextPageFirstAyahIndex) {
+          return i + 1; // Pages are 1-indexed
+        }
+      } else {
+        // Last page - check if target ayah is >= this page's first ayah
+        if (targetAyahIndex >= pageFirstAyahIndex) {
+          return i + 1;
+        }
       }
     }
     
@@ -168,6 +218,26 @@ export const getSurahFirstPage = async (surahId: number): Promise<number> => {
     console.error('Failed to load quran-meta-data.json:', error);
     return 1;
   }
+};
+
+/**
+ * Get the page where a surah's first ayah is located.
+ * 
+ * This is a more descriptive alias for getSurahFirstPage().
+ * Use this when you want to navigate to where a surah actually begins.
+ * 
+ * @param surahId - The surah ID (1-114)
+ * @returns Promise resolving to the 1-indexed page number where the surah's first ayah appears
+ * 
+ * @example
+ * // Navigate to where Surah 70 begins (page 568, shared with Surah 69)
+ * const page = await getPageOfSurahFirstAyah(70);
+ * onNavigate(page);
+ * 
+ * @see {@link getSurahFirstPage} - The underlying implementation
+ */
+export const getPageOfSurahFirstAyah = async (surahId: number): Promise<number> => {
+  return getSurahFirstPage(surahId);
 };
 
 // Get all hizb quarters for a specific surah

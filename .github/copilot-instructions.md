@@ -46,6 +46,29 @@ Use `getMushafPath()` to build image URLs. Persists to `localStorage`.
 
 **Pattern:** Fetch JSON in `useEffect`, cache in component state. See [src/pages/Surah.tsx](src/pages/Surah.tsx) lines 157-626 for examples.
 
+### Multi-Surah Page Handling
+**CRITICAL:** Many pages contain multiple surahs (e.g., page 568 has the end of Surah 69 and the beginning of Surah 70).
+
+**Always use these functions for navigation:**
+- `getPageOfSurahFirstAyah(surahId)` or `getSurahFirstPage(surahId)` — Get the page where a surah's first ayah is located
+- These functions use **absolute ayah indexing** to accurately find which page contains the first ayah of any surah
+- Example: `getPageOfSurahFirstAyah(70)` correctly returns 568 (not 569), because Surah 70 begins on page 568
+
+**Implementation:** [src/lib/quran-mapping.ts](src/lib/quran-mapping.ts)
+```typescript
+// ✅ CORRECT: Navigate to where Surah 70 actually begins
+const page = await getPageOfSurahFirstAyah(70);  // Returns 568
+onNavigate(page);
+
+// ❌ WRONG: Don't assume page numbers based on surah order
+onNavigate(surahId * 5);  // Incorrect calculation
+```
+
+**Why this matters:**
+- Prevents navigation to wrong pages when surahs share pages
+- Handles Juz/Hizb boundaries correctly
+- Essential for bookmarks, navigation, and audio playback features
+
 ## Routing Pattern ([src/App.tsx](src/App.tsx))
 ```tsx
 <Route path="/" element={<Surah />} />
@@ -415,6 +438,169 @@ const { isRTL } = useLanguage();
 **Responsive text:** All view content uses `text-base md:text-xl` for readability on larger screens via `textSizeClasses` from `DialogTextSizeContext`.
 **Container structure:** Views are full-page/panel components with padding and spacing.
 **Centralized text sizing:** Use `getDialogTextSizeClasses()` hook for consistent responsive text sizing.
+
+#### Default Configuration View Pattern
+**MANDATORY for ALL configuration views:** Use this standardized layout pattern for consistency across the app.
+
+```tsx
+import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
+import { motion } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useRef, useEffect } from "react";
+
+function MyConfigView() {
+  const { isRTL, t } = useLanguage();
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+  const [selectedPage, setSelectedPage] = useState(defaultPage);
+  const [selectedSurah, setSelectedSurah] = useState(defaultSurah);
+  
+  // Refs for auto-scrolling to selected items (REQUIRED)
+  const selectedPageRef = useRef<HTMLButtonElement>(null);
+  const selectedSurahRef = useRef<HTMLButtonElement>(null);
+  
+  // Auto-scroll to selected page when view opens or page changes (REQUIRED)
+  useEffect(() => {
+    if (selectedPageRef.current) {
+      selectedPageRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
+    }
+  }, [selectedPage]); // Triggers on mount and when page changes
+  
+  // Auto-scroll to selected surah when view opens or surah changes (REQUIRED)
+  useEffect(() => {
+    if (selectedSurahRef.current) {
+      selectedSurahRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
+    }
+  }, [selectedSurah]); // Triggers on mount and when surah changes
+  
+  return (
+    <div className="space-y-4">
+      {/* 1. Back Button with Bold Title (REQUIRED) */}
+      <button
+        onClick={() => setSearchParams({})}
+        className={cn(
+          "flex items-center gap-2 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors",
+          textSizeClasses.text
+        )}
+      >
+        {isRTL ? (
+          <ChevronRight className="w-5 h-5" />
+        ) : (
+          <ChevronLeft className="w-5 h-5" />
+        )}
+        <span className="font-bold">{t('viewTitle')}</span>
+      </button>
+
+      {/* 2. Scrollable Column Layout (REQUIRED for selection UIs) */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col h-full max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-16rem)]"
+      >
+        {/* 3. Column Headers (REQUIRED) */}
+        <div className="flex gap-2 mb-2">
+          <div className="flex-1 text-center">
+            <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+              {t('page')}
+            </h3>
+          </div>
+          <div className="flex-1 text-center">
+            <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+              {t('surah')}
+            </h3>
+          </div>
+        </div>
+
+        {/* 4. Scrollable Columns (REQUIRED) */}
+        <div className="flex gap-2 flex-1 overflow-hidden mb-3">
+          {/* Column 1: Pages */}
+          <div className="flex-1 overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent">
+            {pages.map((page) => (
+              <button
+                key={page.id}
+                ref={selectedPage === page.id ? selectedPageRef : null}
+                onClick={async () => {
+                  setSelectedPage(page.id);
+                  // Update surah based on page (bidirectional sync)
+                  const pageInfo = await getPageSurahInfo(page.id);
+                  if (pageInfo) {
+                    setSelectedSurah(pageInfo.surahId);
+                  }
+                }}
+                className={cn(
+                  "w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                  selectedPage === page.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                  "text-center",
+                  textSizeClasses.text
+                )}
+              >
+                <div className="text-emerald-800 dark:text-emerald-200">
+                  {page.label}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Column 2: Surahs */}
+          <div className="flex-1 overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent">
+            {surahs.map((surah) => (
+              <button
+                key={surah.id}
+                ref={selectedSurah === surah.id ? selectedSurahRef : null}
+                onClick={async () => {
+                  setSelectedSurah(surah.id);
+                  // Update page to first page of surah (bidirectional sync)
+                  const firstPage = await getSurahFirstPage(surah.id);
+                  setSelectedPage(firstPage);
+                }}
+                className={cn(
+                  "w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                  selectedSurah === surah.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                  textSizeClasses.text
+                )}
+              >
+                <div className="text-emerald-800 dark:text-emerald-200">
+                  {surah.name}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 5. Fixed Bottom Action Button (REQUIRED) */}
+        <div className="mt-auto pt-3 pb-4 border-t border-emerald-100 dark:border-emerald-900 bg-gradient-to-b from-transparent via-[#FBF9F4]/80 to-[#FBF9F4] dark:from-transparent dark:via-gray-900/80 dark:to-gray-900 flex-shrink-0">
+          <Button
+            onClick={handleAction}
+            className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
+          >
+            {t('action')}
+          </Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+```
+
+**Pattern Requirements:**
+1. **Back Button:** Always show chevron (RTL-aware) + bold title text
+2. **Motion Container:** Use Framer Motion for smooth entry animations
+3. **Column Headers:** Clear labels above each scrollable column
+4. **Scrollable Columns:** 
+   - `overflow-y-auto` for scrolling
+   - `border border-emerald-200 dark:border-emerald-800 rounded-lg`
+   - Selected state: `bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold`
+   - Hover state: `hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10`
+   - **Auto-scroll to selected:** Use `ref` on selected item + `useEffect` with dependencies for the selection state
+   - **Cross-column auto-scroll:** When user selects an item in one column, the related item in other columns should automatically scroll into view (e.g., selecting page scrolls to corresponding surah)
+   - **scrollIntoView pattern:** `scrollIntoView({ behavior: 'auto', block: 'center' })` centers the item
+5. **Fixed Bottom Button:** Gradient fade background, always visible at bottom
+6. **Bidirectional Sync:** When applicable (e.g., page↔surah), update related columns automatically AND trigger auto-scroll
+
+**Real-World Examples:**
+- [src/components/config/BookmarksView.tsx](src/components/config/BookmarksView.tsx) - Add/Update bookmark forms
+- [src/components/config/NavigationView.tsx](src/components/config/NavigationView.tsx) - Juz/Hizb navigation
+
 ```tsx
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 
@@ -840,6 +1026,7 @@ const config: CapacitorConfig = {
 | New route | Create page in [src/pages/](src/pages/), add `<Route>` **before** `*` in [src/App.tsx](src/App.tsx) |
 | New UI component | `npx shadcn-ui@latest add <name>` |
 | **New view** | **MANDATORY: Create separate file in [src/components/config/](src/components/config/) (e.g., `SettingsView.tsx`)** |
+| **New config view with selection** | **MANDATORY: Use Default Configuration View Pattern - back button with bold title + scrollable columns with headers + fixed bottom button (see "Default Configuration View Pattern" section)** |
 | Modify Surah metadata | ⚠️ DO NOT EDIT [src/data/surahs.ts](src/data/surahs.ts)—canonical data |
 | Change theme colors | Edit HSL variables in [src/index.css](src/index.css) |
 | Access Quran page data | Use functions from [src/lib/quran-mapping.ts](src/lib/quran-mapping.ts) |
