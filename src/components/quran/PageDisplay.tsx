@@ -78,10 +78,10 @@ export function PageDisplay({
                 <>
                   {/* Left Page */}
                   {leftPageNum > 0 && leftPageNum <= 604 && (
-                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
+                    <div key={`left-${leftPageNum}`} className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
                       <div className="relative group">
                         {(bookmarks.includes(leftPageNum) || memorizationBookmarks.includes(leftPageNum) || readingBookmarks.includes(leftPageNum)) && (
-                          <div className="absolute top-0 left-0 z-10 flex gap-0.5 -translate-x-1">
+                          <div key={`left-icons-${leftPageNum}-${bookmarks.includes(leftPageNum)}-${memorizationBookmarks.includes(leftPageNum)}-${readingBookmarks.includes(leftPageNum)}`} className="absolute top-0 left-0 z-10 flex gap-0.5 -translate-x-1">
                             {bookmarks.includes(leftPageNum) && (
                               <Bookmark className="w-6 h-6 md:w-8 md:h-8 fill-amber-500 text-amber-500 drop-shadow-lg" />
                             )}
@@ -106,10 +106,10 @@ export function PageDisplay({
                   )}
                   {/* Right Page */}
                   {rightPageNum > 0 && rightPageNum <= 604 && (
-                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
+                    <div key={`right-${rightPageNum}`} className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
                       <div className="relative group">
                         {(bookmarks.includes(rightPageNum) || memorizationBookmarks.includes(rightPageNum) || readingBookmarks.includes(rightPageNum)) && (
-                          <div className="absolute top-0 right-0 z-10 flex gap-0.5 translate-x-1">
+                          <div key={`right-icons-${rightPageNum}-${bookmarks.includes(rightPageNum)}-${memorizationBookmarks.includes(rightPageNum)}-${readingBookmarks.includes(rightPageNum)}`} className="absolute top-0 right-0 z-10 flex gap-0.5 translate-x-1">
                             {bookmarks.includes(rightPageNum) && (
                               <Bookmark className="w-6 h-6 md:w-8 md:h-8 fill-amber-500 text-amber-500 drop-shadow-lg" />
                             )}
@@ -137,10 +137,10 @@ export function PageDisplay({
                 <>
                   {/* Right Page (shown first in RTL) */}
                   {rightPageNum > 0 && rightPageNum <= 604 && (
-                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
+                    <div key={`right-rtl-${rightPageNum}`} className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
                       <div className="relative group">
                         {(bookmarks.includes(rightPageNum) || memorizationBookmarks.includes(rightPageNum) || readingBookmarks.includes(rightPageNum)) && (
-                          <div className="absolute top-0 right-0 z-10 flex gap-0.5 translate-x-1">
+                          <div key={`right-rtl-icons-${rightPageNum}-${bookmarks.includes(rightPageNum)}-${memorizationBookmarks.includes(rightPageNum)}-${readingBookmarks.includes(rightPageNum)}`} className="absolute top-0 right-0 z-10 flex gap-0.5 translate-x-1">
                             {bookmarks.includes(rightPageNum) && (
                               <Bookmark className="w-6 h-6 md:w-8 md:h-8 fill-amber-500 text-amber-500 drop-shadow-lg" />
                             )}
@@ -165,10 +165,10 @@ export function PageDisplay({
                   )}
                   {/* Left Page (shown second in RTL) */}
                   {leftPageNum > 0 && leftPageNum <= 604 && (
-                    <div className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
+                    <div key={`left-rtl-${leftPageNum}`} className={`flex-1 max-w-[600px] h-full flex items-center justify-center ${isTashelOrMadinah ? 'py-1' : ''}`}>
                       <div className="relative group">
                         {(bookmarks.includes(leftPageNum) || memorizationBookmarks.includes(leftPageNum) || readingBookmarks.includes(leftPageNum)) && (
-                          <div className="absolute top-0 left-0 z-10 flex gap-0.5 -translate-x-1">
+                          <div key={`left-rtl-icons-${leftPageNum}-${bookmarks.includes(leftPageNum)}-${memorizationBookmarks.includes(leftPageNum)}-${readingBookmarks.includes(leftPageNum)}`} className="absolute top-0 left-0 z-10 flex gap-0.5 -translate-x-1">
                             {bookmarks.includes(leftPageNum) && (
                               <Bookmark className="w-6 h-6 md:w-8 md:h-8 fill-amber-500 text-amber-500 drop-shadow-lg" />
                             )}
@@ -241,7 +241,7 @@ export function PageDisplay({
                 <div className={`relative flex items-center justify-center ${mushafType === 'tashel' ? 'px-2' : ''}`}>
                   {/* Bookmark indicator */}
                   {(bookmarks.includes(pageNum) || memorizationBookmarks.includes(pageNum) || readingBookmarks.includes(pageNum)) && (
-                    <div className={`absolute top-0 ${pageNum % 2 !== 0 ? 'right-0 translate-x-1' : 'left-0 -translate-x-1'} z-10 flex gap-0.5`}>
+                    <div key={`single-icons-${pageNum}-${bookmarks.includes(pageNum)}-${memorizationBookmarks.includes(pageNum)}-${readingBookmarks.includes(pageNum)}`} className={`absolute top-0 ${pageNum % 2 !== 0 ? 'right-0 translate-x-1' : 'left-0 -translate-x-1'} z-10 flex gap-0.5`}>
                       {bookmarks.includes(pageNum) && (
                         <Bookmark className="w-6 h-6 md:w-8 md:h-8 fill-amber-500 text-amber-500 drop-shadow-lg" />
                       )}

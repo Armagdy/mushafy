@@ -73,17 +73,29 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
     return saved ? JSON.parse(saved) : {};
   });
 
-  // Persist bookmarks to localStorage
+  // Persist bookmarks to localStorage and notify other components
   useEffect(() => {
     localStorage.setItem('quran-bookmark-bookmarks', JSON.stringify(bookmarks));
+    // Dispatch event to notify other components
+    window.dispatchEvent(new CustomEvent('quran-bookmarks-changed', {
+      detail: { type: 'bookmark', bookmarks }
+    }));
   }, [bookmarks]);
 
   useEffect(() => {
     localStorage.setItem('quran-memorization-bookmarks', JSON.stringify(memorizationBookmarks));
+    // Dispatch event to notify other components
+    window.dispatchEvent(new CustomEvent('quran-bookmarks-changed', {
+      detail: { type: 'memorization', bookmarks: memorizationBookmarks }
+    }));
   }, [memorizationBookmarks]);
 
   useEffect(() => {
     localStorage.setItem('quran-reading-bookmarks', JSON.stringify(readingBookmarks));
+    // Dispatch event to notify other components
+    window.dispatchEvent(new CustomEvent('quran-bookmarks-changed', {
+      detail: { type: 'reading', bookmarks: readingBookmarks }
+    }));
   }, [readingBookmarks]);
 
   useEffect(() => {
@@ -296,6 +308,42 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
     // Check all types if no type specified
     return bookmarks.includes(page) || memorizationBookmarks.includes(page) || readingBookmarks.includes(page);
   };
+
+  // Listen for bookmark changes from other components/pages
+  useEffect(() => {
+    const handleBookmarkChange = () => {
+      // Reload bookmarks from localStorage when they change in another component
+      const savedBookmarks = localStorage.getItem('quran-bookmark-bookmarks');
+      const savedMemorization = localStorage.getItem('quran-memorization-bookmarks');
+      const savedReading = localStorage.getItem('quran-reading-bookmarks');
+      
+      if (savedBookmarks) {
+        const parsed = JSON.parse(savedBookmarks);
+        // Only update if different (compare stringified to avoid unnecessary re-renders)
+        if (JSON.stringify(parsed) !== JSON.stringify(bookmarks)) {
+          setBookmarks(parsed);
+        }
+      }
+      if (savedMemorization) {
+        const parsed = JSON.parse(savedMemorization);
+        if (JSON.stringify(parsed) !== JSON.stringify(memorizationBookmarks)) {
+          setMemorizationBookmarks(parsed);
+        }
+      }
+      if (savedReading) {
+        const parsed = JSON.parse(savedReading);
+        if (JSON.stringify(parsed) !== JSON.stringify(readingBookmarks)) {
+          setReadingBookmarks(parsed);
+        }
+      }
+    };
+
+    window.addEventListener('quran-bookmarks-changed' as any, handleBookmarkChange);
+    
+    return () => {
+      window.removeEventListener('quran-bookmarks-changed' as any, handleBookmarkChange);
+    };
+  }, [bookmarks, memorizationBookmarks, readingBookmarks]);
 
   return {
     // States
