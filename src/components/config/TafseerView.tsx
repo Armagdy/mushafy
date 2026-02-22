@@ -134,14 +134,16 @@ export default function TafseerView() {
 
   return (
     <div className={cn(
-      "p-4 space-y-4",
+      "flex flex-col h-full",
       isRTL ? "rtl" : "ltr"
     )}>
-      {/* Surah and Ayah Selectors */}
-      <div className={cn(
-        "grid grid-cols-2 gap-3 md:gap-4",
-        isRTL && "rtl"
-      )}>
+      {/* Fixed Top Section - Selectors and Controls */}
+      <div className="flex-shrink-0 p-4 space-y-4">
+        {/* Surah and Ayah Selectors */}
+        <div className={cn(
+          "grid grid-cols-2 gap-3 md:gap-4",
+          isRTL && "rtl"
+        )}>
         {/* Surah Selector */}
         <div className="space-y-2">
           <label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
@@ -252,11 +254,11 @@ export default function TafseerView() {
             <Loader2 className="w-5 h-5 animate-spin text-emerald-600 dark:text-emerald-400" />
           </div>
         ) : ayahText ? (
-          <ScrollArea className="max-h-[150px] md:max-h-[200px] p-4 border border-emerald-300 dark:border-emerald-600 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20">
+          <div className="max-h-[250px] md:max-h-[300px] overflow-y-auto p-4 border border-emerald-300 dark:border-emerald-600 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20">
             <div className={cn("leading-[2.2] text-right text-emerald-900 dark:text-emerald-50", textSizeClasses.text)} style={{ fontFamily: "'Scheherazade New', 'Noto Naskh Arabic', serif" }}>
               {ayahText}
             </div>
-          </ScrollArea>
+          </div>
         ) : (
           <div className={cn("text-center py-6 text-emerald-600 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-900/20 rounded-lg", textSizeClasses.text)}>
             {isRTL ? 'لا يمكن تحميل نص الآية' : 'Unable to load ayah text'}
@@ -297,18 +299,23 @@ export default function TafseerView() {
           </SelectContent>
         </Select>
       </div>
+      </div>
 
-      {/* Tafseer Content */}
-      <ScrollArea className="h-[300px] md:h-[400px] lg:h-[500px] w-full rounded-md border border-emerald-200 dark:border-emerald-700 p-4 bg-white dark:bg-emerald-950/30">
+      {/* Flexible Tafseer Content - Takes remaining space */}
+      <div className="flex-1 overflow-hidden px-4 pb-24 md:pb-20">
+        <div className={cn("font-medium text-emerald-800 dark:text-emerald-300 pb-2", textSizeClasses.label)}>
+          {t('tafseer')}
+        </div>
+        <ScrollArea className="h-full w-full rounded-md border border-emerald-200 dark:border-emerald-700 p-4 bg-white dark:bg-emerald-950/30">
           {isLoading ? (
-            <div className="flex items-center justify-center h-full gap-2">
+            <div className="flex items-center justify-center min-h-[200px] gap-2">
               <Loader2 className="w-6 h-6 md:w-8 md:h-8 animate-spin text-emerald-600 dark:text-emerald-400" />
               <span className={cn("text-emerald-800 dark:text-emerald-300", textSizeClasses.text)}>
                 {t('loadingTafseer')}
               </span>
             </div>
           ) : error ? (
-            <div className="flex flex-col items-center justify-center h-full space-y-4 px-4">
+            <div className="flex flex-col items-center justify-center min-h-[200px] space-y-4 px-4">
               <div className="text-center">
                 <p className={cn("text-red-600 dark:text-red-400 font-medium mb-2", textSizeClasses.text)}>{error}</p>
                 <p className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
@@ -334,11 +341,12 @@ export default function TafseerView() {
               {tafseerText.text}
             </div>
           ) : (
-            <div className={cn("flex items-center justify-center h-full text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
+            <div className={cn("flex items-center justify-center min-h-[200px] text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
               {t('tafseerNotAvailable')}
             </div>
           )}
-      </ScrollArea>
+        </ScrollArea>
+      </div>
     </div>
   );
 }

@@ -10,7 +10,6 @@ import { PlayBar } from '@/components/quran/PlayBar';
 import { PageDisplay } from '@/components/quran/PageDisplay';
 import { AudioProgressBar } from '@/components/quran/AudioProgressBar';
 import { ReciterDialog } from '@/components/quran/ReciterDialog';
-import { AyahSelectorDialog } from '@/components/quran/AyahSelectorDialog';
 import { RepeatDialog } from '@/components/quran/RepeatDialog';
 import { NavigationDialog } from '@/components/quran/NavigationDialog';
 import { TafseerDialog } from '@/components/quran/TafseerDialog';
@@ -83,9 +82,6 @@ const Surah = () => {
   
   // Audio player dialogs
   const [showReciterDialog, setShowReciterDialog] = useState(false);
-  const [showAyahSelector, setShowAyahSelector] = useState(false);
-  
-
 
   // Load ayah metadata (use hook's reload function)
   const loadAyahData = reloadAyahData;
@@ -361,68 +357,6 @@ const Surah = () => {
     
     loadPageInfo();
   }, [currentPageNum, audioSource]);
-
-  // Scroll to currently playing ayah when ayah selector dialog opens
-  useEffect(() => {
-    console.log('=== Ayah Selector Scroll Debug ===');
-    console.log('showAyahSelector:', showAyahSelector);
-    console.log('ayahListRef.current:', ayahListRef.current);
-    console.log('currentPlayingAyah:', currentPlayingAyah);
-    console.log('currentSurahId:', currentSurahId);
-    console.log('currentPageAyah:', currentPageAyah);
-    
-    if (showAyahSelector && ayahListRef.current) {
-      // Determine which ayah to scroll to: playing ayah if available, otherwise current page's first ayah
-      const targetSurah = currentPlayingAyah?.surah || currentSurahId;
-      const targetAyah = currentPlayingAyah?.ayah || (currentPageAyah || 1);
-      
-      console.log('Target ayah to scroll to:', targetSurah, '-', targetAyah);
-      console.log('Selector:', `[data-ayah="${targetSurah}-${targetAyah}"]`);
-      
-      // Scroll the dialog to the target ayah
-      setTimeout(() => {
-        const ayahButton = ayahListRef.current?.querySelector(
-          `[data-ayah="${targetSurah}-${targetAyah}"]`
-        );
-        console.log('Found ayah button:', ayahButton);
-        if (ayahButton) {
-          console.log('Scrolling to ayah button...');
-          ayahButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } else {
-          console.log('Ayah button NOT found! Available buttons:', 
-            Array.from(ayahListRef.current?.querySelectorAll('[data-ayah]') || [])
-              .map(el => el.getAttribute('data-ayah'))
-          );
-        }
-      }, 100);
-      
-      // Simulate the scroll that happens on page change
-      isProgrammaticScroll.current = true;
-      requestAnimationFrame(() => {
-        if (!scrollContainerRef.current) return;
-        const pageElement = document.getElementById(`page-${currentPageNum}`);
-        if (pageElement) {
-          pageElement.scrollIntoView({
-            behavior: 'auto',
-            block: 'nearest',
-            inline: 'start'
-          });
-          setTimeout(() => {
-            isProgrammaticScroll.current = false;
-          }, 300);
-        }
-      });
-    }
-  }, [showAyahSelector, currentPlayingAyah, currentSurahId, currentPageAyah]);
-
-  // Reload ayah data when ayah selector opens
-  useEffect(() => {
-    if (showAyahSelector) {
-      loadAyahData();
-    }
-  }, [showAyahSelector]);
-  
-
 
   // Detect mobile screen and auto-switch to single page
   useEffect(() => {
@@ -820,7 +754,7 @@ const Surah = () => {
                 : (language === 'ar' ? currentSurah.name : currentSurah.englishName)
           }
           formatNumber={formatNumber}
-          onAyahSelectorClick={() => setShowAyahSelector(true)}
+          onAyahSelectorClick={() => setConfigOverlayType('ayahselector')}
           onRepeatClick={() => {
             // Set default values based on current playing ayah
             if (currentPlayingAyah) {
@@ -995,31 +929,6 @@ const Surah = () => {
         }}
       />
 
-      {/* Ayah Selection Dialog */}
-      <AyahSelectorDialog
-        open={showAyahSelector}
-        onOpenChange={setShowAyahSelector}
-        ayahData={ayahData}
-        currentPageNum={currentPageNum}
-        secondPageNum={secondPageNum}
-        currentSurahId={currentSurahId}
-        currentPlayingAyah={currentPlayingAyah}
-        viewMode={viewMode}
-        isMobile={isMobile}
-        isAyahNavigationRef={isAyahNavigation}
-        audioSource={audioSource}
-        onPlayAyah={playAyah}
-        onSetCurrentPlayingAyah={setCurrentPlayingAyah}
-        onSeekToAyahPosition={seekToAyahPosition}
-        onViewTafseer={(surahNum, ayahNum, surahName) => {
-          setTafseerSurahNumber(surahNum);
-          setTafseerAyahNumber(ayahNum);
-          setTafseerSurahName(surahName);
-          setShowTafseerDialog(true);
-        }}
-        onStopAudio={stopAudio}
-      />
-
       {/* Repeat Settings Dialog */}
       <RepeatDialog
         open={showRepeatDialog}
@@ -1125,6 +1034,11 @@ const Surah = () => {
             startRepeat();
             setConfigOverlayType(null);
           }}
+          secondPageNum={secondPageNum}
+          isAyahNavigationRef={isAyahNavigation}
+          onPlayAyah={playAyah}
+          onSetCurrentPlayingAyah={setCurrentPlayingAyah}
+          onSeekToAyahPosition={seekToAyahPosition}
         />
       )}
       </AnimatePresence>

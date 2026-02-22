@@ -15,9 +15,10 @@ import ReciterView from "@/components/config/ReciterView";
 import TafseerView from "@/components/config/TafseerView";
 import RepeatView from "@/components/config/RepeatView";
 import SearchView from "@/components/config/SearchView";
+import AyahSelectorView from "@/components/config/AyahSelectorView";
 import { BottomBar } from "@/components/quran/BottomBar";
 
-export type ConfigType = 'settings' | 'bookmarks' | 'navigation' | 'reciter' | 'tafseer' | 'repeat' | 'search';
+export type ConfigType = 'settings' | 'bookmarks' | 'navigation' | 'reciter' | 'tafseer' | 'repeat' | 'search' | 'ayahselector';
 
 interface ConfigOverlayProps {
   type: ConfigType;
@@ -79,6 +80,13 @@ interface ConfigOverlayProps {
   onRepeatPassageCountChange: (value: number) => void;
   onRepeatAyahCountChange: (value: number) => void;
   onStartRepeat: () => void;
+  
+  // Ayah selector props
+  secondPageNum: number;
+  isAyahNavigationRef: React.MutableRefObject<boolean>;
+  onPlayAyah: (surahNum: number, ayahNum: number) => void;
+  onSetCurrentPlayingAyah: (ayah: { surah: number; ayah: number }) => void;
+  onSeekToAyahPosition: (surahNum: number, ayahNum: number) => void;
 }
 
 /**
@@ -141,6 +149,11 @@ export default function ConfigOverlay({
   onRepeatPassageCountChange,
   onRepeatAyahCountChange,
   onStartRepeat,
+  secondPageNum,
+  isAyahNavigationRef,
+  onPlayAyah,
+  onSetCurrentPlayingAyah,
+  onSeekToAyahPosition,
 }: ConfigOverlayProps) {
   const { t, language, isRTL } = useLanguage();
   
@@ -202,6 +215,8 @@ export default function ConfigOverlay({
         return t('tafseer');
       case 'repeat':
         return t('repeatSettings');
+      case 'ayahselector':
+        return t('selectAyahToPlay');
       default:
         return '';
     }
@@ -303,6 +318,25 @@ export default function ConfigOverlay({
             onClose={onClose}
           />
         );
+      case 'ayahselector':
+        return (
+          <AyahSelectorView
+            onClose={onClose}
+            ayahData={ayahData}
+            currentPageNum={currentPage}
+            secondPageNum={secondPageNum}
+            currentSurahId={currentSurahId}
+            currentPlayingAyah={currentPlayingAyah}
+            viewMode={viewMode}
+            isMobile={isMobile}
+            isAyahNavigationRef={isAyahNavigationRef}
+            audioSource={audioSource}
+            onPlayAyah={onPlayAyah}
+            onSetCurrentPlayingAyah={onSetCurrentPlayingAyah}
+            onSeekToAyahPosition={onSeekToAyahPosition}
+            onStopAudio={onStopAudio}
+          />
+        );
       default:
         return null;
     }
@@ -339,8 +373,10 @@ export default function ConfigOverlay({
         </div>
         
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto pb-20">
-          {renderView()}
+        <div className="flex-1 overflow-y-auto pb-20 flex flex-col">
+          <div className="flex-1 flex flex-col">
+            {renderView()}
+          </div>
         </div>
       </div>
 
