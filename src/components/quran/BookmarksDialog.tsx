@@ -273,9 +273,10 @@ export function BookmarksDialog({
                           e.stopPropagation();
                           onToggleBookmark(page);
                         }}
-                        className="ml-1 sm:ml-2 text-red-500 hover:text-red-700 flex-shrink-0"
+                        className="ml-1 sm:ml-2 p-2 bg-red-50 dark:bg-red-900/10 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg flex-shrink-0 transition-colors border border-red-200 dark:border-red-800/40"
+                        aria-label="Remove bookmark"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-5 h-5 md:w-6 md:h-6" />
                       </button>
                     </div>
                   ))}
@@ -310,9 +311,10 @@ export function BookmarksDialog({
                           e.stopPropagation();
                           onRemoveMemorizationBookmark(page);
                         }}
-                        className="ml-1 sm:ml-2 text-red-500 hover:text-red-700 flex-shrink-0"
+                        className="ml-1 sm:ml-2 p-2 bg-red-50 dark:bg-red-900/10 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg flex-shrink-0 transition-colors border border-red-200 dark:border-red-800/40"
+                        aria-label="Remove memorization bookmark"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-5 h-5 md:w-6 md:h-6" />
                       </button>
                     </div>
                   ))}
@@ -347,9 +349,10 @@ export function BookmarksDialog({
                           e.stopPropagation();
                           onRemoveReadingBookmark(page);
                         }}
-                        className="ml-1 sm:ml-2 text-red-500 hover:text-red-700 flex-shrink-0"
+                        className="ml-1 sm:ml-2 p-2 bg-red-50 dark:bg-red-900/10 text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg flex-shrink-0 transition-colors border border-red-200 dark:border-red-800/40"
+                        aria-label="Remove reading bookmark"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-5 h-5 md:w-6 md:h-6" />
                       </button>
                     </div>
                   ))}
