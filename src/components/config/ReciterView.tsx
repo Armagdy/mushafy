@@ -1,9 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, ChevronDown, Loader2, CheckCircle2, XCircle } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { Search, ChevronLeft, ChevronRight, Loader2, CheckCircle2, XCircle, Pencil } from "lucide-react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
+import { motion } from "framer-motion";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
@@ -11,6 +10,22 @@ import type { Mp3QuranReciter, Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { checkAyahTiming } from "@/lib/mp3quran-service";
 import { getCachedAyahTiming, cacheAyahTiming, getCachedIndividualAyah, isMp3QuranAudioCached, getCachedMp3QuranAudio } from "@/lib/audio-cache";
 import { surahs } from "@/data/surahs";
+
+interface UnifiedReciter {
+  id: string;
+  name: string;
+  nameAr: string;
+  source: 'everyayah' | 'mp3quran';
+  // EveryAyah specific
+  folder?: string;
+  quality?: string;
+  style?: string;
+  reading?: string;
+  readingAr?: string;
+  // MP3Quran specific
+  mp3QuranId?: number;
+  moshaf?: Mp3QuranMoshaf[];
+}
 
 interface ReciterViewProps {
   // Audio source
@@ -48,6 +63,31 @@ interface ReciterViewProps {
   onNavigateToSurah: (surahId: number) => Promise<void>;
 }
 
+// Extract reading type (rewayah) from an MP3Quran moshaf name
+const getMoshafReading = (moshafName: string): string => {
+  const nameLower = moshafName.toLowerCase();
+  if (nameLower.includes("mo'lim") || nameLower.includes('moallem') || nameLower.includes('muallim')) return 'hafs';
+  const rewayatMatch = moshafName.match(/Rewayat\s+(.+?)\s+(?:A'n|An)\s+/i);
+  if (rewayatMatch) {
+    const name = rewayatMatch[1].toLowerCase().replace(/['''\s-]/g, '');
+    if (name.includes('hafs')) return 'hafs';
+    if (name.includes('warsh')) return 'warsh';
+    if (name.includes('qalon') || name.includes('qaloon')) return 'qalon';
+    if (name.includes('dori') || name.includes('aldori')) return 'aldori';
+    if (name.includes('khalaf')) return 'khalaf';
+    return rewayatMatch[1].trim().split(/\s+/)[0];
+  }
+  return 'hafs';
+};
+
+// Extract recitation style from an MP3Quran moshaf name
+const getMoshafStyle = (moshafName: string): string => {
+  const nameLower = moshafName.toLowerCase();
+  if (nameLower.includes("mo'lim") || nameLower.includes('moallem') || nameLower.includes('muallim')) return 'muallim';
+  if (nameLower.includes('mojawwad') || nameLower.includes('mujawwad')) return 'mujawwad';
+  return 'murattal';
+};
+
 export default function ReciterView({
   audioSource,
   onAudioSourceChange,
@@ -79,105 +119,82 @@ export default function ReciterView({
   const { t, isRTL, language } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
-  const [everyAyahSearch, setEveryAyahSearch] = useState('');
-  const [mp3QuranSearch, setMp3QuranSearch] = useState('');
+  const [, setSearchParams] = useSearchParams();
+  
+  // Core state
+  const [search, setSearch] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [selectedUnifiedReciter, setSelectedUnifiedReciter] = useState<UnifiedReciter | null>(null);
+  const [showReciterScroll, setShowReciterScroll] = useState(true);
   const [selectedSurahForPlayback, setSelectedSurahForPlayback] = useState(currentSurahId);
   const [selectedAyahForPlayback, setSelectedAyahForPlayback] = useState(currentPlayingAyah?.ayah || 1);
-  
+
+  // MP3Quran reading/style selection (derived from moshaf names)
+  const [selectedMp3Reading, setSelectedMp3Reading] = useState('');
+  const [selectedMp3Style, setSelectedMp3Style] = useState('');
+
   // MP3Quran timing validation state
   const [isCheckingTiming, setIsCheckingTiming] = useState(false);
   const [timingAvailable, setTimingAvailable] = useState(false);
   const [timingError, setTimingError] = useState<'network' | 'not-found' | null>(null);
-  
-  // MP3Quran surah availability state
+
+  // Surah availability state
   const [isSurahAvailable, setIsSurahAvailable] = useState(true);
-  
-  // EveryAyah surah availability state
-  const [isCheckingEveryAyahSurah, setIsCheckingEveryAyahSurah] = useState(false);
-  const [isEveryAyahSurahAvailable, setIsEveryAyahSurahAvailable] = useState(true);
-  const [everyAyahSurahError, setEveryAyahSurahError] = useState<'network' | 'not-found' | null>(null);
-  
-  // Dropdown visibility state
-  const [showEveryAyahDropdown, setShowEveryAyahDropdown] = useState(false);
-  const [showMp3QuranDropdown, setShowMp3QuranDropdown] = useState(false);
-  const everyAyahContainerRef = useRef<HTMLDivElement>(null);
-  const mp3QuranContainerRef = useRef<HTMLDivElement>(null);
-  const everyAyahInputRef = useRef<HTMLInputElement>(null);
-  const mp3QuranInputRef = useRef<HTMLInputElement>(null);
-  
-  // Polling refs for Android IME composition fix
-  const everyAyahPollingRef = useRef<NodeJS.Timeout | null>(null);
-  const mp3QuranPollingRef = useRef<NodeJS.Timeout | null>(null);
+  const [isCheckingSurah, setIsCheckingSurah] = useState(false);
+  const [surahError, setSurahError] = useState<'network' | 'not-found' | null>(null);
 
-  // Close dropdowns when clicking outside
+  // Scroll-to refs
+  const selectedReciterRef = useRef<HTMLButtonElement>(null);
+  const selectedReadingRef = useRef<HTMLButtonElement>(null);
+  const selectedStyleRef = useRef<HTMLButtonElement>(null);
+  const selectedSurahRef = useRef<HTMLButtonElement>(null);
+
+  // 50ms polling for search input — bypasses Android IME React state desync
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      // Check if click is outside the container for EveryAyah
-      if (everyAyahContainerRef.current && !everyAyahContainerRef.current.contains(target)) {
-        setShowEveryAyahDropdown(false);
-      }
-      // Check if click is outside the container for MP3Quran
-      if (mp3QuranContainerRef.current && !mp3QuranContainerRef.current.contains(target)) {
-        setShowMp3QuranDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    const id = setInterval(() => {
+      const val = searchInputRef.current?.value ?? '';
+      setSearch(prev => prev !== val ? val : prev);
+    }, 50);
+    return () => clearInterval(id);
   }, []);
 
-  // Poll EveryAyah input for changes (fixes Android IME composition issue)
+  // Auto-scroll effects for all columns
   useEffect(() => {
-    if (showEveryAyahDropdown && everyAyahInputRef.current) {
-      everyAyahPollingRef.current = setInterval(() => {
-        if (everyAyahInputRef.current) {
-          const currentValue = everyAyahInputRef.current.value;
-          if (currentValue !== everyAyahSearch) {
-            setEveryAyahSearch(currentValue);
-          }
-        }
-      }, 100); // Poll every 100ms
-    } else {
-      if (everyAyahPollingRef.current) {
-        clearInterval(everyAyahPollingRef.current);
-        everyAyahPollingRef.current = null;
-      }
-    }
+    selectedReciterRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+  }, [selectedUnifiedReciter?.id]);
 
-    return () => {
-      if (everyAyahPollingRef.current) {
-        clearInterval(everyAyahPollingRef.current);
-        everyAyahPollingRef.current = null;
-      }
-    };
-  }, [showEveryAyahDropdown, everyAyahSearch]);
-
-  // Poll MP3Quran input for changes (fixes Android IME composition issue)
   useEffect(() => {
-    if (showMp3QuranDropdown && mp3QuranInputRef.current) {
-      mp3QuranPollingRef.current = setInterval(() => {
-        if (mp3QuranInputRef.current) {
-          const currentValue = mp3QuranInputRef.current.value;
-          if (currentValue !== mp3QuranSearch) {
-            setMp3QuranSearch(currentValue);
-          }
-        }
-      }, 100); // Poll every 100ms
-    } else {
-      if (mp3QuranPollingRef.current) {
-        clearInterval(mp3QuranPollingRef.current);
-        mp3QuranPollingRef.current = null;
-      }
-    }
+    selectedReadingRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+  }, [filterReading, selectedMp3Reading]);
 
-    return () => {
-      if (mp3QuranPollingRef.current) {
-        clearInterval(mp3QuranPollingRef.current);
-        mp3QuranPollingRef.current = null;
-      }
-    };
-  }, [showMp3QuranDropdown, mp3QuranSearch]);
+  useEffect(() => {
+    selectedStyleRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+  }, [filterStyle, selectedMp3Style]);
+
+  useEffect(() => {
+    selectedSurahRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+  }, [selectedSurahForPlayback]);
+
+  // Build unified reciter list (memoized)
+  const unifiedReciters = useMemo<UnifiedReciter[]>(() => [
+    ...uniqueReciterNames.map((r) => ({
+      id: `everyayah-${r.nameAr}`,
+      name: r.name,
+      nameAr: r.nameAr,
+      source: 'everyayah' as const,
+    })),
+    ...mp3QuranReciters.map((r) => {
+      const arReciter = mp3QuranRecitersAr.find(ar => ar.id === r.id);
+      return {
+        id: `mp3quran-${r.id}`,
+        name: r.name,
+        nameAr: arReciter?.name || r.name,
+        source: 'mp3quran' as const,
+        mp3QuranId: r.id,
+        moshaf: r.moshaf,
+      };
+    }),
+  ], [uniqueReciterNames, mp3QuranReciters, mp3QuranRecitersAr]);
 
   // Update selected surah/ayah when current changes
   useEffect(() => {
@@ -185,51 +202,70 @@ export default function ReciterView({
     setSelectedAyahForPlayback(currentPlayingAyah?.ayah || 1);
   }, [currentSurahId, currentPlayingAyah]);
 
-  // Check if selected surah is available in the selected moshaf (MP3Quran only)
+  // Sync current selections → selectedUnifiedReciter
   useEffect(() => {
-    if (audioSource !== 'mp3quran' || !selectedMoshaf || !selectedMoshaf.surah_list) {
+    if (audioSource === 'everyayah' && filterReciterName && !selectedUnifiedReciter) {
+      const found = unifiedReciters.find(r => r.source === 'everyayah' && r.nameAr === filterReciterName);
+      if (found) { setSelectedUnifiedReciter(found); setShowReciterScroll(false); }
+    } else if (audioSource === 'mp3quran' && selectedMp3QuranReciter && !selectedUnifiedReciter) {
+      const found = unifiedReciters.find(r => r.source === 'mp3quran' && r.mp3QuranId === selectedMp3QuranReciter.id);
+      if (found) { setSelectedUnifiedReciter(found); setShowReciterScroll(false); }
+    }
+  }, [audioSource, filterReciterName, selectedMp3QuranReciter, unifiedReciters]);
+
+  // MP3Quran: init reading/style from selectedMoshaf
+  useEffect(() => {
+    if (selectedMp3QuranReciter && selectedMoshaf) {
+      setSelectedMp3Reading(getMoshafReading(selectedMoshaf.name));
+      setSelectedMp3Style(getMoshafStyle(selectedMoshaf.name));
+    }
+  }, [selectedMp3QuranReciter?.id, selectedMoshaf?.id]);
+
+  // MP3Quran: auto-select moshaf when reading+style change
+  useEffect(() => {
+    if (!selectedMp3QuranReciter || !selectedMp3Reading || !selectedMp3Style) return;
+    const matching = selectedMp3QuranReciter.moshaf.find(
+      (m) => getMoshafReading(m.name) === selectedMp3Reading && getMoshafStyle(m.name) === selectedMp3Style
+    );
+    if (matching && matching.id !== selectedMoshaf?.id) {
+      onMoshafChange(matching);
+    }
+  }, [selectedMp3Reading, selectedMp3Style, selectedMp3QuranReciter]);
+
+  // Check MP3Quran surah availability
+  useEffect(() => {
+    if (selectedUnifiedReciter?.source !== 'mp3quran' || !selectedMoshaf) {
       setIsSurahAvailable(true);
       return;
     }
 
     const checkSurahAvailability = async () => {
-      // First check if audio is cached - if yes, it's definitely available
       const isCached = await isMp3QuranAudioCached(selectedMoshaf.id, selectedSurahForPlayback);
       if (isCached) {
-        console.log(`✅ Surah ${selectedSurahForPlayback} is cached for moshaf ${selectedMoshaf.id}`);
         setIsSurahAvailable(true);
         return;
       }
-
-      // Not cached, check surah_list
+      
       const surahList = selectedMoshaf.surah_list.split(',').map(s => parseInt(s.trim(), 10));
-      const isAvailable = surahList.includes(selectedSurahForPlayback);
-      
-      setIsSurahAvailable(isAvailable);
-      
-      if (!isAvailable) {
-        console.log(`❌ Surah ${selectedSurahForPlayback} not available in moshaf ${selectedMoshaf.id}`);
-      }
+      setIsSurahAvailable(surahList.includes(selectedSurahForPlayback));
     };
 
     checkSurahAvailability();
-  }, [audioSource, selectedMoshaf, selectedSurahForPlayback]);
+  }, [selectedUnifiedReciter, selectedMoshaf, selectedSurahForPlayback]);
 
-  // Check if selected surah is available for EveryAyah reciter (check first ayah)
+  // Check EveryAyah surah availability
   useEffect(() => {
-    if (audioSource !== 'everyayah' || !selectedReciter || !selectedReciter.folder) {
-      setIsEveryAyahSurahAvailable(true);
-      setIsCheckingEveryAyahSurah(false);
-      setEveryAyahSurahError(null);
+    if (selectedUnifiedReciter?.source !== 'everyayah' || !selectedReciter?.folder) {
+      setIsCheckingSurah(false);
+      setSurahError(null);
       return;
     }
 
     const checkSurahAvailability = async () => {
-      setIsCheckingEveryAyahSurah(true);
-      setEveryAyahSurahError(null);
+      setIsCheckingSurah(true);
+      setSurahError(null);
 
       try {
-        // First check if first ayah is cached - if yes, surah is available
         const cachedAyah = await getCachedIndividualAyah(
           selectedReciter.folder,
           selectedSurahForPlayback,
@@ -237,70 +273,43 @@ export default function ReciterView({
         );
         
         if (cachedAyah) {
-          console.log(`✅ Surah ${selectedSurahForPlayback} first ayah is cached for ${selectedReciter.folder}`);
-          setIsEveryAyahSurahAvailable(true);
-          setEveryAyahSurahError(null);
-          setIsCheckingEveryAyahSurah(false);
+          setIsSurahAvailable(true);
+          setSurahError(null);
+          setIsCheckingSurah(false);
           return;
         }
 
-        // Not cached, verify via network
-        // Format surah and ayah numbers (3 digits)
         const surahStr = String(selectedSurahForPlayback).padStart(3, '0');
-        const ayahStr = '001'; // Check first ayah
+        const audioUrl = `https://everyayah.com/data/${selectedReciter.folder}/${surahStr}001.mp3`;
         
-        // Build the audio URL
-        const audioUrl = `https://everyayah.com/data/${selectedReciter.folder}/${surahStr}${ayahStr}.mp3`;
-        
-        // Try to fetch first 1KB to verify file exists
         const response = await fetch(audioUrl, {
           method: 'GET',
-          headers: {
-            'Range': 'bytes=0-1023'
-          }
+          headers: { 'Range': 'bytes=0-1023' }
         });
         
-        // Check if response is OK or Partial Content (206)
         if (response.ok || response.status === 206) {
           const blob = await response.blob();
-          if (blob.size > 0) {
-            setIsEveryAyahSurahAvailable(true);
-            setEveryAyahSurahError(null);
-          } else {
-            console.log(`❌ Surah ${selectedSurahForPlayback} not available for reciter ${selectedReciter.folder}`);
-            setIsEveryAyahSurahAvailable(false);
-            setEveryAyahSurahError('not-found');
-          }
+          setIsSurahAvailable(blob.size > 0);
+          setSurahError(blob.size > 0 ? null : 'not-found');
         } else {
-          if (response.status === 404) {
-            console.log(`❌ Surah ${selectedSurahForPlayback} not available for reciter ${selectedReciter.folder} (status: ${response.status})`);
-            setIsEveryAyahSurahAvailable(false);
-            setEveryAyahSurahError('not-found');
-          } else {
-            console.log(`⚠️ Network/server error while checking surah ${selectedSurahForPlayback} for reciter ${selectedReciter.folder} (status: ${response.status})`);
-            setIsEveryAyahSurahAvailable(false);
-            setEveryAyahSurahError('network');
-          }
+          setIsSurahAvailable(false);
+          setSurahError(response.status === 404 ? 'not-found' : 'network');
         }
       } catch (error) {
-        console.error('Error checking EveryAyah surah availability:', error);
-        // Network or connectivity issue
-        setIsEveryAyahSurahAvailable(false);
-        setEveryAyahSurahError('network');
+        setIsSurahAvailable(false);
+        setSurahError('network');
       } finally {
-        setIsCheckingEveryAyahSurah(false);
+        setIsCheckingSurah(false);
       }
     };
 
-    // Debounce the check slightly to avoid too many requests
     const timeoutId = setTimeout(checkSurahAvailability, 300);
     return () => clearTimeout(timeoutId);
-  }, [audioSource, selectedReciter, selectedSurahForPlayback]);
+  }, [selectedUnifiedReciter, selectedReciter, selectedSurahForPlayback]);
 
-  // Check ayah timing availability for MP3Quran
+  // Check MP3Quran ayah timing availability
   useEffect(() => {
-    // Only check for MP3Quran mode
-    if (audioSource !== 'mp3quran' || !selectedMp3QuranReciter || !selectedMoshaf) {
+    if (selectedUnifiedReciter?.source !== 'mp3quran' || !selectedMp3QuranReciter || !selectedMoshaf) {
       setTimingAvailable(false);
       setTimingError(null);
       setIsCheckingTiming(false);
@@ -313,692 +322,455 @@ export default function ReciterView({
       setTimingAvailable(false);
 
       try {
-        // Check dedicated timing cache first
         const cachedTiming = await getCachedAyahTiming(selectedMoshaf.id, selectedSurahForPlayback);
-        
         if (cachedTiming && cachedTiming.length > 0) {
-          console.log(`[ReciterView] ✅ Timing available from cache for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
-          console.log('[ReciterView] ✅ Setting timingAvailable to TRUE (from cache)');
           setTimingAvailable(true);
           setIsCheckingTiming(false);
           return;
         }
 
-        // Fallback: if MP3Quran audio is already cached and has embedded timing metadata, use it
         const cachedMp3Audio = await getCachedMp3QuranAudio(selectedMoshaf.id, selectedSurahForPlayback);
         if (cachedMp3Audio && cachedMp3Audio.timingData && cachedMp3Audio.timingData.length > 0) {
-          console.log(`[ReciterView] ✅ Timing available from cached MP3Quran audio for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
-          console.log('[ReciterView] ✅ Setting timingAvailable to TRUE (from cached MP3)');
-          // Persist to dedicated timing cache for faster future checks
           await cacheAyahTiming(selectedMoshaf.id, selectedSurahForPlayback, cachedMp3Audio.timingData);
           setTimingAvailable(true);
           setIsCheckingTiming(false);
           return;
         }
 
-        // Not in cache, fetch from API
-        console.log(`🔍 Checking timing from API for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
         const result = await checkAyahTiming(selectedSurahForPlayback, selectedMoshaf.id);
         
-        console.log('[ReciterView] ⏱️ Timing check result:', result);
-        console.log('[ReciterView] 📊 Surah:', selectedSurahForPlayback, 'Moshaf ID:', selectedMoshaf.id);
-
         if (result.success && result.timings.length > 0) {
-          // Save to cache
           await cacheAyahTiming(selectedMoshaf.id, selectedSurahForPlayback, result.timings);
-          console.log(`[ReciterView] ✅ Timing fetched and cached for moshaf ${selectedMoshaf.id} surah ${selectedSurahForPlayback}`);
-          console.log('[ReciterView] ✅ Setting timingAvailable to TRUE');
           setTimingAvailable(true);
-        } else {
-          // Handle errors
-          if (result.error === 'network') {
-            setTimingError('network');
-          } else if (result.error === 'not-found') {
-            setTimingError('not-found');
-          }
+          setTimingError(null);
+        } else if (result.error === 'network') {
           setTimingAvailable(false);
+          setTimingError('network');
+        } else {
+          setTimingAvailable(false);
+          setTimingError('not-found');
         }
       } catch (error) {
-        console.error('Error checking timing:', error);
-        setTimingError('network');
         setTimingAvailable(false);
+        setTimingError('network');
       } finally {
         setIsCheckingTiming(false);
       }
     };
 
-    checkTiming();
-  }, [audioSource, selectedMp3QuranReciter, selectedMoshaf, selectedSurahForPlayback]);
-
-  // Get current surah info
-  const currentSurah = surahs.find(s => s.id === selectedSurahForPlayback) || surahs[0];
-  const ayahsCount = currentSurah.numberOfAyahs;
+    const timeoutId = setTimeout(checkTiming, 300);
+    return () => clearTimeout(timeoutId);
+  }, [selectedUnifiedReciter, selectedMp3QuranReciter, selectedMoshaf, selectedSurahForPlayback]);
 
   // Normalize Arabic text for search
   const normalizeArabic = (text: string): string => {
     return text
-      // Normalize different forms of Alif
       .replace(/[أإآٱ]/g, 'ا')
-      // Normalize Alif Maqsura to Ya
       .replace(/ى/g, 'ي')
-      // Normalize Ta Marbuta to Ha
       .replace(/ة/g, 'ه')
-      // Remove all diacritics (tashkeel)
       .replace(/[\u064B-\u065F\u0670]/g, '')
-      // Remove tatweel (kashida)
       .replace(/\u0640/g, '')
       .toLowerCase();
   };
 
-  // Filter function for Arabic/English text
-  const matchesSearch = (text: string, search: string): boolean => {
-    if (!search.trim()) return true;
-    const normalizedText = normalizeArabic(text);
-    const normalizedSearch = normalizeArabic(search);
-    return normalizedText.includes(normalizedSearch);
-  };
-
-  // Get Arabic name for MP3Quran reciter
-  const getMp3QuranReciterName = (reciter: Mp3QuranReciter) => {
-    const arReciter = mp3QuranRecitersAr.find(r => r.id === reciter.id);
-    return arReciter ? arReciter.name : reciter.name;
-  };
-
-  // Get display value for EveryAyah search input
-  const getEveryAyahDisplayValue = () => {
-    if (showEveryAyahDropdown) return everyAyahSearch;
-    if (filterReciterName && filterReciterName !== 'all') {
-      const reciter = uniqueReciterNames.find(r => r.nameAr === filterReciterName);
-      if (reciter) {
-        return language === 'ar' ? reciter.nameAr : reciter.name;
-      }
-    }
-    return '';
-  };
-
-  // Get display value for MP3Quran search input
-  const getMp3QuranDisplayValue = () => {
-    if (showMp3QuranDropdown) return mp3QuranSearch;
-    if (selectedMp3QuranReciter) {
-      return getMp3QuranReciterName(selectedMp3QuranReciter);
-    }
-    return '';
+  // Filter reciters based on search
+  const matchesSearch = (text: string, searchTerm: string): boolean => {
+    if (!searchTerm.trim()) return true;
+    return normalizeArabic(text).includes(normalizeArabic(searchTerm));
   };
 
   // Translate moshaf name
   const translateMoshafName = (moshafName: string): string => {
     const nameLower = moshafName.toLowerCase();
     
-    // Special case for specific patterns (these already include the style in the name)
-    if (nameLower.includes("almusshaf al mo'lim - almusshaf al mo'lim")) {
-      return t('muallim');
-    } else if (nameLower.includes("almusshaf al mojawwad - almusshaf al mojawwad")) {
-      return t('mujawwad');
-    }
+    if (nameLower.includes("almusshaf al mo'lim")) return t('muallim');
+    if (nameLower.includes("almusshaf al mojawwad")) return t('mujawwad');
     
-    // Extract rewayat (reading style) from the name
-    // Pattern: "Rewayat [Name] - [Style]"
     const rewayatMatch = moshafName.match(/Rewayat\s+(.+?)\s+-\s+(.+)/i);
-    
     if (rewayatMatch) {
-      const rewayatName = rewayatMatch[1].trim(); // e.g., "Hafs A'n Assem", "Warsh A'n Nafi'"
-      const styleName = rewayatMatch[2].trim().toLowerCase(); // e.g., "Murattal", "Mujawwad"
+      const rewayatName = rewayatMatch[1].trim();
+      const styleName = rewayatMatch[2].trim().toLowerCase();
       
-      // Simplify common rewayat names for brevity
-      let simplifiedRewayat = rewayatName;
-      
-      // Extract just the main name (before "A'n" or "An")
       const mainNameMatch = rewayatName.match(/^(.+?)\s+(?:A'n|An)\s+/i);
-      if (mainNameMatch) {
-        simplifiedRewayat = mainNameMatch[1].trim(); // e.g., "Hafs", "Warsh", "Qalon"
-      }
+      const simplifiedRewayat = mainNameMatch ? mainNameMatch[1].trim() : rewayatName;
       
-      // Translate the rewayat name using a mapping
-      const translateRewayat = (rewayat: string): string => {
-        const rewayatLower = rewayat.toLowerCase().replace(/['\s-]/g, '');
-        
-        // Map common rewayat names to translation keys
-        const rewayatMap: Record<string, string> = {
-          'hafs': 'hafs',
-          'warsh': 'warsh',
-          'qalon': 'qalon',
-          'aldori': 'aldori',
-          'aldorai': 'aldorai',
-          'shobah': 'shobah',
-          'khalaf': 'khalaf',
-          'khallad': 'khallad',
-          'albizi': 'albizi',
-          'qunbol': 'qunbol',
-          'ibnthakwan': 'ibnThakwan',
-          'ibnamer': 'ibnAmer',
-          'ibnkatheer': 'ibnKatheer',
-          'alkisai': 'alkisai',
-          'hamzah': 'hamzah',
-          'asim': 'asim',
-          'assem': 'assem',
-          'nafi': 'nafi',
-          'abiamr': 'abiAmr',
-        };
-        
-        const key = rewayatMap[rewayatLower];
-        if (key) {
-          return t(key as any);
-        }
-        
-        // If no translation found, return original
-        return rewayat;
+      const rewayatLower = simplifiedRewayat.toLowerCase().replace(/['\s-]/g, '');
+      const rewayatMap: Record<string, string> = {
+        'hafs': 'hafs',
+        'warsh': 'warsh',
+        'qalon': 'qalon',
+        'aldori': 'aldori',
       };
       
-      const translatedRewayat = translateRewayat(simplifiedRewayat);
+      const translatedRewayat = rewayatMap[rewayatLower] ? t(rewayatMap[rewayatLower] as any) : simplifiedRewayat;
       
-      // Translate the style
       let translatedStyle = '';
       if (styleName.includes('murattal') || styleName.includes('مرتل')) {
         translatedStyle = t('murattal');
-      } else if (styleName.includes('mujawwad') || styleName.includes('mojawwad') || styleName.includes('مجود')) {
+      } else if (styleName.includes('mujawwad') || styleName.includes('mojawwad')) {
         translatedStyle = t('mujawwad');
-      } else if (styleName.includes("mo'lim") || styleName.includes('muallim') || styleName.includes('معلم') || styleName.includes('teacher')) {
-        translatedStyle = t('muallim');
-      } else {
-        translatedStyle = styleName;
       }
       
-      // Return combined name: "Murattal - Hafs" or just the rewayat name if no style translation
-      if (translatedStyle && translatedStyle !== styleName) {
+      if (translatedStyle) {
         return `${translatedStyle} - ${translatedRewayat}`;
       }
       return translatedRewayat;
     }
     
-    // Check for common recitation types (fallback if no rewayat pattern)
-    if (nameLower.includes('murattal') || nameLower.includes('مرتل')) {
-      return t('murattal');
-    } else if (nameLower.includes('mujawwad') || nameLower.includes('مجود')) {
-      return t('mujawwad');
-    } else if (nameLower.includes("mo'lim") || nameLower.includes('muallim') || nameLower.includes('معلم') || nameLower.includes('teacher')) {
-      return t('muallim');
-    }
+    if (nameLower.includes('murattal') || nameLower.includes('مرتل')) return t('murattal');
+    if (nameLower.includes('mujawwad') || nameLower.includes('مجود')) return t('mujawwad');
     
-    // Return original name if no translation found
     return moshafName;
   };
 
+  // Handle reciter selection
+  const handleReciterSelect = (reciter: UnifiedReciter) => {
+    setSelectedUnifiedReciter(reciter);
+    setShowReciterScroll(false);
+    onAudioSourceChange(reciter.source);
+    if (reciter.source === 'everyayah') {
+      onFilterReciterNameChange(reciter.nameAr);
+    } else if (reciter.source === 'mp3quran' && reciter.mp3QuranId) {
+      const mp3Reciter = mp3QuranReciters.find(r => r.id === reciter.mp3QuranId);
+      if (mp3Reciter) onMp3QuranReciterChange(mp3Reciter);
+    }
+  };
+
+  // Filtered + sorted reciter list (memoized)
+  const filteredAndSortedReciters = useMemo(() => unifiedReciters
+    .filter(r => {
+      const name = language === 'ar' ? r.nameAr : r.name;
+      return matchesSearch(name, search);
+    })
+    .sort((a, b) => {
+      // MP3Quran always before EveryAyah
+      if (a.source !== b.source) {
+        return a.source === 'mp3quran' ? -1 : 1;
+      }
+      const nameA = language === 'ar' ? a.nameAr : a.name;
+      const nameB = language === 'ar' ? b.nameAr : b.name;
+      return nameA.localeCompare(nameB, language);
+    }), [unifiedReciters, search, language]);
+
+  // ── Column 1: reading type data ───────────────────────────────────────────────
+  const mp3Readings = useMemo(() => {
+    if (!selectedMp3QuranReciter) return [];
+    const readings = selectedMp3QuranReciter.moshaf.map(m => getMoshafReading(m.name));
+    return [...new Set(readings)];
+  }, [selectedMp3QuranReciter]);
+
+  // ── Column 2: style data (filtered by reading for MP3Quran) ───────────────────
+  const mp3StylesForReading = useMemo(() => {
+    if (!selectedMp3QuranReciter) return [];
+    const moshafs = selectedMp3Reading
+      ? selectedMp3QuranReciter.moshaf.filter(m => getMoshafReading(m.name) === selectedMp3Reading)
+      : selectedMp3QuranReciter.moshaf;
+    const styles = moshafs.map(m => getMoshafStyle(m.name));
+    return [...new Set(styles)];
+  }, [selectedMp3QuranReciter, selectedMp3Reading]);
+
+  const getReadings = () => {
+    if (!selectedUnifiedReciter) return [];
+    if (selectedUnifiedReciter.source === 'everyayah') return availableReadings.length > 0 ? availableReadings : ['hafs'];
+    return mp3Readings;
+  };
+
+  const getStyles = () => {
+    if (!selectedUnifiedReciter) return [];
+    if (selectedUnifiedReciter.source === 'everyayah') return availableStyles.length > 0 ? availableStyles : ['murattal'];
+    return mp3StylesForReading;
+  };
+
+  const isReadingSelected = (reading: string) => {
+    if (selectedUnifiedReciter?.source === 'everyayah') return filterReading === reading;
+    return selectedMp3Reading === reading;
+  };
+
+  const isStyleSelected = (style: string) => {
+    if (selectedUnifiedReciter?.source === 'everyayah') return filterStyle === style;
+    return selectedMp3Style === style;
+  };
+
+  const handleReadingSelect = (reading: string) => {
+    if (!selectedUnifiedReciter) return;
+    if (selectedUnifiedReciter.source === 'everyayah') {
+      onFilterReadingChange(reading);
+    } else {
+      setSelectedMp3Reading(reading);
+      const moshafs = selectedMp3QuranReciter?.moshaf.filter(m => getMoshafReading(m.name) === reading) || [];
+      if (moshafs.length > 0) setSelectedMp3Style(getMoshafStyle(moshafs[0].name));
+    }
+  };
+
+  const handleStyleSelect = (style: string) => {
+    if (!selectedUnifiedReciter) return;
+    if (selectedUnifiedReciter.source === 'everyayah') {
+      onFilterStyleChange(style);
+    } else {
+      setSelectedMp3Style(style);
+    }
+  };
+
+  const translateReadingKey = (key: string): string => {
+    const map: Record<string, string> = {
+      hafs: t('hafs'), warsh: t('warsh'), qalon: t('qalon'), aldori: t('aldori'),
+    };
+    return map[key] || key;
+  };
+
+  const translateStyleKey = (key: string): string => {
+    const map: Record<string, string> = {
+      murattal: t('murattal'), mujawwad: t('mujawwad'), muallim: t('muallim'),
+    };
+    return map[key] || key;
+  };
+
+  // Save button disability
+  const isSaveDisabled = selectedUnifiedReciter?.source === 'everyayah'
+    ? (!selectedReciter || !isSurahAvailable)
+    : (!selectedMp3QuranReciter || !selectedMoshaf || !isSurahAvailable);
+
+  // Column item shared classes
+  const colItemBase = cn(
+    'w-full px-2 py-1.5 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-center',
+    textSizeClasses.text
+  );
+
   return (
-    <div className={cn("p-4 space-y-3 bg-[#FBF9F4]", isRTL ? "rtl" : "ltr")}>
-      {/* Audio Source Tabs */}
-      <Tabs value={audioSource} onValueChange={(value) => onAudioSourceChange(value as 'everyayah' | 'mp3quran')} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-11 md:h-12 bg-emerald-100 dark:bg-emerald-900/30">
-          <TabsTrigger value="everyayah" className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]", textSizeClasses.text)}>
-            {t('everyAyah')}
-          </TabsTrigger>
-          <TabsTrigger value="mp3quran" className={cn("data-[state=active]:bg-emerald-700 data-[state=active]:text-[#F2E3BB]", textSizeClasses.text)}>
-            {t('mp3Quran')}
-          </TabsTrigger>
-        </TabsList>
+    <div
+      className={cn('flex flex-col flex-1 min-h-0 overflow-hidden px-4 pt-3 pb-[5.5rem]', isRTL ? 'rtl' : 'ltr')}
+    >
+      {/* Back button + title */}
+      <button
+        onClick={() => setSearchParams({})}
+        className={cn(
+          'flex items-center gap-2 shrink-0 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors',
+          textSizeClasses.text
+        )}
+      >
+        {isRTL ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+        <span className="font-bold">{t('reciter')}</span>
+      </button>
 
-        {/* Tab Explanation Text */}
-        <div className="mt-3 mb-2 px-2 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700">
-          <p className={cn(
-            "text-emerald-700 dark:text-emerald-300",
-            isRTL ? "text-right" : "text-left",
-            textSizeClasses.text
+      {showReciterScroll ? (
+        /* ── PHASE 1: Reciter picker (full remaining height) ── */
+        <>
+          {/* Search input */}
+          <div className="relative mt-2 mb-1 shrink-0">
+            <Search className={cn(
+              'absolute top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 dark:text-emerald-400',
+              isRTL ? 'right-3' : 'left-3'
+            )} />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder={t('searchReciter')}
+              className={cn(
+                'w-full h-9 rounded-md border border-emerald-300 bg-transparent px-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
+                isRTL ? 'pr-9 text-right' : 'pl-9 text-left',
+                textSizeClasses.text
+              )}
+            />
+          </div>
+
+          {/* Reciter scroll — takes all remaining height */}
+          <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-[calc(100vh-30rem)] md:max-h-[calc(100vh-26rem)]">
+            {filteredAndSortedReciters.map((reciter, index) => (
+              <button
+                key={reciter.id}
+                ref={selectedUnifiedReciter?.id === reciter.id ? selectedReciterRef : null}
+                onClick={() => handleReciterSelect(reciter)}
+                className={cn(
+                  'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+                  'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
+                  selectedUnifiedReciter?.id === reciter.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                  textSizeClasses.text,
+                  isRTL ? 'text-right' : 'text-left'
+                )}
+              >
+                <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+                  <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
+                  <span className="flex-1 text-emerald-800 dark:text-emerald-200">
+                    {language === 'ar' ? reciter.nameAr : reciter.name}
+                  </span>
+                  <span className={cn(
+                    'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+                    reciter.source === 'everyayah'
+                      ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                      : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+                  )}>
+                    {reciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : selectedUnifiedReciter ? (
+        /* ── PHASE 2: Reciter chosen — name chip + 3 columns ── */
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col flex-1 min-h-0 mt-2"
+        >
+          {/* Selected reciter name + re-choose button */}
+          <div className={cn(
+            'flex items-center gap-2 mb-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 shrink-0',
+            isRTL ? 'flex-row-reverse' : 'flex-row'
           )}>
-            {audioSource === 'everyayah' ? t('everyAyahExplanation') : t('mp3QuranExplanation')}
-          </p>
-        </div>
-
-        {/* EveryAyah Tab Content */}
-        <TabsContent value="everyayah" className="space-y-2 sm:space-y-3 mt-3">
-          {/* Reciter Name Search Box */}
-          <div className="flex flex-col gap-2" ref={everyAyahContainerRef}>
-            <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-              {t('reciterName')}
+            <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200', textSizeClasses.text)}>
+              {language === 'ar' ? selectedUnifiedReciter.nameAr : selectedUnifiedReciter.name}
             </span>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400 z-10" />
-              <Input
-                ref={everyAyahInputRef}
-                placeholder={t('searchReciter')}
-                value={showEveryAyahDropdown ? everyAyahSearch : getEveryAyahDisplayValue()}
-                onChange={(e) => {
-                  setEveryAyahSearch(e.target.value);
-                  setShowEveryAyahDropdown(true);
-                }}
-                onCompositionUpdate={(e) => {
-                  // Android IME composition: update during text composition
-                  const target = e.target as HTMLInputElement;
-                  setEveryAyahSearch(target.value);
-                }}
-                onKeyUp={(e) => {
-                  // Fallback for Android: read value directly from input on any key
-                  const target = e.target as HTMLInputElement;
-                  if (target.value !== everyAyahSearch) {
-                    setEveryAyahSearch(target.value);
-                  }
-                }}
-                onFocus={() => {
-                  setEveryAyahSearch('');
-                  setShowEveryAyahDropdown(true);
-                }}
-                className={cn("pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-emerald-50 dark:bg-emerald-900/20", textSizeClasses.text)}
-              />
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            
-              {/* Dropdown Results */}
-              {showEveryAyahDropdown && (
-                <div 
-                  className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#FBF9F4] dark:bg-emerald-950 border border-emerald-300 rounded-lg shadow-lg"
-                  style={{ maxHeight: '200px', overflowY: 'scroll' }}
+            <span className={cn(
+              'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+              selectedUnifiedReciter.source === 'everyayah'
+                ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+            )}>
+              {selectedUnifiedReciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
+            </span>
+            <button
+              onClick={() => setShowReciterScroll(true)}
+              className="shrink-0 p-1.5 rounded-md text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-800 transition-colors"
+              title={t('searchReciter')}
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          </div>
+          {/* Column headers */}
+          <div className={cn('flex gap-2 mb-1 shrink-0', textSizeClasses.label)}>
+            <h3 className="flex-1 text-center font-semibold text-emerald-800 dark:text-emerald-200">
+              {t('readingType')}
+            </h3>
+            <h3 className="flex-1 text-center font-semibold text-emerald-800 dark:text-emerald-200">
+              {t('recitationStyle')}
+            </h3>
+            <h3 className="flex-1 text-center font-semibold text-emerald-800 dark:text-emerald-200">
+              {t('surah')}
+            </h3>
+          </div>
+
+          {/* 3 scrollable columns */}
+          <div className="flex gap-2 overflow-hidden min-h-0 max-h-[calc(100vh-30rem)] md:max-h-[calc(100vh-26rem)]">
+            {/* Column 1: Reading type */}
+            <div className="flex-1 overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg">
+              {getReadings().map((reading) => (
+                <button
+                  key={reading}
+                  ref={isReadingSelected(reading) ? selectedReadingRef : null}
+                  onClick={() => handleReadingSelect(reading)}
+                  className={cn(colItemBase, 'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10', isReadingSelected(reading) && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold')}
                 >
-                  {uniqueReciterNames
-                    .filter((reciter) => {
-                      const name = language === 'ar' ? reciter.nameAr : reciter.name;
-                      return matchesSearch(name, everyAyahSearch);
-                    })
-                    .slice()
-                    .sort((a, b) => {
-                      const nameA = language === 'ar' ? a.nameAr : a.name;
-                      const nameB = language === 'ar' ? b.nameAr : b.name;
-                      return nameA.localeCompare(nameB, language);
-                    })
-                    .map((reciter, index) => (
-                      <div
-                        key={reciter.nameAr}
-                        className="px-4 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-800 cursor-pointer border-b border-emerald-100 last:border-none"
-                        onClick={() => {
-                          onFilterReciterNameChange(reciter.nameAr);
-                          setShowEveryAyahDropdown(false);
-                        }}
-                      >
-                        <div className={cn("flex items-center gap-2 w-full", language === 'ar' && "flex-row-reverse text-right", textSizeClasses.text)}>
-                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">{index + 1}.</span>
-                          <span className="flex-1">{language === 'ar' ? reciter.nameAr : reciter.name}</span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
+                  <span className="text-emerald-800 dark:text-emerald-200">{translateReadingKey(reading)}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Column 2: Style */}
+            <div className="flex-1 overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg">
+              {getStyles().map((style) => (
+                <button
+                  key={style}
+                  ref={isStyleSelected(style) ? selectedStyleRef : null}
+                  onClick={() => handleStyleSelect(style)}
+                  className={cn(colItemBase, 'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10', isStyleSelected(style) && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold')}
+                >
+                  <span className="text-emerald-800 dark:text-emerald-200">{translateStyleKey(style)}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Column 3: Surah */}
+            <div className="flex-1 overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg">
+              {surahs.map((surah) => (
+                <button
+                  key={surah.id}
+                  ref={selectedSurahForPlayback === surah.id ? selectedSurahRef : null}
+                  onClick={() => setSelectedSurahForPlayback(surah.id)}
+                  className={cn(
+                    colItemBase,
+                    'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
+                    selectedSurahForPlayback === surah.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                    isRTL ? 'text-right' : 'text-left'
+                  )}
+                >
+                  <span className="text-emerald-800 dark:text-emerald-200">
+                    {surah.id}. {language === 'ar' ? surah.name : surah.englishName}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Show other options only after selection */}
-          {filterReciterName && filterReciterName !== 'all' && (
-            <>
-              {/* Reading Type Filter */}
-              <div className="flex flex-col gap-2">
-                <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-                  {t('readingType')}
-                </span>
-                <Select value={filterReading} onValueChange={onFilterReadingChange} modal={false}>
-                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
-                    {filterReciterName === 'all' && <SelectItem value="all" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('all')}</SelectItem>}
-                    {availableReadings.includes('hafs') && <SelectItem value="hafs" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('hafs')}</SelectItem>}
-                    {availableReadings.includes('warsh') && <SelectItem value="warsh" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('warsh')}</SelectItem>}
-                  </SelectContent>
-                </Select>
+          {/* Status messages (compact) */}
+          <div className="shrink-0 mt-1 space-y-0.5">
+            {isCheckingSurah && (
+              <div className={cn('flex items-center gap-2 text-emerald-600 dark:text-emerald-400', textSizeClasses.text)}>
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                <span>{t('loading')}</span>
               </div>
-              
-              {/* Recitation Style Filter */}
-              <div className="flex flex-col gap-2">
-                <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-                  {t('recitationStyle')}
-                </span>
-                <Select value={filterStyle} onValueChange={onFilterStyleChange} modal={false}>
-                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
-                    {filterReciterName === 'all' && <SelectItem value="all" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('all')}</SelectItem>}
-                    {availableStyles.includes('murattal') && <SelectItem value="murattal" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('murattal')}</SelectItem>}
-                    {availableStyles.includes('mujawwad') && <SelectItem value="mujawwad" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('mujawwad')}</SelectItem>}
-                  </SelectContent>
-                </Select>
+            )}
+            {!isCheckingSurah && !isSurahAvailable && surahError === 'not-found' && (
+              <div className={cn('flex items-center gap-2 text-amber-600 dark:text-amber-400', textSizeClasses.text)}>
+                <XCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{t('surahNotAvailableForReciter')}</span>
               </div>
-              
-              {/* Quality Filter */}
-              <div className="flex flex-col gap-2">
-                <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-                  {t('quality')}
-                </span>
-                <Select value={filterQuality} onValueChange={onFilterQualityChange} modal={false}>
-                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
-                    {filterReciterName === 'all' && <SelectItem value="all" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>{t('all')}</SelectItem>}
-                    {availableQualities.includes('192kbps') && <SelectItem value="192kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>192kbps</SelectItem>}
-                    {availableQualities.includes('128kbps') && <SelectItem value="128kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>128kbps</SelectItem>}
-                    {availableQualities.includes('64kbps') && <SelectItem value="64kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>64kbps</SelectItem>}
-                    {availableQualities.includes('48kbps') && <SelectItem value="48kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>48kbps</SelectItem>}
-                    {availableQualities.includes('40kbps') && <SelectItem value="40kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>40kbps</SelectItem>}
-                    {availableQualities.includes('32kbps') && <SelectItem value="32kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>32kbps</SelectItem>}
-                    {availableQualities.includes('16kbps') && <SelectItem value="16kbps" className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}>16kbps</SelectItem>}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Separator */}
-              <div className="border-t border-emerald-200 dark:border-emerald-700 my-2"></div>
-
-              {/* Ayah and Surah Selection */}
-              <div className="grid grid-cols-2 gap-2">
-                {/* Ayah Selection */}
-                <div className="flex flex-col gap-2">
-                  <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-                    {t('chooseAyah')}
-                  </span>
-                  <Select value={selectedAyahForPlayback.toString()} onValueChange={(value) => setSelectedAyahForPlayback(Number(value))}>
-                    <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                      <div className="max-h-[200px] overflow-y-auto">
-                        {Array.from({ length: ayahsCount }, (_, i) => i + 1).map((ayahNum) => (
-                          <SelectItem
-                            key={ayahNum}
-                            value={ayahNum.toString()}
-                            className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100", textSizeClasses.text)}
-                          >
-                            {t('ayah')} {ayahNum}
-                          </SelectItem>
-                        ))}
-                      </div>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Surah Selection */}
-                <div className="flex flex-col gap-2">
-                  <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-                    {t('chooseSurah')}
-                  </span>
-                  <Select value={selectedSurahForPlayback.toString()} onValueChange={(value) => {
-                    setSelectedSurahForPlayback(Number(value));
-                    setSelectedAyahForPlayback(1);
-                  }}>
-                    <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                      <div className="max-h-[200px] overflow-y-auto">
-                        {surahs.map((surah) => (
-                          <SelectItem
-                            key={surah.id}
-                            value={surah.id.toString()}
-                            className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100", textSizeClasses.text)}
-                          >
-                            {language === 'ar' ? `${surah.id}. ${surah.name}` : `${surah.id}. ${surah.englishName}`}
-                          </SelectItem>
-                        ))}
-                      </div>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Surah Availability Status for EveryAyah */}
-              {selectedReciter && (
-                <div className="flex flex-col gap-2 mt-2">
-                  {isCheckingEveryAyahSurah && (
-                    <div className={cn("flex items-center gap-2 text-blue-600 dark:text-blue-400 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800", textSizeClasses.text)}>
-                      <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
-                      <span>{t('loading')}</span>
-                    </div>
-                  )}
-
-                  {!isCheckingEveryAyahSurah && everyAyahSurahError === 'network' && (
-                    <div className={cn("flex items-center gap-2 text-red-600 dark:text-red-400 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800", textSizeClasses.text)}>
-                      <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                      <span>{t('everyAyahNetworkError')}</span>
-                    </div>
-                  )}
-                  
-                  {!isCheckingEveryAyahSurah && everyAyahSurahError === 'not-found' && (
-                    <div className={cn("flex items-center gap-2 text-red-600 dark:text-red-400 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800", textSizeClasses.text)}>
-                      <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                      <span>{t('surahNotAvailableForReciter')}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Save Button for EveryAyah */}
-              <div className="pt-2 sm:pt-3 mt-2">
-                <Button
-                  onClick={async () => {
-                    onListen();
-                    await onNavigateToSurah(selectedSurahForPlayback);
-                  }}
-                  disabled={(!selectedReciter && filteredReciters.length === 0) || isCheckingEveryAyahSurah || !isEveryAyahSurahAvailable}
-                  className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed", textSizeClasses.button)}
-                >
-                  {isCheckingEveryAyahSurah ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      {t('loading')}
-                    </span>
-                  ) : (
-                    t('save')
-                  )}
-                </Button>
-              </div>
-            </>
-          )}
-        </TabsContent>
-
-        {/* MP3Quran Tab Content */}
-        <TabsContent value="mp3quran" className="space-y-2 sm:space-y-3 mt-3">
-          {/* Reciter Search Box */}
-          <div className="flex flex-col gap-2" ref={mp3QuranContainerRef}>
-            <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-              {t('reciterName')}
-            </span>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400 z-10" />
-              <Input
-                ref={mp3QuranInputRef}
-                placeholder={t('searchReciter')}
-                value={showMp3QuranDropdown ? mp3QuranSearch : getMp3QuranDisplayValue()}
-                onChange={(e) => {
-                  setMp3QuranSearch(e.target.value);
-                  setShowMp3QuranDropdown(true);
-                }}
-                onCompositionUpdate={(e) => {
-                  // Android IME composition: update during text composition
-                  const target = e.target as HTMLInputElement;
-                  setMp3QuranSearch(target.value);
-                }}
-                onKeyUp={(e) => {
-                  // Fallback for Android: read value directly from input on any key
-                  const target = e.target as HTMLInputElement;
-                  if (target.value !== mp3QuranSearch) {
-                    setMp3QuranSearch(target.value);
-                  }
-                }}
-                onFocus={() => {
-                  setMp3QuranSearch('');
-                  setShowMp3QuranDropdown(true);
-                }}
-                className={cn("pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-emerald-50 dark:bg-emerald-900/20", textSizeClasses.text)}
-              />
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            
-              {/* Dropdown Results */}
-              {showMp3QuranDropdown && (
-                <div 
-                  className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#FBF9F4] dark:bg-emerald-950 border border-emerald-300 rounded-lg shadow-lg"
-                  style={{ maxHeight: '200px', overflowY: 'scroll' }}
-                >
-                  {mp3QuranReciters
-                    .filter((reciter) => matchesSearch(getMp3QuranReciterName(reciter), mp3QuranSearch))
-                    .slice()
-                    .sort((a, b) => {
-                      const nameA = getMp3QuranReciterName(a);
-                      const nameB = getMp3QuranReciterName(b);
-                      return nameA.localeCompare(nameB, 'ar');
-                    })
-                    .map((reciter, index) => (
-                      <div
-                        key={reciter.id}
-                        className="px-4 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-800 cursor-pointer border-b border-emerald-100 last:border-none"
-                        onClick={() => {
-                          console.log('[ReciterView] 🎤 Reciter selected:', reciter.name, 'ID:', reciter.id);
-                          console.log('[ReciterView] 📋 Reciter object:', reciter);
-                          console.log('[ReciterView] ⏱️ Current timingAvailable state:', timingAvailable);
-                          onMp3QuranReciterChange(reciter);
-                          setShowMp3QuranDropdown(false);
-                        }}
-                      >
-                        <div className={cn("flex items-center gap-2 w-full flex-row-reverse text-right", textSizeClasses.text)}>
-                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">{index + 1}.</span>
-                          <span className="flex-1">{getMp3QuranReciterName(reciter)}</span>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
+            )}
+            {selectedUnifiedReciter.source === 'mp3quran' && (
+              <>
+                {isCheckingTiming && (
+                  <div className={cn('flex items-center gap-2 text-emerald-600 dark:text-emerald-400', textSizeClasses.text)}>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span>{t('checkingTiming')}</span>
+                  </div>
+                )}
+                {!isCheckingTiming && timingAvailable && (
+                  <div className={cn('flex items-center gap-2 text-green-600 dark:text-green-400', textSizeClasses.text)}>
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t('timingAvailable')}</span>
+                  </div>
+                )}
+                {!isCheckingTiming && timingError === 'network' && (
+                  <div className={cn('flex items-center gap-2 text-red-600 dark:text-red-400', textSizeClasses.text)}>
+                    <XCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t('timingNetworkError')}</span>
+                  </div>
+                )}
+                {!isCheckingTiming && timingError === 'not-found' && (
+                  <div className={cn('flex items-center gap-2 text-amber-600 dark:text-amber-400', textSizeClasses.text)}>
+                    <XCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span className="whitespace-pre-line">{t('timingNotAvailable')}</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
-          {/* Show other options only after selection */}
-          {selectedMp3QuranReciter && (
-            <>
-              {/* Moshaf/Recitation Type Selection */}
-              {selectedMp3QuranReciter.moshaf.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-                    {t('recitationType')}
-                  </span>
-                  <Select
-                    value={selectedMoshaf?.id.toString() || ''}
-                    onValueChange={(value) => {
-                      const moshaf = selectedMp3QuranReciter.moshaf.find(m => m.id.toString() === value);
-                      if (moshaf) {
-                        console.log('[ReciterView] 📖 Moshaf selected:', moshaf.name, 'ID:', moshaf.id);
-                        console.log('[ReciterView] 📋 Moshaf object:', moshaf);
-                        console.log('[ReciterView] ⏱️ Current timingAvailable state:', timingAvailable);
-                        onMoshafChange(moshaf);
-                      }
-                    }}
-                    modal={false}
-                  >
-                    <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
-                      {selectedMp3QuranReciter.moshaf.map((moshaf) => (
-                        <SelectItem
-                          key={moshaf.id}
-                          value={moshaf.id.toString()}
-                          className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}
-                        >
-                          {translateMoshafName(moshaf.name)} ({moshaf.surah_total} {t('surahs')})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          {/* Save button */}
+          <div className="shrink-0 pt-2 pb-1 mt-1 border-t border-emerald-100 dark:border-emerald-900 bg-gradient-to-b from-transparent via-[#FBF9F4]/80 to-[#FBF9F4] dark:from-transparent dark:via-gray-900/80 dark:to-gray-900">
+            <Button
+              onClick={async () => {
+                onListen();
+                await onNavigateToSurah(selectedSurahForPlayback);
+              }}
+              disabled={isSaveDisabled}
+              className={cn(
+                'w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50',
+                textSizeClasses.button
               )}
-
-              {/* Separator */}
-              <div className="border-t border-emerald-200 dark:border-emerald-700 my-2"></div>
-
-              {/* Surah Selection */}
-              <div className="flex flex-col gap-2">
-                <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-                  {t('chooseSurah')}
+            >
+              {isCheckingTiming ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t('checkingTiming')}
                 </span>
-                <Select value={selectedSurahForPlayback.toString()} onValueChange={(value) => {
-                  setSelectedSurahForPlayback(Number(value));
-                  setSelectedAyahForPlayback(1);
-                }} modal={false}>
-                  <SelectTrigger className="w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 z-[100]" position="popper" sideOffset={5}>
-                    <div className="max-h-[200px] overflow-y-auto">
-                      {surahs.map((surah) => (
-                        <SelectItem
-                          key={surah.id}
-                          value={surah.id.toString()}
-                          className={cn("focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation", textSizeClasses.text)}
-                        >
-                          {language === 'ar' ? `${surah.id}. ${surah.name}` : `${surah.id}. ${surah.englishName}`}
-                        </SelectItem>
-                      ))}
-                    </div>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Surah Availability Warning for MP3Quran */}
-              {selectedMp3QuranReciter && selectedMoshaf && !isSurahAvailable && (
-                <div className={cn("flex items-center gap-2 text-red-600 dark:text-red-400 mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800", textSizeClasses.text)}>
-                  <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                  <span>{t('surahNotAvailableForReciter')}</span>
-                </div>
+              ) : (
+                t('save')
               )}
-
-              {/* Timing Status Display */}
-              {selectedMp3QuranReciter && selectedMoshaf && isSurahAvailable && (
-                <div className="flex flex-col gap-2 mt-2">
-                  {isCheckingTiming && (
-                    <div className={cn("flex items-center gap-2 text-blue-600 dark:text-blue-400", textSizeClasses.text)}>
-                      <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
-                      <span>{t('checkingTiming')}</span>
-                    </div>
-                  )}
-                  
-                  {!isCheckingTiming && timingAvailable && (
-                    <div className={cn("flex items-center gap-2 text-green-600 dark:text-green-400", textSizeClasses.text)}>
-                      <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5" />
-                      <span>{t('timingAvailable')}</span>
-                    </div>
-                  )}
-                  
-                  {!isCheckingTiming && timingError === 'network' && (
-                    <div className={cn("flex items-center gap-2 text-red-600 dark:text-red-400", textSizeClasses.text)}>
-                      <XCircle className="w-4 h-4 md:w-5 md:h-5" />
-                      <span>{t('timingNetworkError')}</span>
-                    </div>
-                  )}
-                  
-                  {!isCheckingTiming && timingError === 'not-found' && (
-                    <div className={cn("flex items-center gap-2 text-amber-600 dark:text-amber-400", textSizeClasses.text)}>
-                      <XCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                      <span className="whitespace-pre-line">{t('timingNotAvailable')}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Save Button for MP3Quran */}
-              <div className="pt-2 sm:pt-3 mt-2">
-                <Button
-                  onClick={async () => {
-                    onListen();
-                    await onNavigateToSurah(selectedSurahForPlayback);
-                  }}
-                  disabled={!selectedMp3QuranReciter || !selectedMoshaf || !isSurahAvailable}
-                  className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50 disabled:cursor-not-allowed", textSizeClasses.button)}
-                >
-                  {isCheckingTiming ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      {t('checkingTiming')}
-                    </span>
-                  ) : (
-                    t('save')
-                  )}
-                </Button>
-              </div>
-            </>
-          )}
-        </TabsContent>
-      </Tabs>
+            </Button>
+          </div>
+        </motion.div>
+      ) : null}
     </div>
   );
 }

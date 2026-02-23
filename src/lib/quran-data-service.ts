@@ -174,13 +174,13 @@ export const getAyahMetaData = async (): Promise<any> => {
 };
 
 /**
- * Fetch audio.json once and cache it
+ * Fetch reciters.json once and cache it (contains both everyayah and mp3quran reciters)
  * Priority: Memory Cache → Native Storage → Fetch from Assets
  */
 export const getAudioData = async (): Promise<any> => {
   // Return cached data if available
   if (audioDataCache) {
-    console.log('✅ Loaded audio.json from memory cache');
+    console.log('✅ Loaded everyayah reciters from memory cache');
     return audioDataCache;
   }
 
@@ -190,14 +190,14 @@ export const getAudioData = async (): Promise<any> => {
   }
 
   // Try loading from persistent storage first
-  const storedData = await loadDataFromStorage('audio-data');
-  if (storedData) {
+  const storedData = await loadDataFromStorage('reciters-data');
+  if (storedData && Array.isArray(storedData) && storedData.length > 0) {
     audioDataCache = storedData;
     return storedData;
   }
 
   // Start new fetch and cache the promise
-  audioDataPromise = fetch(`${ASSETS_BASE_URL}/audio.json`)
+  audioDataPromise = fetch(`${ASSETS_BASE_URL}/reciters.json`)
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -205,18 +205,20 @@ export const getAudioData = async (): Promise<any> => {
       return response.json();
     })
     .then(data => {
-      audioDataCache = data;
+      // Filter for everyayah reciters only
+      const everyayahReciters = data.reciters.filter((r: any) => r.source === 'everyayah');
+      audioDataCache = everyayahReciters;
       audioDataPromise = null;
       
       // Save to storage for offline access
-      saveDataToStorage('audio-data', data);
+      saveDataToStorage('reciters-data', everyayahReciters);
       
-      console.log('✅ audio.json loaded and cached');
-      return data;
+      console.log('✅ reciters.json loaded and cached (everyayah reciters)');
+      return everyayahReciters;
     })
     .catch(error => {
       audioDataPromise = null;
-      console.error('Failed to load audio.json:', error);
+      console.error('Failed to load reciters.json:', error);
       throw error;
     });
 

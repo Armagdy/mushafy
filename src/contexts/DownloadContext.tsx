@@ -3,7 +3,7 @@ import { MushafType } from './MushafContext';
 import { cacheAsset, isAssetCached } from '@/lib/asset-cache';
 import { getPageImageFilename } from '@/lib/quran-mapping';
 import { getSurahAudioUrl } from '@/lib/mp3quran-service';
-import { ASSETS_BASE_URL } from '@/config/assets';
+import { IMAGES_BASE_URL } from '@/config/assets';
 import type { Mp3QuranMoshaf } from '@/lib/mp3quran-service';
 
 export interface DownloadJob {
@@ -207,7 +207,7 @@ async function downloadPages(
     : mushafType === 'tashel'
     ? 'mushaf_tashel_pages'
     : 'mushaf_madinah_images';
-  const mushafPath = `${ASSETS_BASE_URL}/${folder}`;
+  const mushafPath = `${IMAGES_BASE_URL}/${folder}`;
   const category = `mushaf-${mushafType}`;
 
   // Create array of page numbers to download

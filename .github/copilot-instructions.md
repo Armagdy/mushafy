@@ -42,7 +42,7 @@ Use `getMushafPath()` to build image URLs. Persists to `localStorage`.
 ### Dynamic JSON Files (loaded via `fetch`)
 - `/assets/quran-meta-data.json` — Page→Surah/Ayah mappings (see [src/lib/quran-mapping.ts](src/lib/quran-mapping.ts))
 - `/assets/ayah-meta-data.json` — Ayah text, Juz/Hizb boundaries
-- `/assets/audio.json` — Reciter metadata for audio player
+- `/assets/reciters.json` — Reciter metadata for both EveryAyah and MP3Quran audio sources
 
 **Pattern:** Fetch JSON in `useEffect`, cache in component state. See [src/pages/Surah.tsx](src/pages/Surah.tsx) lines 157-626 for examples.
 

@@ -2756,7 +2756,7 @@ export const useAudioPlayer = ({
     };
   }, [isPlaying, requestWakeLock, releaseWakeLock]);
   
-  // Load reciters from audio.json
+  // Load EveryAyah reciters from consolidated reciters.json
   useEffect(() => {
     // Load EveryAyah reciters
     getAudioData()

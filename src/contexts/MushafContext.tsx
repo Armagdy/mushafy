@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { ASSETS_BASE_URL } from '@/config/assets';
+import { IMAGES_BASE_URL } from '@/config/assets';
 
 export type MushafType = 'mwdoa' | 'tashel' | 'madinah';
 
@@ -27,7 +27,7 @@ export const MushafProvider = ({ children }: { children: ReactNode }) => {
       : mushafType === 'tashel'
       ? 'mushaf_tashel_pages'
       : 'mushaf_madinah_images';
-    return `${ASSETS_BASE_URL}/${folder}`;
+    return `${IMAGES_BASE_URL}/${folder}`;
   };
 
   return (

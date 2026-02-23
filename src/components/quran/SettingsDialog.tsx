@@ -11,7 +11,7 @@ import { useMushaf, MushafType } from "@/contexts/MushafContext";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
 import { surahs } from "@/data/surahs";
-import { ASSETS_BASE_URL } from "@/config/assets";
+import { IMAGES_BASE_URL } from "@/config/assets";
 import { getAudioData } from "@/lib/quran-data-service";
 import { getMp3QuranReciters, getSurahAudioUrl, type Mp3QuranReciter, type Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { cacheAsset } from "@/lib/asset-cache";
@@ -405,7 +405,7 @@ export function SettingsDialog({
           : downloadMushafType === 'tashel'
           ? 'mushaf_tashel_pages'
           : 'mushaf_madinah_images';
-        const mushafPath = `${ASSETS_BASE_URL}/${folder}`;
+        const mushafPath = `${IMAGES_BASE_URL}/${folder}`;
         const category = `mushaf-${downloadMushafType}`;
         
         for (let page = downloadFromPage; page <= downloadToPage; page++) {

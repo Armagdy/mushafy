@@ -18,9 +18,6 @@ interface CachedImageProps extends ImgHTMLAttributes<HTMLImageElement> {
  * Falls back to original src if not cached and online.
  * Shows error state if not cached and offline.
  */
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
-
 export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...props }: CachedImageProps) {
   const { t, isRTL } = useLanguage();
   const filename = src.split('/').pop() || 'unknown';
@@ -29,19 +26,17 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [retryKey, setRetryKey] = useState<number>(0);
-  const [retryCount, setRetryCount] = useState<number>(0);
+  const [loadTrigger, setLoadTrigger] = useState<number>(0);
   const blobUrlRef = useRef<string | null>(null);
   const prevSrcRef = useRef<string | null>(null);
-  const prevRetryKeyRef = useRef<number>(0);
+  const prevTriggerRef = useRef<number>(-1);
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Skip if same src and not a retry
-    if (prevSrcRef.current === src && prevRetryKeyRef.current === retryKey) return;
+    // Skip if same src and same trigger
+    if (prevSrcRef.current === src && prevTriggerRef.current === loadTrigger) return;
     prevSrcRef.current = src;
-    prevRetryKeyRef.current = retryKey;
+    prevTriggerRef.current = loadTrigger;
 
     const filename = src.split('/').pop() || 'unknown';
     console.log(`[CachedImage] 🆕 Component mounted for: ${filename}`);
@@ -50,21 +45,11 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
     setIsLoading(true);
     setLoadError(false);
     setImageSrc(null);
-    // Reset retry count when src changes (but not on manual retry)
-    if (prevSrcRef.current !== src) {
-      setRetryCount(0);
-    }
 
     // Cleanup previous blob URL
     if (blobUrlRef.current) {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
-    }
-
-    // Clear any pending retry timeout
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
     }
 
     let cancelled = false;
@@ -136,22 +121,14 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
 
     return () => {
       cancelled = true;
-      // Clear any pending retry timeout
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
     };
-  }, [src, autoCache, cacheCategory, retryKey]);
+  }, [src, autoCache, cacheCategory, loadTrigger]);
 
   // Cleanup blob URL on unmount
   useEffect(() => {
     return () => {
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);
-      }
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
       }
     };
   }, []);
@@ -162,17 +139,15 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
       console.log('[CachedImage] 🌐 Network came back online');
       if (loadError) {
         console.log('[CachedImage] 🔄 Retrying failed image load...');
-        // Reset retry count and increment retryKey to trigger reload
-        setRetryCount(0);
-        setRetryKey(prev => prev + 1);
+        setLoadError(false);
+        setIsLoading(true);
+        prevTriggerRef.current = -1;
+        setLoadTrigger(prev => prev + 1);
       }
     };
 
     window.addEventListener('online', handleOnline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-    };
+    return () => window.removeEventListener('online', handleOnline);
   }, [loadError]);
 
   // Handle image load error
@@ -181,7 +156,7 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
     console.error(`[CachedImage] src: ${imageSrc}`);
     console.error(`[CachedImage] original src: ${src}`);
     console.error(`[CachedImage] navigator.onLine: ${navigator.onLine}`);
-    console.error(`[CachedImage] retryCount: ${retryCount}`);
+    // retryCount removed (no retry logic)
     console.error(`[CachedImage] Error event:`, e);
     
     // Check if this is a failed cached file URI (native platform)
@@ -189,62 +164,29 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
                                imageSrc?.includes('_capacitor_file_');
     
     if (isFailedCachedUri) {
-      console.warn(`[CachedImage] ⚠️ Cached file URI failed to load, removing from cache and retrying from network`);
-      
-      // Remove the corrupted/missing cached file
+      console.warn(`[CachedImage] ⚠️ Cached file URI failed, removing bad cache entry`);
       try {
         await removeCachedAsset(src);
-        console.log(`[CachedImage] 🗑️ Removed bad cache entry`);
       } catch (error) {
         console.error(`[CachedImage] Failed to remove bad cache:`, error);
       }
       
-      // If online, try loading from network
       if (navigator.onLine) {
-        console.log(`[CachedImage] 🌐 Retrying from network after cache failure`);
+        console.log(`[CachedImage] 🌐 Falling back to network after cache failure`);
         setImageSrc(src);
         setIsLoading(false);
-        setRetryCount(0); // Reset retry count for network load
-        return;
       } else {
-        // Offline and cached file is bad - show error
         console.error(`[CachedImage] 🔴 Cached file failed and offline`);
         setLoadError(true);
         setIsLoading(false);
-        return;
       }
-    }
-    
-    // If offline and not cached, show error immediately
-    if (!navigator.onLine) {
-      console.log(`[CachedImage] 🔴 Offline - cannot load image`);
-      setLoadError(true);
-      setIsLoading(false);
       return;
     }
     
-    // If online but failed to load from network, retry with exponential backoff
-    if (retryCount < MAX_RETRIES) {
-      const nextRetryCount = retryCount + 1;
-      const delay = RETRY_DELAY_MS * Math.pow(2, retryCount); // Exponential backoff
-      
-      console.log(`[CachedImage] 🔄 Retry ${nextRetryCount}/${MAX_RETRIES} in ${delay}ms...`);
-      
-      setRetryCount(nextRetryCount);
-      setIsLoading(true);
-      
-      // Schedule retry after delay
-      retryTimeoutRef.current = setTimeout(() => {
-        console.log(`[CachedImage] 🔄 Executing retry ${nextRetryCount}...`);
-        // Force reload by incrementing retryKey
-        setRetryKey(prev => prev + 1);
-      }, delay);
-    } else {
-      // Exhausted all retries
-      console.error(`[CachedImage] 🔴 Failed after ${MAX_RETRIES} retries`);
-      setLoadError(true);
-      setIsLoading(false);
-    }
+    // Any other failure (including network load) — show error immediately, no retries
+    console.error(`[CachedImage] 🔴 Failed to load image`);
+    setLoadError(true);
+    setIsLoading(false);
   };
 
   // Handle image load success
@@ -255,8 +197,6 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
     console.log(`[CachedImage] ✅ Image loaded successfully from: ${isFromCache ? 'CACHE' : 'NETWORK'}`);
     setLoadError(false);
     setIsLoading(false);
-    setRetryCount(0); // Reset retry count on success
-    
     // If loaded from network and autoCache is enabled, cache it now
     if (!isFromCache && autoCache && cacheCategory && imageSrc === src) {
       console.log(`[CachedImage] 📦 Caching image after successful network load: ${src}`);
@@ -326,11 +266,6 @@ export function CachedImage({ src, alt, cacheCategory, autoCache = true, ...prop
         }}
       >
         <span className="text-gray-400 text-sm md:text-base">{t('loading')}</span>
-        {retryCount > 0 && (
-          <span className="text-gray-500 text-xs md:text-sm">
-            {isRTL ? `محاولة ${retryCount}/${MAX_RETRIES}` : `Retry ${retryCount}/${MAX_RETRIES}`}
-          </span>
-        )}
       </div>
     );
   }

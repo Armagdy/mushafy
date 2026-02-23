@@ -91,18 +91,20 @@ async function loadRecitersFromStorage(language: 'en' | 'ar'): Promise<Mp3QuranR
 }
 
 /**
- * Load reciters from local JSON file (offline fallback)
+ * Load reciters from consolidated reciters.json file (offline fallback)
  */
 async function loadRecitersFromLocalFile(): Promise<Mp3QuranReciter[]> {
   try {
-    const response = await fetch('/mp3quran_reciters.json');
+    const response = await fetch('/assets/reciters.json');
     if (!response.ok) {
-      throw new Error('Failed to load local reciters file');
+      throw new Error('Failed to load reciters file');
     }
     const data = await response.json();
-    return data.reciters || [];
+    // Filter for mp3quran reciters only
+    const mp3quranReciters = (data.reciters || []).filter((r: any) => r.source === 'mp3quran');
+    return mp3quranReciters;
   } catch (error) {
-    console.error('Error loading local reciters file:', error);
+    console.error('Error loading reciters file:', error);
     throw error;
   }
 }

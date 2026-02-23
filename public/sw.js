@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mushafy-v4';
+const CACHE_NAME = 'mushafy-v5';
 const AUDIO_CACHE_NAME = 'mushafy-audio-v1';
 const APP_SHELL_CACHE = 'mushafy-shell-v1';
 
@@ -12,8 +12,7 @@ const CORE_ASSETS = [
   './mushafy.jpeg',
   './assets/quran-meta-data.json',
   './assets/ayah-meta-data.json',
-  './assets/audio.json',
-  './mp3quran_reciters.json'
+  './assets/reciters.json'
 ];
 
 // Install event - cache core assets
