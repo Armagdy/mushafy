@@ -255,58 +255,21 @@ export default function ReciterView({
     checkSurahAvailability();
   }, [selectedUnifiedReciter, selectedMoshaf, selectedSurahForPlayback]);
 
-  // Check EveryAyah surah availability
+  // Check EveryAyah surah availability - DISABLED: No checks for EveryAyah
   useEffect(() => {
+    // Skip all checks for EveryAyah reciters
+    if (selectedUnifiedReciter?.source === 'everyayah') {
+      setIsSurahAvailable(true);
+      setIsCheckingSurah(false);
+      setSurahError(null);
+      return;
+    }
+    
     if (selectedUnifiedReciter?.source !== 'everyayah' || !selectedReciter?.folder) {
       setIsCheckingSurah(false);
       setSurahError(null);
       return;
     }
-
-    const checkSurahAvailability = async () => {
-      setIsCheckingSurah(true);
-      setSurahError(null);
-
-      try {
-        const cachedAyah = await getCachedIndividualAyah(
-          selectedReciter.folder,
-          selectedSurahForPlayback,
-          1
-        );
-        
-        if (cachedAyah) {
-          setIsSurahAvailable(true);
-          setSurahError(null);
-          setIsCheckingSurah(false);
-          return;
-        }
-
-        const surahStr = String(selectedSurahForPlayback).padStart(3, '0');
-        const audioUrl = `https://everyayah.com/data/${selectedReciter.folder}/${surahStr}001.mp3`;
-        
-        const response = await fetch(audioUrl, {
-          method: 'GET',
-          headers: { 'Range': 'bytes=0-1023' }
-        });
-        
-        if (response.ok || response.status === 206) {
-          const blob = await response.blob();
-          setIsSurahAvailable(blob.size > 0);
-          setSurahError(blob.size > 0 ? null : 'not-found');
-        } else {
-          setIsSurahAvailable(false);
-          setSurahError(response.status === 404 ? 'not-found' : 'network');
-        }
-      } catch (error) {
-        setIsSurahAvailable(false);
-        setSurahError('network');
-      } finally {
-        setIsCheckingSurah(false);
-      }
-    };
-
-    const timeoutId = setTimeout(checkSurahAvailability, 300);
-    return () => clearTimeout(timeoutId);
   }, [selectedUnifiedReciter, selectedReciter, selectedSurahForPlayback]);
 
   // Check MP3Quran ayah timing availability
@@ -527,11 +490,6 @@ export default function ReciterView({
     return map[key] || key;
   };
 
-  // Save button disability
-  const isSaveDisabled = selectedUnifiedReciter?.source === 'everyayah'
-    ? (!selectedReciter || !isSurahAvailable)
-    : (!selectedMp3QuranReciter || !selectedMoshaf || !isSurahAvailable);
-
   // Column item shared classes
   const colItemBase = cn(
     'w-full px-2 py-1.5 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-center',
@@ -704,8 +662,31 @@ export default function ReciterView({
             </div>
           </div>
 
-          {/* Status messages (compact) */}
-          <div className="shrink-0 mt-1 space-y-0.5">
+          {/* Save button */}
+          <div className="shrink-0 pt-2 mt-1 border-t border-emerald-100 dark:border-emerald-900 bg-gradient-to-b from-transparent via-[#FBF9F4]/80 to-[#FBF9F4] dark:from-transparent dark:via-gray-900/80 dark:to-gray-900">
+            <Button
+              onClick={async () => {
+                onListen();
+                await onNavigateToSurah(selectedSurahForPlayback);
+              }}
+              className={cn(
+                'w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]',
+                textSizeClasses.button
+              )}
+            >
+              {isCheckingTiming ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {t('checkingTiming')}
+                </span>
+              ) : (
+                t('save')
+              )}
+            </Button>
+          </div>
+
+          {/* Status messages (compact) - below button to prevent jumping */}
+          <div className="shrink-0 pb-1 space-y-0.5">
             {isCheckingSurah && (
               <div className={cn('flex items-center gap-2 text-emerald-600 dark:text-emerald-400', textSizeClasses.text)}>
                 <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
@@ -746,30 +727,6 @@ export default function ReciterView({
                 )}
               </>
             )}
-          </div>
-
-          {/* Save button */}
-          <div className="shrink-0 pt-2 pb-1 mt-1 border-t border-emerald-100 dark:border-emerald-900 bg-gradient-to-b from-transparent via-[#FBF9F4]/80 to-[#FBF9F4] dark:from-transparent dark:via-gray-900/80 dark:to-gray-900">
-            <Button
-              onClick={async () => {
-                onListen();
-                await onNavigateToSurah(selectedSurahForPlayback);
-              }}
-              disabled={isSaveDisabled}
-              className={cn(
-                'w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] disabled:opacity-50',
-                textSizeClasses.button
-              )}
-            >
-              {isCheckingTiming ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {t('checkingTiming')}
-                </span>
-              ) : (
-                t('save')
-              )}
-            </Button>
           </div>
         </motion.div>
       ) : null}
