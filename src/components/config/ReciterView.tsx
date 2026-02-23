@@ -184,11 +184,13 @@ export default function ReciterView({
       source: 'everyayah' as const,
     })),
     ...mp3QuranReciters.map((r) => {
+      // Use nameAr from the reciter object if available (from local JSON)
+      // Otherwise try to find it from the Arabic reciters array (from API)
       const arReciter = mp3QuranRecitersAr.find(ar => ar.id === r.id);
       return {
         id: `mp3quran-${r.id}`,
         name: r.name,
-        nameAr: arReciter?.name || r.name,
+        nameAr: r.nameAr || arReciter?.name || r.name,
         source: 'mp3quran' as const,
         mp3QuranId: r.id,
         moshaf: r.moshaf,

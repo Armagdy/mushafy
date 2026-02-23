@@ -75,10 +75,15 @@ export function PlayBar({
       // MP3Quran reciter - show reciter name with surah name and (كاملة) indicating complete surah
       let rawName = selectedMp3QuranReciter.name;
       
-      // If Arabic language is selected, use Arabic reciter name
+      // If Arabic language is selected, use nameAr if available (from local JSON)
+      // Otherwise try to find it from the Arabic reciters array (from API)
       if (language === 'ar') {
-        const arReciter = mp3QuranRecitersAr.find(r => r.id === selectedMp3QuranReciter.id);
-        rawName = arReciter ? arReciter.name : selectedMp3QuranReciter.name;
+        if (selectedMp3QuranReciter.nameAr) {
+          rawName = selectedMp3QuranReciter.nameAr;
+        } else {
+          const arReciter = mp3QuranRecitersAr.find(r => r.id === selectedMp3QuranReciter.id);
+          rawName = arReciter ? arReciter.name : selectedMp3QuranReciter.name;
+        }
       }
       
       const reciterName = cleanReciterName(rawName);

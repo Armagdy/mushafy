@@ -5,6 +5,7 @@ import { NativeStorage, isNativePlatform } from './native-storage';
 export interface Mp3QuranReciter {
   id: number;
   name: string;
+  nameAr?: string; // Arabic name (only present in local JSON or when explicitly populated)
   letter: string;
   moshaf: Mp3QuranMoshaf[];
 }

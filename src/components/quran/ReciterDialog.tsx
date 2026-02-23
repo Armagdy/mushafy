@@ -400,6 +400,11 @@ export function ReciterDialog({
 
   // Get Arabic name for MP3Quran reciter
   const getMp3QuranReciterName = (reciter: Mp3QuranReciter) => {
+    // Use nameAr from the reciter object if available (from local JSON)
+    // Otherwise try to find it from the Arabic reciters array (from API)
+    if (reciter.nameAr) {
+      return reciter.nameAr;
+    }
     const arReciter = mp3QuranRecitersAr.find(r => r.id === reciter.id);
     return arReciter ? arReciter.name : reciter.name;
   };
