@@ -27,11 +27,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(QuranMediaSessionPlugin.class);
         super.onCreate(savedInstanceState);
         
-        // Explicitly hide action bar for older Android versions (Android 13 and below)
-        // This fixes the issue where a native title bar appears between status bar and app header
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().hide();
-        }
+        // Completely remove action bar and its space - CRITICAL: Must be done after super.onCreate
+        removeActionBar();
         
         // Remove window background to prevent any background showing through
         getWindow().setBackgroundDrawable(null);
@@ -48,6 +45,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onStart() {
         super.onStart();
+        // Re-remove action bar and its space
+        removeActionBar();
         // Re-apply edge-to-edge in case it was reset
         setupEdgeToEdge();
     }
@@ -55,6 +54,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        // Re-remove action bar when configuration changes
+        removeActionBar();
         // Re-apply edge-to-edge when theme changes (light/dark mode)
         // Use a slight delay to ensure the system has settled after theme change
         getWindow().getDecorView().post(new Runnable() {
@@ -63,6 +64,43 @@ public class MainActivity extends BridgeActivity {
                 setupEdgeToEdge();
             }
         });
+    }
+    
+    /**
+     * Completely remove the action bar and the space it reserves
+     * This ensures no title bar appears and no space is left behind
+     */
+    private void removeActionBar() {
+        try {
+            // Hide the action bar itself
+            if (getSupportActionBar() != null) {
+                getSupportActionBar().hide();
+            }
+            if (getActionBar() != null) {
+                getActionBar().hide();
+            }
+            
+            // Critical: Tell the window to not reserve space for action bar
+            // This removes the empty gap that was left after hiding the action bar
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // Android 11+ (API 30+) - Use WindowInsetsController
+                WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+            }
+            
+            // Force the content view to extend behind system bars
+            View contentView = findViewById(android.R.id.content);
+            if (contentView != null) {
+                contentView.setFitsSystemWindows(false);
+            }
+            
+            // Ensure WebView bridge content also doesn't fit system windows
+            View bridgeView = findViewById(com.getcapacitor.android.R.id.webview);
+            if (bridgeView != null) {
+                bridgeView.setFitsSystemWindows(false);
+            }
+        } catch (Exception e) {
+            // Silently catch any exceptions
+        }
     }
     
     private void setupEdgeToEdge() {
@@ -118,6 +156,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
+        // Re-remove action bar when returning to app
+        removeActionBar();
         // Resume normally when app comes back to foreground
         // Re-apply edge-to-edge in case theme changed while app was paused
         setupEdgeToEdge();
