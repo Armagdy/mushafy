@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Type, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -121,6 +120,12 @@ export default function SettingsView() {
   const renderCategoryContent = () => {
     switch (activeCategory) {
       case 'mushaf':
+        const mushafOptions: { value: MushafType; label: string }[] = [
+          { value: 'mwdoa', label: t('mushafMwdoa') },
+          { value: 'tashel', label: t('mushafTashel') },
+          { value: 'madinah', label: t('mushafMadinah') },
+        ];
+        
         return (
           <div className="space-y-5">
             <div className="flex flex-col gap-2">
@@ -128,16 +133,30 @@ export default function SettingsView() {
                 <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>{t('mushafType')}</span>
               </div>
-              <Select value={selectedMushaf} onValueChange={(value) => setSelectedMushaf(value as MushafType)}>
-                <SelectTrigger className={cn("w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                  <SelectItem value="mwdoa" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>{t('mushafMwdoa')}</SelectItem>
-                  <SelectItem value="tashel" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>{t('mushafTashel')}</SelectItem>
-                  <SelectItem value="madinah" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>{t('mushafMadinah')}</SelectItem>
-                </SelectContent>
-              </Select>
+              
+              {/* Scrollable list of mushaf options */}
+              <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent max-h-[300px]">
+                {mushafOptions.map((option) => {
+                  const isSelected = selectedMushaf === option.value;
+                  
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => setSelectedMushaf(option.value)}
+                      className={cn(
+                        "w-full px-3 py-3 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                        isSelected && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                        "text-center",
+                        textSizeClasses.text
+                      )}
+                    >
+                      <div className="text-emerald-800 dark:text-emerald-200">
+                        {option.label}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             
             <button
