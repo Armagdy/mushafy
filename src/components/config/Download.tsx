@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { HardDriveDownload, Search, ChevronDown, WifiOff, StopCircle, CheckCircle2, XCircle } from "lucide-react";
+import { HardDriveDownload, Search, WifiOff, StopCircle, CheckCircle2, XCircle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { MushafType } from "@/contexts/MushafContext";
@@ -12,6 +10,7 @@ import { getAudioData } from "@/lib/quran-data-service";
 import { getMp3QuranReciters, type Mp3QuranReciter, type Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { useNetwork } from "@/hooks/useNetwork";
 import { useToast } from "@/hooks/use-toast";
+import { motion } from "framer-motion";
 
 interface Reciter {
   folder: string;
@@ -19,8 +18,25 @@ interface Reciter {
   nameAr: string;
   baseUrl: string;
   reading: string;
+  readingAr?: string;
   style: string;
   quality: string;
+}
+
+interface UnifiedReciter {
+  id: string;
+  name: string;
+  nameAr: string;
+  source: 'everyayah' | 'mp3quran';
+  // EveryAyah specific
+  folder?: string;
+  quality?: string;
+  style?: string;
+  reading?: string;
+  readingAr?: string;
+  // MP3Quran specific
+  mp3QuranId?: number;
+  moshaf?: Mp3QuranMoshaf[];
 }
 
 export function Download() {
@@ -48,60 +64,26 @@ export function Download() {
   
   // Reciter state for downloads
   const [everyAyahReciters, setEveryAyahReciters] = useState<Reciter[]>([]);
-  const [selectedEveryAyahReciter, setSelectedEveryAyahReciter] = useState<string>('');
-  const [selectedRecitationStyle, setSelectedRecitationStyle] = useState<string>('__all__');
-  const [selectedQuality, setSelectedQuality] = useState<string>('__all__');
   const [mp3QuranReciters, setMp3QuranReciters] = useState<Mp3QuranReciter[]>([]);
   const [mp3QuranRecitersAr, setMp3QuranRecitersAr] = useState<Mp3QuranReciter[]>([]);
   const [selectedMp3QuranReciter, setSelectedMp3QuranReciter] = useState<number | null>(null);
   const [selectedMoshaf, setSelectedMoshaf] = useState<Mp3QuranMoshaf | null>(null);
   
-  // Search state for reciter dropdowns
-  const [everyAyahSearch, setEveryAyahSearch] = useState('');
-  const [mp3QuranSearch, setMp3QuranSearch] = useState('');
-  const [showEveryAyahDropdown, setShowEveryAyahDropdown] = useState(false);
-  const [showMp3QuranDropdown, setShowMp3QuranDropdown] = useState(false);
-  const everyAyahContainerRef = useRef<HTMLDivElement>(null);
-  const mp3QuranContainerRef = useRef<HTMLDivElement>(null);
-  const everyAyahInputRef = useRef<HTMLInputElement>(null);
-  const mp3QuranInputRef = useRef<HTMLInputElement>(null);
-  const everyAyahPollingRef = useRef<NodeJS.Timeout | null>(null);
-  const mp3QuranPollingRef = useRef<NodeJS.Timeout | null>(null);
+  // Unified reciter selection
+  const [selectedUnifiedReciter, setSelectedUnifiedReciter] = useState<UnifiedReciter | null>(null);
+  const [showReciterScroll, setShowReciterScroll] = useState(true);
+  
+  // EveryAyah: Reading, Style, Quality selection
+  const [selectedReading, setSelectedReading] = useState<string>('');
+  const [selectedStyle, setSelectedStyle] = useState<string>('');
+  const [selectedQuality, setSelectedQuality] = useState<string>('');
+  
+  // Unified search state
+  const [reciterSearch, setReciterSearch] = useState('');
+  const reciterSearchInputRef = useRef<HTMLInputElement>(null);
   
   // Track previous download status to detect transitions
   const prevDownloadStatusRef = useRef<string | null>(null);
-  
-  // Get the selected reciter object
-  const selectedReciterObj = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
-  
-  // Get reciters matching the selected reciter name (same reciter can have different styles/qualities)
-  const recitersMatchingName = selectedReciterObj 
-    ? everyAyahReciters.filter(r => r.nameAr === selectedReciterObj.nameAr)
-    : everyAyahReciters;
-  
-  // Get unique styles based on selected reciter name
-  const uniqueStyles = selectedEveryAyahReciter
-    ? [...new Set(recitersMatchingName.map(r => r.style).filter(Boolean))]
-    : [...new Set(everyAyahReciters.map(r => r.style).filter(Boolean))];
-  
-  // Get reciters matching reciter name AND selected style (for quality filtering)
-  const recitersMatchingNameAndStyle = selectedRecitationStyle === '__all__'
-    ? recitersMatchingName
-    : recitersMatchingName.filter(r => r.style === selectedRecitationStyle);
-  
-  // Get unique qualities based on selected reciter AND style
-  const uniqueQualities = [...new Set(recitersMatchingNameAndStyle.map(r => r.quality).filter(Boolean))].sort((a, b) => {
-    const numA = parseInt(a);
-    const numB = parseInt(b);
-    return numA - numB;
-  });
-  
-  // Filter reciters based on selected style and quality (for final reciter selection)
-  const filteredEveryAyahReciters = everyAyahReciters.filter(r => {
-    if (selectedRecitationStyle !== '__all__' && r.style !== selectedRecitationStyle) return false;
-    if (selectedQuality !== '__all__' && r.quality !== selectedQuality) return false;
-    return true;
-  });
   
   // Normalize Arabic text for search
   const normalizeArabic = (text: string): string => {
@@ -122,111 +104,58 @@ export function Download() {
     return normalizedText.includes(normalizedSearch);
   };
   
-  // Get unique reciter names (deduplicated by nameAr)
-  const uniqueReciterNames = everyAyahReciters.reduce((acc, reciter) => {
-    if (!acc.find(r => r.nameAr === reciter.nameAr)) {
-      acc.push(reciter);
-    }
-    return acc;
-  }, [] as Reciter[]);
-  
   // Get Arabic name for MP3Quran reciter
   const getMp3QuranReciterName = (reciter: Mp3QuranReciter) => {
     const arReciter = mp3QuranRecitersAr.find(r => r.id === reciter.id);
     return arReciter ? arReciter.name : reciter.name;
   };
   
-  // Get display value for EveryAyah search input
-  const getEveryAyahDisplayValue = () => {
-    if (showEveryAyahDropdown) return everyAyahSearch;
-    if (selectedEveryAyahReciter) {
-      const reciter = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
-      if (reciter) {
-        return language === 'ar' ? reciter.nameAr : reciter.name;
-      }
-    }
-    return '';
-  };
+  // Build unified reciter list (combining EveryAyah and MP3Quran)
+  const unifiedReciters = React.useMemo<UnifiedReciter[]>(() => {
+    const everyAyahUnified = everyAyahReciters.map((r) => ({
+      id: `everyayah-${r.folder}`,
+      name: r.name,
+      nameAr: r.nameAr,
+      source: 'everyayah' as const,
+      folder: r.folder,
+      quality: r.quality,
+      style: r.style,
+      reading: r.reading,
+      readingAr: r.readingAr,
+    }));
+    
+    const mp3QuranUnified = mp3QuranReciters.map((r) => {
+      const arReciter = mp3QuranRecitersAr.find(ar => ar.id === r.id);
+      return {
+        id: `mp3quran-${r.id}`,
+        name: r.name,
+        nameAr: r.nameAr || arReciter?.name || r.name,
+        source: 'mp3quran' as const,
+        mp3QuranId: r.id,
+        moshaf: r.moshaf,
+      };
+    });
+    
+    return [...everyAyahUnified, ...mp3QuranUnified];
+  }, [everyAyahReciters, mp3QuranReciters, mp3QuranRecitersAr]);
   
-  // Get display value for MP3Quran search input
-  const getMp3QuranDisplayValue = () => {
-    if (showMp3QuranDropdown) return mp3QuranSearch;
-    if (selectedMp3QuranReciter) {
-      const reciter = mp3QuranReciters.find(r => r.id === selectedMp3QuranReciter);
-      if (reciter) {
-        return getMp3QuranReciterName(reciter);
-      }
-    }
-    return '';
-  };
-  
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (everyAyahContainerRef.current && !everyAyahContainerRef.current.contains(target)) {
-        setShowEveryAyahDropdown(false);
-      }
-      if (mp3QuranContainerRef.current && !mp3QuranContainerRef.current.contains(target)) {
-        setShowMp3QuranDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Poll EveryAyah input for changes (fixes Android IME composition issue)
-  useEffect(() => {
-    if (showEveryAyahDropdown && everyAyahInputRef.current) {
-      everyAyahPollingRef.current = setInterval(() => {
-        if (everyAyahInputRef.current) {
-          const currentValue = everyAyahInputRef.current.value;
-          if (currentValue !== everyAyahSearch) {
-            setEveryAyahSearch(currentValue);
-          }
+  // Filtered and sorted unified reciters
+  const filteredUnifiedReciters = React.useMemo(() => {
+    return unifiedReciters
+      .filter((reciter) => {
+        const name = language === 'ar' ? reciter.nameAr : reciter.name;
+        return matchesSearch(name, reciterSearch);
+      })
+      .sort((a, b) => {
+        // Sort by source first (MP3Quran before EveryAyah)
+        if (a.source !== b.source) {
+          return a.source === 'mp3quran' ? -1 : 1;
         }
-      }, 100);
-    } else {
-      if (everyAyahPollingRef.current) {
-        clearInterval(everyAyahPollingRef.current);
-        everyAyahPollingRef.current = null;
-      }
-    }
-
-    return () => {
-      if (everyAyahPollingRef.current) {
-        clearInterval(everyAyahPollingRef.current);
-        everyAyahPollingRef.current = null;
-      }
-    };
-  }, [showEveryAyahDropdown, everyAyahSearch]);
-
-  // Poll MP3Quran input for changes (fixes Android IME composition issue)
-  useEffect(() => {
-    if (showMp3QuranDropdown && mp3QuranInputRef.current) {
-      mp3QuranPollingRef.current = setInterval(() => {
-        if (mp3QuranInputRef.current) {
-          const currentValue = mp3QuranInputRef.current.value;
-          if (currentValue !== mp3QuranSearch) {
-            setMp3QuranSearch(currentValue);
-          }
-        }
-      }, 100);
-    } else {
-      if (mp3QuranPollingRef.current) {
-        clearInterval(mp3QuranPollingRef.current);
-        mp3QuranPollingRef.current = null;
-      }
-    }
-
-    return () => {
-      if (mp3QuranPollingRef.current) {
-        clearInterval(mp3QuranPollingRef.current);
-        mp3QuranPollingRef.current = null;
-      }
-    };
-  }, [showMp3QuranDropdown, mp3QuranSearch]);
+        const nameA = language === 'ar' ? a.nameAr : a.name;
+        const nameB = language === 'ar' ? b.nameAr : b.name;
+        return nameA.localeCompare(nameB, language);
+      });
+  }, [unifiedReciters, reciterSearch, language]);
   
   // Determine if download button should be enabled
   const isDownloadEnabled = (() => {
@@ -235,25 +164,29 @@ export function Download() {
     if (downloadType === 'pages') {
       return true; // Pages just need a range
     } else if (downloadType === 'everyayah') {
-      // Need reciter, style, and quality all selected (not __all__)
-      return selectedEveryAyahReciter !== '' && 
-             selectedRecitationStyle !== '__all__' && 
-             selectedQuality !== '__all__';
+      // Need unified reciter selected, must be EveryAyah source, and must have reading/style/quality selected
+      return selectedUnifiedReciter !== null && 
+             selectedUnifiedReciter.source === 'everyayah' &&
+             selectedReading !== '' &&
+             selectedStyle !== '' &&
+             selectedQuality !== '';
     } else if (downloadType === 'mp3quran') {
-      return selectedMp3QuranReciter !== null && selectedMoshaf !== null;
+      // Need unified reciter selected and it must be MP3Quran source
+      return selectedUnifiedReciter !== null && selectedUnifiedReciter.source === 'mp3quran' && selectedMoshaf !== null;
     }
     return false;
   })();
   
   // Load reciters when component mounts
   useEffect(() => {
-    // Load EveryAyah reciters
-    getAudioData().then((data) => {
-      setEveryAyahReciters(data);
-      if (data.length > 0 && !selectedEveryAyahReciter) {
-        setSelectedEveryAyahReciter(data[0].folder);
-      }
-    });
+    // Load ALL EveryAyah reciters (including all variations)
+    fetch(`/assets/reciters.json`)
+      .then(response => response.json())
+      .then(data => {
+        // Filter for everyayah reciters only
+        const everyayahReciters = data.reciters.filter((r: any) => r.source === 'everyayah');
+        setEveryAyahReciters(everyayahReciters);
+      });
     
     // Load MP3Quran reciters (English and Arabic)
     getMp3QuranReciters('en').then((data) => {
@@ -281,6 +214,20 @@ export function Download() {
     }
   }, [selectedMp3QuranReciter, mp3QuranReciters]);
   
+  // Sync unified reciter selection with source-specific state
+  useEffect(() => {
+    if (selectedUnifiedReciter) {
+      if (selectedUnifiedReciter.source === 'mp3quran' && selectedUnifiedReciter.mp3QuranId) {
+        setSelectedMp3QuranReciter(selectedUnifiedReciter.mp3QuranId);
+        // Find the reciter and set the first moshaf
+        const reciter = mp3QuranReciters.find(r => r.id === selectedUnifiedReciter.mp3QuranId);
+        if (reciter && reciter.moshaf && reciter.moshaf.length > 0) {
+          setSelectedMoshaf(reciter.moshaf[0]);
+        }
+      }
+    }
+  }, [selectedUnifiedReciter, mp3QuranReciters]);
+  
   // Update max ayahs when surah changes
   useEffect(() => {
     const surah = surahs.find(s => s.id === downloadFromSurah);
@@ -288,30 +235,20 @@ export function Download() {
       setDownloadToAyah(surah.numberOfAyahs);
     }
   }, [downloadFromSurah]);
-
-  // Auto-update reciter selection when style/quality changes and current selection doesn't match
+  
+  // Reset reciter scroll when download type changes
   useEffect(() => {
-    if (!selectedEveryAyahReciter) return;
-    
-    const currentReciter = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
-    if (!currentReciter) return;
-    
-    const styleMatches = selectedRecitationStyle === '__all__' || currentReciter.style === selectedRecitationStyle;
-    const qualityMatches = selectedQuality === '__all__' || currentReciter.quality === selectedQuality;
-    
-    if (!styleMatches || !qualityMatches) {
-      // Find a matching reciter with same name
-      const matchingReciter = everyAyahReciters.find(r => 
-        r.nameAr === currentReciter.nameAr &&
-        (selectedRecitationStyle === '__all__' || r.style === selectedRecitationStyle) &&
-        (selectedQuality === '__all__' || r.quality === selectedQuality)
-      );
-      
-      if (matchingReciter) {
-        setSelectedEveryAyahReciter(matchingReciter.folder);
-      }
+    if (downloadType === 'everyayah' || downloadType === 'mp3quran') {
+      setShowReciterScroll(true);
     }
-  }, [selectedRecitationStyle, selectedQuality, everyAyahReciters, selectedEveryAyahReciter]);
+  }, [downloadType]);
+  
+  // Reset reading/style/quality when reciter changes
+  useEffect(() => {
+    setSelectedReading('');
+    setSelectedStyle('');
+    setSelectedQuality('');
+  }, [selectedUnifiedReciter]);
   
   // Initialize the ref on mount with current status (don't show toast for existing state)
   useEffect(() => {
@@ -369,7 +306,15 @@ export function Download() {
         },
       });
     } else if (downloadType === 'everyayah') {
-      const reciter = everyAyahReciters.find(r => r.folder === selectedEveryAyahReciter);
+      if (!selectedUnifiedReciter || selectedUnifiedReciter.source !== 'everyayah') return;
+      
+      // Find the exact reciter matching reading/style/quality selection
+      const reciter = everyAyahReciters.find(r => 
+        r.nameAr === selectedUnifiedReciter.nameAr &&
+        r.reading === selectedReading &&
+        r.style === selectedStyle &&
+        r.quality === selectedQuality
+      );
       if (!reciter) return;
       
       await startDownload({
@@ -384,7 +329,7 @@ export function Download() {
         },
       });
     } else if (downloadType === 'mp3quran') {
-      if (!selectedMoshaf) return;
+      if (!selectedMoshaf || !selectedUnifiedReciter || selectedUnifiedReciter.source !== 'mp3quran') return;
       
       await startDownload({
         type: 'mp3quran',
@@ -422,24 +367,47 @@ export function Download() {
             {t('downloadType')}
           </span>
         </div>
-        <Select value={downloadType} onValueChange={(value) => setDownloadType(value as 'pages' | 'everyayah' | 'mp3quran')}>
-          <SelectTrigger className={cn("w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-            <SelectItem value="pages" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>
+        <div className="flex flex-col gap-1 border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden bg-transparent">
+          <button
+            onClick={() => setDownloadType('pages')}
+            className={cn(
+              "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
+              downloadType === 'pages' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+              textSizeClasses.text
+            )}
+          >
+            <span className="text-emerald-800 dark:text-emerald-200">
               {t('downloadMushafPages')}
-            </SelectItem>
-            {/* Temporarily hidden - EveryAyah download option
-            <SelectItem value="everyayah" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>
+            </span>
+          </button>
+          {/* Temporarily hidden - EveryAyah download option */}
+          {/*
+          <button
+            onClick={() => setDownloadType('everyayah')}
+            className={cn(
+              "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
+              downloadType === 'everyayah' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+              textSizeClasses.text
+            )}
+          >
+            <span className="text-emerald-800 dark:text-emerald-200">
               {t('downloadEveryAyahAudio')}
-            </SelectItem>
-            */}
-            <SelectItem value="mp3quran" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>
+            </span>
+          </button>
+          */}
+          <button
+            onClick={() => setDownloadType('mp3quran')}
+            className={cn(
+              "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
+              downloadType === 'mp3quran' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+              textSizeClasses.text
+            )}
+          >
+            <span className="text-emerald-800 dark:text-emerald-200">
               {t('downloadMp3QuranAudio')}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+            </span>
+          </button>
+        </div>
       </div>
       
       {/* Pages Download Options */}
@@ -447,16 +415,47 @@ export function Download() {
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-2">
             <label className={cn("text-emerald-700 dark:text-emerald-300", textSizeClasses.label)}>{t('mushafType')}</label>
-            <Select value={downloadMushafType} onValueChange={(value) => setDownloadMushafType(value as MushafType)}>
-              <SelectTrigger className={cn("w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                <SelectItem value="mwdoa" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>{t('mushafMwdoa')}</SelectItem>
-                <SelectItem value="tashel" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>{t('mushafTashel')}</SelectItem>
-                <SelectItem value="madinah" className={cn("focus:bg-emerald-100 focus:text-emerald-900", textSizeClasses.text)}>{t('mushafMadinah')}</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-1 border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden bg-transparent max-h-40 overflow-y-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <button
+                onClick={() => setDownloadMushafType('mwdoa')}
+                className={cn(
+                  "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                  downloadMushafType === 'mwdoa' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                  textSizeClasses.text,
+                  isRTL ? 'text-right' : 'text-left'
+                )}
+              >
+                <span className="text-emerald-800 dark:text-emerald-200">
+                  {t('mushafMwdoa')}
+                </span>
+              </button>
+              <button
+                onClick={() => setDownloadMushafType('tashel')}
+                className={cn(
+                  "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                  downloadMushafType === 'tashel' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                  textSizeClasses.text,
+                  isRTL ? 'text-right' : 'text-left'
+                )}
+              >
+                <span className="text-emerald-800 dark:text-emerald-200">
+                  {t('mushafTashel')}
+                </span>
+              </button>
+              <button
+                onClick={() => setDownloadMushafType('madinah')}
+                className={cn(
+                  "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                  downloadMushafType === 'madinah' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                  textSizeClasses.text,
+                  isRTL ? 'text-right' : 'text-left'
+                )}
+              >
+                <span className="text-emerald-800 dark:text-emerald-200">
+                  {t('mushafMadinah')}
+                </span>
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex-1">
@@ -488,268 +487,470 @@ export function Download() {
       {/* EveryAyah Download Options */}
       {downloadType === 'everyayah' && (
         <div className="flex flex-col gap-3">
-          {/* Reciter Name Search Box */}
-          <div className="flex flex-col gap-2" ref={everyAyahContainerRef}>
-            <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('reciter')}</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400 z-10" />
-              <Input
-                ref={everyAyahInputRef}
-                placeholder={t('searchReciter')}
-                value={showEveryAyahDropdown ? everyAyahSearch : getEveryAyahDisplayValue()}
-                onChange={(e) => {
-                  setEveryAyahSearch(e.target.value);
-                  setShowEveryAyahDropdown(true);
-                }}
-                onCompositionUpdate={(e) => {
-                  const target = e.target as HTMLInputElement;
-                  setEveryAyahSearch(target.value);
-                }}
-                onKeyUp={(e) => {
-                  const target = e.target as HTMLInputElement;
-                  if (target.value !== everyAyahSearch) {
-                    setEveryAyahSearch(target.value);
-                  }
-                }}
-                onFocus={() => {
-                  setEveryAyahSearch('');
-                  setShowEveryAyahDropdown(true);
-                }}
-                className="pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg bg-emerald-50 dark:bg-emerald-900/20"
-              />
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            
-            {/* Dropdown Results */}
-            {showEveryAyahDropdown && (
-              <div 
-                className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#FBF9F4] dark:bg-emerald-950 border border-emerald-300 rounded-lg shadow-lg"
-                style={{ maxHeight: '200px', overflowY: 'scroll' }}
-              >
-                {uniqueReciterNames
-                  .filter((reciter) => {
-                    const name = language === 'ar' ? reciter.nameAr : reciter.name;
-                    return matchesSearch(name, everyAyahSearch);
-                  })
-                  .slice()
-                  .sort((a, b) => {
-                    const nameA = language === 'ar' ? a.nameAr : a.name;
-                    const nameB = language === 'ar' ? b.nameAr : b.name;
-                    return nameA.localeCompare(nameB, language);
-                  })
-                  .map((reciter, index) => (
-                    <div
-                      key={reciter.folder}
-                      className="px-4 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-800 cursor-pointer border-b border-emerald-100 last:border-none"
-                      onClick={() => {
-                        setSelectedEveryAyahReciter(reciter.folder);
-                        setShowEveryAyahDropdown(false);
-                      }}
-                    >
-                      <div className={cn("flex items-center gap-2 w-full text-base md:text-xl", language === 'ar' && "flex-row-reverse text-right")}>
-                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">{index + 1}.</span>
-                        <span className="flex-1">{language === 'ar' ? reciter.nameAr : reciter.name}</span>
-                      </div>
-                    </div>
-                  ))}
+          {showReciterScroll ? (
+            /* Reciter Selection Phase */
+            <>
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('reciter')}</label>
               </div>
-            )}
-          </div>
-          </div>
-          
-          {/* Recitation Style */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('recitationStyle')}</label>
-            <Select value={selectedRecitationStyle} onValueChange={(v) => {
-              setSelectedRecitationStyle(v);
-              // Reset quality selection when style changes (reciter stays)
-              setSelectedQuality('__all__');
-            }}>
-              <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
-                <SelectValue placeholder={isRTL ? 'الكل' : 'All'} />
-              </SelectTrigger>
-              <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60 z-[100]" position="popper" sideOffset={5}>
-                <SelectItem value="__all__" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
-                  {isRTL ? 'الكل' : 'All'}
-                </SelectItem>
-                {uniqueStyles.map((style) => (
-                  <SelectItem key={style} value={style} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
-                    {style === 'murattal' ? (isRTL ? 'مرتل' : 'Murattal') : 
-                     style === 'mujawwad' ? (isRTL ? 'مجود' : 'Mujawwad') :
-                     style === 'muallim' ? (isRTL ? 'معلم' : 'Muallim') : style}
-                  </SelectItem>
+              {/* Search input */}
+              <div className="relative">
+                <Search className={cn(
+                  'absolute top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 dark:text-emerald-400',
+                  isRTL ? 'right-3' : 'left-3'
+                )} />
+                <input
+                  ref={reciterSearchInputRef}
+                  type="text"
+                  placeholder={t('searchReciter')}
+                  value={reciterSearch}
+                  onChange={(e) => setReciterSearch(e.target.value)}
+                  className={cn(
+                    'w-full h-9 rounded-md border border-emerald-300 bg-transparent px-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
+                    isRTL ? 'pr-9 text-right' : 'pl-9 text-left',
+                    textSizeClasses.text
+                  )}
+                />
+              </div>
+
+              {/* Unified Reciter scrollable list */}
+              <div className="overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-48" style={{ WebkitOverflowScrolling: 'touch' }}>
+                {filteredUnifiedReciters.map((reciter, index) => (
+                  <button
+                    key={reciter.id}
+                    onClick={() => {
+                      setSelectedUnifiedReciter(reciter);
+                      setShowReciterScroll(false);
+                    }}
+                    className={cn(
+                      'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+                      'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
+                      selectedUnifiedReciter?.id === reciter.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                      textSizeClasses.text,
+                      isRTL ? 'text-right' : 'text-left'
+                    )}
+                  >
+                    <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+                      <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
+                      <span className="flex-1 text-emerald-800 dark:text-emerald-200">
+                        {language === 'ar' ? reciter.nameAr : reciter.name}
+                      </span>
+                      {/* Source badge only */}
+                      <span className={cn(
+                        'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+                        reciter.source === 'everyayah'
+                          ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                          : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+                      )}>
+                        {reciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
+                      </span>
+                    </div>
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Quality */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('quality')}</label>
-            <Select value={selectedQuality} onValueChange={setSelectedQuality}>
-              <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
-                <SelectValue placeholder={isRTL ? 'الكل' : 'All'} />
-              </SelectTrigger>
-              <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60 z-[100]" position="popper" sideOffset={5}>
-                <SelectItem value="__all__" className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
-                  {isRTL ? 'الكل' : 'All'}
-                </SelectItem>
-                {uniqueQualities.map((quality) => (
-                  <SelectItem key={quality} value={quality} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
-                    {quality}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex flex-col gap-2">
-            <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('selectSurah')}</label>
-            <Select value={String(downloadFromSurah)} onValueChange={(v) => setDownloadFromSurah(parseInt(v))}>
-              <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60 z-[100]" position="popper" sideOffset={5}>
-                {surahs.map((surah) => (
-                  <SelectItem key={surah.id} value={String(surah.id)} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
-                    {surah.id}. {isRTL ? surah.name : surah.englishName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('fromAyah')}</label>
-              <input
-                type="number"
-                min={1}
-                max={surahs.find(s => s.id === downloadFromSurah)?.numberOfAyahs || 7}
-                value={downloadFromAyah}
-                onChange={(e) => setDownloadFromAyah(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('toAyah')}</label>
-              <input
-                type="number"
-                min={1}
-                max={surahs.find(s => s.id === downloadFromSurah)?.numberOfAyahs || 7}
-                value={downloadToAyah}
-                onChange={(e) => setDownloadToAyah(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
-              />
-            </div>
-          </div>
+              </div>
+            </>
+          ) : selectedUnifiedReciter ? (
+            /* Reciter Selected - Show chip with edit button */
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col gap-3"
+            >
+              <div className={cn(
+                'flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30',
+                isRTL ? 'flex-row-reverse' : 'flex-row'
+              )}>
+                <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200', textSizeClasses.text)}>
+                  {language === 'ar' ? selectedUnifiedReciter.nameAr : selectedUnifiedReciter.name}
+                </span>
+                <span className={cn(
+                  'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+                  selectedUnifiedReciter.source === 'everyayah'
+                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                    : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+                )}>
+                  {selectedUnifiedReciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
+                </span>
+                <button
+                  onClick={() => setShowReciterScroll(true)}
+                  className="shrink-0 p-1.5 rounded-md text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-800 transition-colors"
+                  title={t('searchReciter')}
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+              </div>
+              
+              {/* Reading/Style/Quality Selection for EveryAyah */}
+              {selectedUnifiedReciter.source === 'everyayah' && (
+                <div className="flex flex-col">
+                  {/* Column Headers */}
+                  <div className="flex gap-2 mb-2">
+                    <div className="flex-1 text-center">
+                      <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+                        {t('reading')}
+                      </h3>
+                    </div>
+                    <div className="flex-1 text-center">
+                      <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+                        {t('recitationStyle')}
+                      </h3>
+                    </div>
+                    <div className="flex-1 text-center">
+                      <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+                        {t('quality')}
+                      </h3>
+                    </div>
+                  </div>
+
+                  {/* Scrollable Columns */}
+                  <div className="flex gap-2 max-h-32 mb-3">
+                    {/* Reading Column */}
+                    <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
+                      {(() => {
+                        const readings = [...new Set(everyAyahReciters
+                          .filter(r => r.nameAr === selectedUnifiedReciter.nameAr)
+                          .map(r => r.reading)
+                        )];
+                        return readings.map((reading) => (
+                          <button
+                            key={reading}
+                            onClick={() => {
+                              setSelectedReading(reading);
+                              setSelectedStyle('');
+                              setSelectedQuality('');
+                            }}
+                            className={cn(
+                              "w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-center",
+                              selectedReading === reading && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                              textSizeClasses.text
+                            )}
+                          >
+                            <span className="text-emerald-800 dark:text-emerald-200">
+                              {language === 'ar' 
+                                ? (everyAyahReciters.find(r => r.reading === reading)?.readingAr || reading)
+                                : reading.charAt(0).toUpperCase() + reading.slice(1)
+                              }
+                            </span>
+                          </button>
+                        ));
+                      })()}
+                    </div>
+
+                    {/* Style Column */}
+                    <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
+                      {(() => {
+                        const styles = selectedReading
+                          ? [...new Set(everyAyahReciters
+                              .filter(r => r.nameAr === selectedUnifiedReciter.nameAr && r.reading === selectedReading)
+                              .map(r => r.style)
+                            )]
+                          : [];
+                        return styles.map((style) => (
+                          <button
+                            key={style}
+                            onClick={() => {
+                              setSelectedStyle(style);
+                              setSelectedQuality('');
+                            }}
+                            className={cn(
+                              "w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-center",
+                              selectedStyle === style && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                              textSizeClasses.text
+                            )}
+                          >
+                            <span className="text-emerald-800 dark:text-emerald-200">
+                              {t(style as 'murattal' | 'mujawwad' | 'muallim')}
+                            </span>
+                          </button>
+                        ));
+                      })()}
+                    </div>
+
+                    {/* Quality Column */}
+                    <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
+                      {(() => {
+                        const qualities = selectedReading && selectedStyle
+                          ? [...new Set(everyAyahReciters
+                              .filter(r => r.nameAr === selectedUnifiedReciter.nameAr && r.reading === selectedReading && r.style === selectedStyle)
+                              .map(r => r.quality)
+                            )].sort((a, b) => parseInt(a) - parseInt(b))
+                          : [];
+                        return qualities.map((quality) => (
+                          <button
+                            key={quality}
+                            onClick={() => setSelectedQuality(quality)}
+                            className={cn(
+                              "w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-center",
+                              selectedQuality === quality && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                              textSizeClasses.text
+                            )}
+                          >
+                            <span className="text-emerald-800 dark:text-emerald-200">
+                              {quality}
+                            </span>
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex flex-col gap-2">
+                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('selectSurah')}</label>
+                <div className="flex flex-col gap-1 border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden bg-transparent max-h-40 overflow-y-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  {surahs.map((surah) => (
+                    <button
+                      key={surah.id}
+                      onClick={() => setDownloadFromSurah(surah.id)}
+                      className={cn(
+                        "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
+                        downloadFromSurah === surah.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                        textSizeClasses.text
+                      )}
+                    >
+                      <span className="text-emerald-800 dark:text-emerald-200">
+                        {surah.id}. {isRTL ? surah.name : surah.englishName}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('fromAyah')}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={surahs.find(s => s.id === downloadFromSurah)?.numberOfAyahs || 7}
+                    value={downloadFromAyah}
+                    onChange={(e) => setDownloadFromAyah(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('toAyah')}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={surahs.find(s => s.id === downloadFromSurah)?.numberOfAyahs || 7}
+                    value={downloadToAyah}
+                    onChange={(e) => setDownloadToAyah(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+            </motion.div>
+          ) : null}
         </div>
       )}
       
       {/* MP3Quran Download Options */}
       {downloadType === 'mp3quran' && (
         <div className="flex flex-col gap-3">
-          {/* Reciter Name Search Box */}
-          <div className="flex flex-col gap-2" ref={mp3QuranContainerRef}>
-            <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('reciter')}</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400 z-10" />
-              <Input
-                ref={mp3QuranInputRef}
-                placeholder={t('searchReciter')}
-                value={showMp3QuranDropdown ? mp3QuranSearch : getMp3QuranDisplayValue()}
-                onChange={(e) => {
-                  setMp3QuranSearch(e.target.value);
-                  setShowMp3QuranDropdown(true);
-                }}
-                onCompositionUpdate={(e) => {
-                  const target = e.target as HTMLInputElement;
-                  setMp3QuranSearch(target.value);
-                }}
-                onKeyUp={(e) => {
-                  const target = e.target as HTMLInputElement;
-                  if (target.value !== mp3QuranSearch) {
-                    setMp3QuranSearch(target.value);
-                  }
-                }}
-                onFocus={() => {
-                  setMp3QuranSearch('');
-                  setShowMp3QuranDropdown(true);
-                }}
-                className="pl-10 pr-10 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 text-base md:text-lg bg-emerald-50 dark:bg-emerald-900/20"
-              />
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            
-            {/* Dropdown Results */}
-            {showMp3QuranDropdown && (
-              <div 
-                className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#FBF9F4] dark:bg-emerald-950 border border-emerald-300 rounded-lg shadow-lg"
-                style={{ maxHeight: '200px', overflowY: 'scroll' }}
-              >
-                {mp3QuranReciters
-                  .filter((reciter) => matchesSearch(getMp3QuranReciterName(reciter), mp3QuranSearch))
-                  .slice()
-                  .sort((a, b) => {
-                    const nameA = getMp3QuranReciterName(a);
-                    const nameB = getMp3QuranReciterName(b);
-                    return nameA.localeCompare(nameB, 'ar');
-                  })
-                  .map((reciter, index) => (
-                    <div
-                      key={reciter.id}
-                      className="px-4 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-800 cursor-pointer border-b border-emerald-100 last:border-none"
-                      onClick={() => {
-                        setSelectedMp3QuranReciter(reciter.id);
-                        setShowMp3QuranDropdown(false);
-                      }}
-                    >
-                      <div className="flex items-center gap-2 w-full flex-row-reverse text-right text-base md:text-xl">
-                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">{index + 1}.</span>
-                        <span className="flex-1">{getMp3QuranReciterName(reciter)}</span>
-                      </div>
-                    </div>
-                  ))}
+          {showReciterScroll ? (
+            /* Reciter Selection Phase */
+            <>
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('reciter')}</label>
               </div>
-            )}
-          </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('fromSurah')}</label>
-              <Select value={String(downloadFromSurah)} onValueChange={(v) => {
-                const newFromSurah = parseInt(v);
-                setDownloadFromSurah(newFromSurah);
-                // Auto-adjust toSurah if it's now less than fromSurah
-                if (downloadToSurah < newFromSurah) {
-                  setDownloadToSurah(newFromSurah);
-                }
-              }}>
-                <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60 z-[100]" position="popper" sideOffset={5}>
-                  {surahs.map((surah) => (
-                    <SelectItem key={surah.id} value={String(surah.id)} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
-                      {surah.id}. {isRTL ? surah.name : surah.englishName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1">
-              <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('toSurah')}</label>
-              <Select value={String(downloadToSurah)} onValueChange={(v) => setDownloadToSurah(parseInt(v))}>
-                <SelectTrigger className="w-full text-base md:text-xl border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 touch-manipulation">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950 max-h-60 z-[100]" position="popper" sideOffset={5}>
-                  {surahs.filter(surah => surah.id >= downloadFromSurah).map((surah) => (
-                    <SelectItem key={surah.id} value={String(surah.id)} className="text-base md:text-xl focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 touch-manipulation">
-                      {surah.id}. {isRTL ? surah.name : surah.englishName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+              {/* Search input */}
+              <div className="relative">
+                <Search className={cn(
+                  'absolute top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 dark:text-emerald-400',
+                  isRTL ? 'right-3' : 'left-3'
+                )} />
+                <input
+                  ref={reciterSearchInputRef}
+                  type="text"
+                  placeholder={t('searchReciter')}
+                  value={reciterSearch}
+                  onChange={(e) => setReciterSearch(e.target.value)}
+                  className={cn(
+                    'w-full h-9 rounded-md border border-emerald-300 bg-transparent px-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
+                    isRTL ? 'pr-9 text-right' : 'pl-9 text-left',
+                    textSizeClasses.text
+                  )}
+                />
+              </div>
+
+              {/* Unified Reciter scrollable list */}
+              <div className="overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-48" style={{ WebkitOverflowScrolling: 'touch' }}>
+                {filteredUnifiedReciters.map((reciter, index) => (
+                  <button
+                    key={reciter.id}
+                    onClick={() => {
+                      setSelectedUnifiedReciter(reciter);
+                      setShowReciterScroll(false);
+                    }}
+                    className={cn(
+                      'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+                      'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
+                      selectedUnifiedReciter?.id === reciter.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                      textSizeClasses.text,
+                      isRTL ? 'text-right' : 'text-left'
+                    )}
+                  >
+                    <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+                      <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
+                      <span className="flex-1 text-emerald-800 dark:text-emerald-200">
+                        {language === 'ar' ? reciter.nameAr : reciter.name}
+                      </span>
+                      {/* Source badge only */}
+                      <span className={cn(
+                        'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+                        reciter.source === 'everyayah'
+                          ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                          : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+                      )}>
+                        {reciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : selectedUnifiedReciter ? (
+            /* Reciter Selected - Show chip with edit button */
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col gap-3"
+            >
+              <div className={cn(
+                'flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30',
+                isRTL ? 'flex-row-reverse' : 'flex-row'
+              )}>
+                <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200', textSizeClasses.text)}>
+                  {language === 'ar' ? selectedUnifiedReciter.nameAr : selectedUnifiedReciter.name}
+                </span>
+                <span className={cn(
+                  'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+                  selectedUnifiedReciter.source === 'everyayah'
+                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                    : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+                )}>
+                  {selectedUnifiedReciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
+                </span>
+                <button
+                  onClick={() => setShowReciterScroll(true)}
+                  className="shrink-0 p-1.5 rounded-md text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-800 transition-colors"
+                  title={t('searchReciter')}
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+              </div>
+              
+              {/* Moshaf Selection (only for mp3quran) */}
+              {selectedUnifiedReciter.source === 'mp3quran' && selectedUnifiedReciter.moshaf && selectedUnifiedReciter.moshaf.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('mushafType')}</label>
+                  <div className="flex flex-col gap-1 border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden bg-transparent max-h-32 overflow-y-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    {selectedUnifiedReciter.moshaf.map((moshaf) => {
+                      // Get Arabic moshaf name if language is Arabic
+                      let displayName = moshaf.name;
+                      if (language === 'ar' && selectedUnifiedReciter.mp3QuranId) {
+                        const arReciter = mp3QuranRecitersAr.find(r => r.id === selectedUnifiedReciter.mp3QuranId);
+                        const arMoshaf = arReciter?.moshaf?.find(m => m.id === moshaf.id);
+                        if (arMoshaf) {
+                          displayName = arMoshaf.name;
+                        }
+                      }
+                      
+                      // Remove duplicate text pattern like "text - text"
+                      const parts = displayName.split(' - ');
+                      if (parts.length === 2 && parts[0].trim() === parts[1].trim()) {
+                        displayName = parts[0].trim();
+                      }
+                      
+                      return (
+                        <button
+                          key={moshaf.id}
+                          onClick={() => setSelectedMoshaf(moshaf)}
+                          className={cn(
+                            "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                            selectedMoshaf?.id === moshaf.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                            textSizeClasses.text,
+                            isRTL ? 'text-right' : 'text-left'
+                          )}
+                        >
+                          <span className="text-emerald-800 dark:text-emerald-200">
+                            {displayName}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* From/To Surah - Side by Side Scrollable Columns */}
+              <div className="flex flex-col">
+                {/* Column Headers */}
+                <div className="flex gap-2 mb-2">
+                  <div className="flex-1 text-center">
+                    <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+                      {t('fromSurah')}
+                    </h3>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+                      {t('toSurah')}
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Scrollable Columns */}
+                <div className="flex gap-2 max-h-40">
+                  {/* From Surah Column */}
+                  <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    {surahs.map((surah) => (
+                      <button
+                        key={surah.id}
+                        onClick={() => {
+                          setDownloadFromSurah(surah.id);
+                          // Auto-adjust toSurah if it's now less than fromSurah
+                          if (downloadToSurah < surah.id) {
+                            setDownloadToSurah(surah.id);
+                          }
+                        }}
+                        className={cn(
+                          "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
+                          downloadFromSurah === surah.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                          textSizeClasses.text
+                        )}
+                      >
+                        <span className="text-emerald-800 dark:text-emerald-200">
+                          {surah.id}. {isRTL ? surah.name : surah.englishName}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* To Surah Column */}
+                  <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    {surahs.filter(surah => surah.id >= downloadFromSurah).map((surah) => (
+                      <button
+                        key={surah.id}
+                        onClick={() => setDownloadToSurah(surah.id)}
+                        className={cn(
+                          "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
+                          downloadToSurah === surah.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                          textSizeClasses.text
+                        )}
+                      >
+                        <span className="text-emerald-800 dark:text-emerald-200">
+                          {surah.id}. {isRTL ? surah.name : surah.englishName}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : null}
         </div>
       )}
       
@@ -814,7 +1015,7 @@ export function Download() {
       )}
       
       {/* Download/Cancel Buttons */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 pt-2">
         <button
           onClick={handleDownload}
           disabled={!isDownloadEnabled || !isOnline || isDownloading}
