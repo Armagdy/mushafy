@@ -86,13 +86,15 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
   // Normalize Arabic text by removing diacritics and normalizing character variations
   const normalizeArabic = (text: string) => {
     const normalized = text
-      .replace(/ٰ/g, 'ا') // IMPORTANT: Normalize superscript alif (U+0670) to regular alif FIRST, before removing diacritics
+      .replace(/\u0640\u0670/g, '') // Remove tatweel+superscript-alif combo FIRST (e.g. هَـٰٓؤُلَآء, أُوْلَـٰٓئِكَ) — decorative elongation, NOT a real alif
+      .replace(/\u0670/g, '\u0627') // Remaining standalone superscript alif → regular alif (e.g. إِبْرَٰهِيمَ has a real alif here)
+      .replace(/\u0640/g, '') // Remove any remaining tatweel/kashida
       .replace(/[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g, '') // Remove diacritics
       .replace(/[ٱأإآٲٳٵ]/g, 'ا') // Normalize alef variations
       .replace(/[ىي]/g, 'ي') // Normalize yaa
       .replace(/ة/g, 'ه') // Normalize taa marboota
       .replace(/ؤ/g, 'و') // Normalize waw with hamza
-      .replace(/ئ/g, 'ي') // Normalize yaa with hamza
+      // .replace(/ئ/g, 'ي') // Normalize yaa with hamza
       .toLowerCase();
     
     // Debug: Show before and after for first few characters
