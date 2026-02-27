@@ -350,7 +350,7 @@ export default function ConfigOverlay({
       >
         {/* Header with close button */}
         <div 
-          className="sticky top-0 z-10 bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-lg pt-12"
+          className="sticky top-0 z-10 bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-lg pt-8"
         >
           <div className="flex items-center justify-between px-4 py-3">
             <Button

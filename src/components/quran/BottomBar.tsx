@@ -52,7 +52,7 @@ export function BottomBar({
         "px-2 md:px-6 flex items-stretch justify-between",
         showBottomBarText ? "pt-1 md:pt-1.5 pb-0.5 md:pb-1" : "pt-1.5 md:pt-2 pb-2 md:pb-3"
       )}
-      style={{ paddingBottom: `calc(env(safe-area-inset-bottom) + 0.75rem)` }}
+      style={{ paddingBottom: `calc(env(safe-area-inset-bottom) + 0.25rem)` }}
     >
       {buttons.map(({ key, icon: Icon, label, onClick, title }) => {
         const isActive = activeButton === key;
