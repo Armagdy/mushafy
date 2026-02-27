@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { surahs } from '@/data/surahs';
 import { Button } from '@/components/ui/button';
 import { TopBar } from '@/components/quran/TopBar';
@@ -953,10 +953,8 @@ const Surah = () => {
       />
 
       {/* ConfigOverlay for Settings, Bookmarks, Tafseer, etc. */}
-      <AnimatePresence>
       {configOverlayType && (
         <ConfigOverlay
-          key="config-overlay"
           type={configOverlayType}
           onClose={() => setConfigOverlayType(null)}
           onChangeView={(view) => setConfigOverlayType(view)}
@@ -1042,7 +1040,6 @@ const Surah = () => {
           onSeekToAyahPosition={seekToAyahPosition}
         />
       )}
-      </AnimatePresence>
     </div>
   );
 };
