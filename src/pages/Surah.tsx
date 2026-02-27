@@ -783,6 +783,7 @@ const Surah = () => {
         totalBookmarks={getTotalBookmarks()}
         isMobile={isMobile}
         viewMode={viewMode}
+        activeButton={null}
         onGoToClick={() => {
           // Reset navigation initial values to show main menu (no specific type selected)
           setInitialNavigationType(undefined);

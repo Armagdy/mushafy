@@ -389,6 +389,14 @@ export default function ConfigOverlay({
           totalBookmarks={getTotalBookmarks()}
           isMobile={isMobile}
           viewMode={viewMode}
+          activeButton={
+            type === 'navigation' ? 'navigation'
+            : type === 'search' ? 'search'
+            : type === 'bookmarks' ? 'bookmarks'
+            : type === 'settings' ? 'settings'
+            : type === 'tafseer' ? 'tafseer'
+            : null
+          }
           onGoToClick={() => type === 'navigation' ? onClose() : onChangeView('navigation')}
           onSearchClick={() => type === 'search' ? onClose() : onChangeView('search')}
           onBookmarkClick={() => type === 'bookmarks' ? onClose() : onChangeView('bookmarks')}

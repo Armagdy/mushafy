@@ -4,11 +4,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 
+type ActiveBottomButton = 'navigation' | 'search' | 'tafseer' | 'bookmarks' | 'settings' | null;
+
 interface BottomBarProps {
   showBottomBarText: boolean;
   totalBookmarks: number;
   isMobile: boolean;
   viewMode: 'single' | 'double';
+  activeButton?: ActiveBottomButton;
   onGoToClick: () => void;
   onSearchClick: () => void;
   onBookmarkClick: () => void;
@@ -22,6 +25,7 @@ export function BottomBar({
   totalBookmarks,
   isMobile,
   viewMode,
+  activeButton = null,
   onGoToClick,
   onSearchClick,
   onBookmarkClick,
@@ -31,6 +35,17 @@ export function BottomBar({
 }: BottomBarProps) {
   const { isRTL, t } = useLanguage();
 
+  const activeIconClass = "text-emerald-800";
+  const inactiveIconClass = "text-[#F2E3BB] group-hover:text-white";
+
+  const buttons = [
+    { key: 'navigation' as const, icon: Navigation, label: isRTL ? 'انتقل' : 'Go To', onClick: onGoToClick, title: t('search') },
+    { key: 'search' as const, icon: Search, label: isRTL ? 'بحث' : 'Search', onClick: onSearchClick, title: isRTL ? 'بحث عن كلمة' : 'Word Search' },
+    { key: 'tafseer' as const, icon: BookText, label: t('tafseer'), onClick: onTafseerClick, title: t('tafseer') },
+    { key: 'bookmarks' as const, icon: Bookmark, label: isRTL ? 'علامة' : t('bookmark'), onClick: onBookmarkClick, title: t('bookmarks') },
+    { key: 'settings' as const, icon: Settings, label: t('settings'), onClick: onSettingsClick, title: t('settings') },
+  ];
+
   return (
     <div 
       className={cn(
@@ -39,83 +54,46 @@ export function BottomBar({
       )}
       style={{ paddingBottom: `calc(env(safe-area-inset-bottom) + 0.75rem)` }}
     >
-      {/* Go To */}
-      <div className="flex-1 flex justify-center">
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={onGoToClick}
-          className="flex flex-col items-center gap-0.5 md:gap-1 text-[#F2E3BB] hover:text-white transition-colors group"
-          title={t('search')}
-        >
-          <Navigation className="w-7 h-7 md:w-8 md:h-8 text-[#F2E3BB] group-hover:text-white" />
-          {showBottomBarText && <span className="text-base md:text-xl font-medium">{isRTL ? 'انتقل' : 'Go To'}</span>}
-        </motion.button>
-      </div>
-
-      {/* Word Search */}
-      <div className="flex-1 flex justify-center">
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={onSearchClick}
-          className="flex flex-col items-center gap-0.5 md:gap-1 text-[#F2E3BB] hover:text-white transition-colors group"
-          title={isRTL ? 'بحث عن كلمة' : 'Word Search'}
-        >
-          <Search className="w-7 h-7 md:w-8 md:h-8 text-[#F2E3BB] group-hover:text-white" />
-          {showBottomBarText && <span className="text-base md:text-xl font-medium">{isRTL ? ' بحث' : 'Search'}</span>}
-        </motion.button>
-      </div>
-
-      {/* Tafseer Button */}
-      <div className="flex-1 flex justify-center">
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={onTafseerClick}
-          className="flex flex-col items-center gap-0.5 md:gap-1 text-[#F2E3BB] hover:text-white transition-colors group"
-          title={t('tafseer')}
-        >
-          <BookText className="w-7 h-7 md:w-8 md:h-8 text-[#F2E3BB] group-hover:text-white" />
-          {showBottomBarText && <span className="text-base md:text-xl font-medium">{t('tafseer')}</span>}
-        </motion.button>
-      </div>
-
-      {/* Bookmark Button */}
-      <div className="flex-1 flex justify-center">
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={onBookmarkClick}
-          className="flex flex-col items-center gap-0.5 md:gap-1 text-[#F2E3BB] hover:text-white transition-colors group"
-          title={t('bookmarks')}
-        >
-          <div className="relative">
-            <Bookmark className="w-7 h-7 md:w-8 md:h-8 text-[#F2E3BB] group-hover:text-white" />
-            {totalBookmarks > 0 && (
-              <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] rounded-full min-w-[12px] h-3 px-1 flex items-center justify-center">
-                {totalBookmarks}
-              </span>
+      {buttons.map(({ key, icon: Icon, label, onClick, title }) => {
+        const isActive = activeButton === key;
+        return (
+          <div key={key} className="flex-1 flex justify-center relative">
+            {/* Animated shared background — slides between buttons via layoutId */}
+            {isActive && (
+              <motion.div
+                layoutId="bottom-bar-active-bg"
+                className="absolute inset-0 bg-[#F2E3BB] rounded-xl pt-1.5"
+                transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+              />
             )}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={onClick}
+              className="relative flex flex-col items-center gap-0.5 md:gap-1 transition-colors group w-full py-1.5 pt-2"
+              title={title}
+            >
+              {key === 'bookmarks' ? (
+                <div className="relative">
+                  <Icon className={cn("w-7 h-7 md:w-8 md:h-8 transition-colors", isActive ? activeIconClass : inactiveIconClass)} />
+                  {totalBookmarks > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] rounded-full min-w-[12px] h-3 px-1 flex items-center justify-center">
+                      {totalBookmarks}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <Icon className={cn("w-7 h-7 md:w-8 md:h-8 transition-colors", isActive ? activeIconClass : inactiveIconClass)} />
+              )}
+              {showBottomBarText && (
+                <span className={cn("text-base md:text-xl font-medium transition-colors", isActive ? activeIconClass : "text-[#F2E3BB] group-hover:text-white")}>
+                  {label}
+                </span>
+              )}
+            </motion.button>
           </div>
-          {showBottomBarText && <span className="text-base md:text-xl font-medium">{isRTL ? 'علامة' : t('bookmark')}</span>}
-        </motion.button>
-      </div>
-
-      {/* 
-      {/* Settings */}
-      <div className="flex-1 flex justify-center">
-        <motion.button
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={onSettingsClick}
-          className="flex flex-col items-center gap-0.5 md:gap-1 text-[#F2E3BB] hover:text-white transition-colors group"
-          title={t('settings')}
-        >
-          <Settings className="w-7 h-7 md:w-8 md:h-8 text-[#F2E3BB] group-hover:text-white" />
-          {showBottomBarText && <span className="text-base md:text-xl font-medium">{t('settings')}</span>}
-        </motion.button>
-      </div>
+        );
+      })}
 
       {/* View Mode Toggle - Hidden on mobile */}
       {!isMobile && (
