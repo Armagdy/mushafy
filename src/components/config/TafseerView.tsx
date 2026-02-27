@@ -131,17 +131,17 @@ export default function TafseerView() {
   // Navigation handlers
   const handlePreviousAyah = useCallback(() => {
     if (currentAyahNumber > 1) {
-      setAnimDirection(isRTL ? 1 : -1);
+      setAnimDirection(-1); // enters from right, slides left
       setCurrentAyahNumber(prev => prev - 1);
     }
-  }, [currentAyahNumber, isRTL]);
+  }, [currentAyahNumber]);
 
   const handleNextAyah = useCallback(() => {
     if (currentAyahNumber < maxAyahs) {
-      setAnimDirection(isRTL ? -1 : 1);
+      setAnimDirection(1); // enters from left, slides right
       setCurrentAyahNumber(prev => prev + 1);
     }
-  }, [currentAyahNumber, maxAyahs, isRTL]);
+  }, [currentAyahNumber, maxAyahs]);
 
   // Swipe gesture support for navigating between ayahs
   const touchStartX = useRef<number>(0);
@@ -178,15 +178,10 @@ export default function TafseerView() {
     const absY = Math.abs(deltaY);
     if (absX < 50 || absX < absY * 1.2) return;
 
-    // RTL: swipe right → previous ayah, swipe left → next ayah
-    // LTR: swipe left → next ayah, swipe right → previous ayah
-    if (isRTL) {
-      if (deltaX > 0) handlePreviousAyah();
-      else handleNextAyah();
-    } else {
-      if (deltaX < 0) handleNextAyah();
-      else handlePreviousAyah();
-    }
+    // Swipe right (left→right, deltaX > 0) → next ayah
+    // Swipe left  (right→left, deltaX < 0) → previous ayah
+    if (deltaX > 0) handleNextAyah();
+    else handlePreviousAyah();
   }, [isRTL, handlePreviousAyah, handleNextAyah]);
 
   // Get tafseers for current language
@@ -280,11 +275,11 @@ export default function TafseerView() {
         isRTL && "flex-row-reverse"
       )}>
         <button
-          onClick={handlePreviousAyah}
-          disabled={currentAyahNumber <= 1}
+          onClick={handleNextAyah}
+          disabled={currentAyahNumber >= maxAyahs}
           className={cn("bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md px-3 md:px-4 py-1.5 md:py-2 text-[#F2E3BB] font-medium transition-all", textSizeClasses.button)}
         >
-          {t('previousAyah')}
+          {t('nextAyah')}
         </button>
         
         <div className="text-center flex-1">
@@ -294,11 +289,11 @@ export default function TafseerView() {
         </div>
 
         <button
-          onClick={handleNextAyah}
-          disabled={currentAyahNumber >= maxAyahs}
+          onClick={handlePreviousAyah}
+          disabled={currentAyahNumber <= 1}
           className={cn("bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md px-3 md:px-4 py-1.5 md:py-2 text-[#F2E3BB] font-medium transition-all", textSizeClasses.button)}
         >
-          {t('nextAyah')}
+          {t('previousAyah')}
         </button>
       </div>
 
@@ -320,26 +315,26 @@ export default function TafseerView() {
           >
             {/* Swipe arrow overlays */}
             <AnimatePresence>
-              {swipeHint === 'left' && currentAyahNumber < maxAyahs && (
-                <motion.div
-                  key="hint-left"
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-emerald-700/80 rounded-full p-1 shadow"
-                >
-                  <ChevronLeft className="w-5 h-5 text-[#F2E3BB]" />
-                </motion.div>
-              )}
-              {swipeHint === 'right' && currentAyahNumber > 1 && (
+              {swipeHint === 'right' && currentAyahNumber < maxAyahs && (
                 <motion.div
                   key="hint-right"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-emerald-700/80 rounded-full p-1 shadow"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-emerald-700/80 rounded-full p-1 shadow"
                 >
                   <ChevronRight className="w-5 h-5 text-[#F2E3BB]" />
+                </motion.div>
+              )}
+              {swipeHint === 'left' && currentAyahNumber > 1 && (
+                <motion.div
+                  key="hint-left"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-emerald-700/80 rounded-full p-1 shadow"
+                >
+                  <ChevronLeft className="w-5 h-5 text-[#F2E3BB]" />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -412,37 +407,37 @@ export default function TafseerView() {
 
       {/* Flexible Tafseer Content - Takes remaining space */}
       <div
-        className="flex-1 overflow-hidden px-4 pb-24 md:pb-20"
+        className="flex-1 min-h-0 overflow-hidden px-4 pb-20 flex flex-col"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <div className={cn("font-medium text-emerald-800 dark:text-emerald-300 pb-2", textSizeClasses.label)}>
+        <div className={cn("font-medium text-emerald-800 dark:text-emerald-300 pb-2 flex-shrink-0", textSizeClasses.label)}>
           {t('tafseer')}
         </div>
-        <div className="relative h-full">
+        <div className="relative flex-1 min-h-0">
           {/* Swipe arrow overlays on tafseer panel */}
           <AnimatePresence>
-            {swipeHint === 'left' && currentAyahNumber < maxAyahs && (
-              <motion.div
-                key="tafs-hint-left"
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-emerald-700/80 rounded-full p-1.5 shadow-lg pointer-events-none"
-              >
-                <ChevronLeft className="w-6 h-6 text-[#F2E3BB]" />
-              </motion.div>
-            )}
-            {swipeHint === 'right' && currentAyahNumber > 1 && (
+            {swipeHint === 'right' && currentAyahNumber < maxAyahs && (
               <motion.div
                 key="tafs-hint-right"
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
-                className="absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-emerald-700/80 rounded-full p-1.5 shadow-lg pointer-events-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-emerald-700/80 rounded-full p-1.5 shadow-lg pointer-events-none"
               >
                 <ChevronRight className="w-6 h-6 text-[#F2E3BB]" />
+              </motion.div>
+            )}
+            {swipeHint === 'left' && currentAyahNumber > 1 && (
+              <motion.div
+                key="tafs-hint-left"
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                className="absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-emerald-700/80 rounded-full p-1.5 shadow-lg pointer-events-none"
+              >
+                <ChevronLeft className="w-6 h-6 text-[#F2E3BB]" />
               </motion.div>
             )}
           </AnimatePresence>
