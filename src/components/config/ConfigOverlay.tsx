@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
@@ -156,6 +157,7 @@ export default function ConfigOverlay({
   onSeekToAyahPosition,
 }: ConfigOverlayProps) {
   const { t, language, isRTL } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Get bookmarks data
   const {
@@ -173,30 +175,51 @@ export default function ConfigOverlay({
     getTotalBookmarks,
   } = useBookmarks(language);
   
+  // Returns true if the current view has an active sub-page, and clears it
+  const goBackInView = (): boolean => {
+    if (type === 'settings' && searchParams.get('category')) {
+      setSearchParams({});
+      return true;
+    }
+    if (type === 'navigation' && searchParams.get('type')) {
+      setSearchParams({});
+      return true;
+    }
+    if (type === 'bookmarks' && searchParams.get('category')) {
+      setSearchParams({});
+      return true;
+    }
+    return false;
+  };
+
   // Handle Android hardware back button
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       const handleBackButton = App.addListener('backButton', () => {
-        onClose();
+        if (!goBackInView()) {
+          onClose();
+        }
       });
       
       return () => {
         handleBackButton.then(listener => listener.remove());
       };
     }
-  }, [onClose]);
+  }, [onClose, type, searchParams, setSearchParams]);
   
   // Handle ESC key to close
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (!goBackInView()) {
+          onClose();
+        }
       }
     };
     
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
+  }, [onClose, type, searchParams, setSearchParams]);
   
   // Get page title based on type
   const getTitle = (): string => {
