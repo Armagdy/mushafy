@@ -574,11 +574,15 @@ export default function ReciterView({
           className="flex flex-col flex-1 min-h-0 mt-2"
         >
           {/* Selected reciter name + re-choose button */}
-          <div className={cn(
-            'flex items-center gap-2 mb-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 shrink-0',
-            isRTL ? 'flex-row-reverse' : 'flex-row'
-          )}>
-            <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200', textSizeClasses.text)}>
+          <button
+            onClick={() => setShowReciterScroll(true)}
+            title={t('searchReciter')}
+            className={cn(
+              'w-full flex items-center gap-2 mb-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 shrink-0 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
+              isRTL ? 'flex-row-reverse' : 'flex-row'
+            )}
+          >
+            <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-start', textSizeClasses.text)}>
               {language === 'ar' ? selectedUnifiedReciter.nameAr : selectedUnifiedReciter.name}
             </span>
             <span className={cn(
@@ -589,14 +593,8 @@ export default function ReciterView({
             )}>
               {selectedUnifiedReciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
             </span>
-            <button
-              onClick={() => setShowReciterScroll(true)}
-              className="shrink-0 p-1.5 rounded-md text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-800 transition-colors"
-              title={t('searchReciter')}
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
-          </div>
+            <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          </button>
           {/* Column headers */}
           <div className={cn('flex gap-2 mb-1 shrink-0', textSizeClasses.label)}>
             <h3 className="flex-1 text-center font-semibold text-emerald-800 dark:text-emerald-200">
