@@ -538,7 +538,7 @@ const Surah = () => {
   const minSwipeDistance = 50;
 
   return (
-    <div className="w-full h-screen max-h-screen bg-white dark:bg-gray-900 flex flex-col overflow-hidden" style={{ height: '100dvh', maxHeight: '100dvh' }}>
+    <div className="w-full h-screen max-h-screen bg-[#FBF9F4] dark:bg-gray-900 flex flex-col overflow-hidden" style={{ height: '100dvh', maxHeight: '100dvh' }}>
       {/* Enhanced Islamic Top Header */}
       <motion.div
         initial={false}
