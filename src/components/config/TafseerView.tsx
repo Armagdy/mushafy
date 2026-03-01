@@ -1,11 +1,10 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Search, Pencil } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
 import { useTafseer } from "@/hooks/useTafseer";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { surahs } from "@/data/surahs";
 
@@ -45,6 +44,20 @@ export default function TafseerView() {
   const [dragOffset, setDragOffset] = useState(0);              // live drag preview
   const [swipeHint, setSwipeHint] = useState<'left' | 'right' | null>(null);
 
+  // Dropdown picker state
+  const [surahSearch, setSurahSearch] = useState('');
+  const [tafseerSearch, setTafseerSearch] = useState('');
+  const [showSurahPicker, setShowSurahPicker] = useState(false);
+  const [showAyahPicker, setShowAyahPicker] = useState(false);
+  const [showTafseerPicker, setShowTafseerPicker] = useState(false);
+
+  // Refs for scrollable pickers
+  const surahSearchRef = useRef<HTMLInputElement>(null);
+  const tafseerSearchRef = useRef<HTMLInputElement>(null);
+  const selectedSurahRef = useRef<HTMLButtonElement>(null);
+  const selectedAyahRef = useRef<HTMLButtonElement>(null);
+  const selectedTafseerRef = useRef<HTMLButtonElement>(null);
+
   // Helper function to convert numbers based on language
   const formatNumber = (num: number | string): string => {
     const numStr = num.toString();
@@ -59,17 +72,21 @@ export default function TafseerView() {
   const currentSurah = surahs.find(s => s.id === currentSurahNumber);
   const maxAyahs = currentSurah?.numberOfAyahs || 1;
 
-  // Handle surah change - reset to first ayah
-  const handleSurahChange = (value: string) => {
-    const newSurahNumber = parseInt(value);
+  // Handle surah change - reset to first ayah and collapse pickers
+  const handleSurahChange = (value: string | number) => {
+    const newSurahNumber = typeof value === 'string' ? parseInt(value) : value;
     setCurrentSurahNumber(newSurahNumber);
-    setCurrentAyahNumber(1); // Reset to first ayah when changing surah
+    setCurrentAyahNumber(1);
+    setSurahSearch('');
+    setShowSurahPicker(false);
+    setShowAyahPicker(false);
   };
 
-  // Handle ayah change
-  const handleAyahChange = (value: string) => {
-    const newAyahNumber = parseInt(value);
+  // Handle ayah change and collapse picker
+  const handleAyahChange = (value: string | number) => {
+    const newAyahNumber = typeof value === 'string' ? parseInt(value) : value;
     setCurrentAyahNumber(newAyahNumber);
+    setShowAyahPicker(false);
   };
 
   // Fetch ayah text from Quran.com API - defer to avoid blocking render
@@ -188,6 +205,58 @@ export default function TafseerView() {
   const languageTafseers = getTafseersByLanguage(language);
   const allTafseers = languageTafseers.length > 0 ? languageTafseers : tafseers;
 
+  // Filtered lists for search
+  const filteredSurahs = useMemo(() => {
+    const q = surahSearch.trim().toLowerCase();
+    if (!q) return surahs;
+    return surahs.filter(s =>
+      s.name.includes(q) ||
+      s.englishName.toLowerCase().includes(q) ||
+      s.id.toString().includes(q)
+    );
+  }, [surahSearch]);
+
+  const filteredTafseers = useMemo(() => {
+    const q = tafseerSearch.trim().toLowerCase();
+    if (!q) return allTafseers;
+    return allTafseers.filter(t => t.name.toLowerCase().includes(q));
+  }, [tafseerSearch, allTafseers]);
+
+  // Auto-scroll selected surah into view
+  useEffect(() => {
+    selectedSurahRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+  }, [currentSurahNumber]);
+
+  // Auto-scroll selected ayah into view
+  useEffect(() => {
+    selectedAyahRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+  }, [currentAyahNumber]);
+
+  // Auto-scroll selected items into view when pickers open
+  useEffect(() => {
+    if (showSurahPicker) {
+      setTimeout(() => {
+        selectedSurahRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+      }, 0);
+    }
+  }, [showSurahPicker]);
+
+  useEffect(() => {
+    if (showAyahPicker) {
+      setTimeout(() => {
+        selectedAyahRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+      }, 0);
+    }
+  }, [showAyahPicker]);
+
+  useEffect(() => {
+    if (showTafseerPicker) {
+      setTimeout(() => {
+        selectedTafseerRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' });
+      }, 0);
+    }
+  }, [showTafseerPicker]);
+
   return (
     <div className={cn(
       "flex flex-col h-full",
@@ -196,78 +265,117 @@ export default function TafseerView() {
       {/* Fixed Top Section - Selectors and Controls */}
       <div className="flex-shrink-0 p-4 space-y-4">
         {/* Surah and Ayah Selectors */}
-        <div className={cn(
-          "grid grid-cols-2 gap-3 md:gap-4",
-          isRTL && "rtl"
-        )}>
-        {/* Surah Selector */}
-        <div className="space-y-2">
-          <label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-            {t('selectSurah')}
-          </label>
-          <Select
-            value={currentSurahNumber.toString()}
-            onValueChange={handleSurahChange}
-          >
-            <SelectTrigger className={cn(
-              "w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500",
-              isRTL && "text-right",
-              textSizeClasses.text
-            )}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className={cn("bg-[#FBF9F4] dark:bg-emerald-950", isRTL ? "rtl" : "ltr")}>
-              {surahs.map((surah) => (
-                <SelectItem 
-                  key={surah.id} 
-                  value={surah.id.toString()}
-                  className={cn(
-                    "focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100",
-                    isRTL ? "text-right" : "text-left",
-                    textSizeClasses.text
-                  )}
-                >
-                  {formatNumber(surah.id)}. {language === 'ar' ? surah.name : surah.englishName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <div className={cn("grid grid-cols-2 gap-3 md:gap-4", isRTL && "rtl")}>
 
-        {/* Ayah Selector */}
-        <div className="space-y-2">
-          <label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-            {t('selectAyah')}
-          </label>
-          <Select
-            value={currentAyahNumber.toString()}
-            onValueChange={handleAyahChange}
-          >
-            <SelectTrigger className={cn(
-              "w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500",
-              isRTL && "text-right",
-              textSizeClasses.text
-            )}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className={cn("bg-[#FBF9F4] dark:bg-emerald-950", isRTL ? "rtl" : "ltr")}>
-              {Array.from({ length: maxAyahs }, (_, i) => i + 1).map((ayahNum) => (
-                <SelectItem 
-                  key={ayahNum} 
-                  value={ayahNum.toString()}
-                  className={cn(
-                    "focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100",
-                    isRTL ? "text-right" : "text-left",
-                    textSizeClasses.text
-                  )}
-                >
-                  {t('ayah')} {formatNumber(ayahNum)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Surah Selector — chip when chosen, search+list when open */}
+          <div className="space-y-1">
+            <label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
+              {t('selectSurah')}
+            </label>
+            {!showSurahPicker ? (
+              /* Collapsed chip */
+              <button
+                onClick={() => setShowSurahPicker(true)}
+                className={cn(
+                  'w-full flex items-center gap-1 px-2 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
+                  isRTL ? 'flex-row-reverse' : 'flex-row'
+                )}
+              >
+                <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{formatNumber(currentSurahNumber)}.</span>
+                <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200 truncate text-start', textSizeClasses.text)}>
+                  {language === 'ar' ? currentSurah?.name : currentSurah?.englishName}
+                </span>
+                <Pencil className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              </button>
+            ) : (
+              /* Expanded picker */
+              <>
+                <div className="relative shrink-0">
+                  <Search className={cn(
+                    'absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400',
+                    isRTL ? 'right-2' : 'left-2'
+                  )} />
+                  <input
+                    ref={surahSearchRef}
+                    type="text"
+                    placeholder={t('search')}
+                    value={surahSearch}
+                    onChange={e => setSurahSearch(e.target.value)}
+                    autoFocus
+                    className={cn(
+                      'w-full h-8 rounded-md border border-emerald-300 bg-transparent px-2 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
+                      isRTL ? 'pr-7 text-right' : 'pl-7 text-left',
+                      textSizeClasses.text
+                    )}
+                  />
+                </div>
+                <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-36">
+                  {filteredSurahs.map((surah) => (
+                    <button
+                      key={surah.id}
+                      ref={surah.id === currentSurahNumber ? selectedSurahRef : null}
+                      onClick={() => handleSurahChange(surah.id)}
+                      className={cn(
+                        'w-full px-2 py-1.5 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-start',
+                        'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
+                        surah.id === currentSurahNumber && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                        textSizeClasses.text
+                      )}
+                    >
+                      <div className={cn('flex items-center gap-1 w-full', isRTL && 'flex-row-reverse')}>
+                        <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{formatNumber(surah.id)}.</span>
+                        <span className="flex-1 text-emerald-800 dark:text-emerald-200 truncate">
+                          {language === 'ar' ? surah.name : surah.englishName}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Ayah Selector — chip when chosen, scrollable list when open */}
+          <div className="space-y-1">
+            <label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
+              {t('selectAyah')}
+            </label>
+            {!showAyahPicker ? (
+              /* Collapsed chip */
+              <button
+                onClick={() => setShowAyahPicker(true)}
+                className={cn(
+                  'w-full flex items-center gap-2 px-2 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
+                  isRTL ? 'flex-row-reverse' : 'flex-row'
+                )}
+              >
+                <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-center', textSizeClasses.text)}>
+                  {formatNumber(currentAyahNumber)}
+                </span>
+                <Pencil className="w-3.5 h-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              </button>
+            ) : (
+              /* Expanded picker */
+              <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-36">
+                {Array.from({ length: maxAyahs }, (_, i) => i + 1).map((ayahNum) => (
+                  <button
+                    key={ayahNum}
+                    ref={ayahNum === currentAyahNumber ? selectedAyahRef : null}
+                    onClick={() => handleAyahChange(ayahNum)}
+                    className={cn(
+                      'w-full px-2 py-1.5 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-center',
+                      'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
+                      ayahNum === currentAyahNumber && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                      textSizeClasses.text
+                    )}
+                  >
+                    <span className="text-emerald-800 dark:text-emerald-200">{formatNumber(ayahNum)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
       {/* Ayah Navigation */}
       <div className={cn(
@@ -370,38 +478,75 @@ export default function TafseerView() {
         )}
       </div>
 
-      {/* Tafseer Selector */}
-      <div className="space-y-2">
+      {/* Tafseer Selector — selected-chip + expandable picker */}
+      <div className="space-y-1">
         <label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
           {t('selectTafseer')}
         </label>
-        <Select
-          value={selectedTafseerId?.toString() || ""}
-          onValueChange={(value) => setSelectedTafseerId(parseInt(value))}
-        >
-          <SelectTrigger className={cn(
-            "w-full border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500",
-            isRTL && "text-right",
-            textSizeClasses.text
-          )}>
-            <SelectValue placeholder={t('selectTafseer')} />
-          </SelectTrigger>
-          <SelectContent className={cn("bg-[#FBF9F4] dark:bg-emerald-950", isRTL ? "rtl" : "ltr")}>
-            {allTafseers.map((tafseer) => (
-              <SelectItem 
-                key={tafseer.id} 
-                value={tafseer.id.toString()}
+        {/* Selected chip — entire row is clickable to re-open picker */}
+        {!showTafseerPicker && selectedTafseerInfo && (
+          <button
+            onClick={() => setShowTafseerPicker(true)}
+            title={t('selectTafseer')}
+            className={cn(
+              'w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
+              isRTL ? 'flex-row-reverse' : 'flex-row'
+            )}
+          >
+            <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-start', textSizeClasses.text)}>
+              {selectedTafseerInfo.name}
+            </span>
+            <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          </button>
+        )}
+        {/* Picker — search + scrollable list */}
+        {(showTafseerPicker || !selectedTafseerInfo) && (
+          <>
+            <div className="relative shrink-0">
+              <Search className={cn(
+                'absolute top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 dark:text-emerald-400',
+                isRTL ? 'right-3' : 'left-3'
+              )} />
+              <input
+                ref={tafseerSearchRef}
+                type="text"
+                placeholder={t('selectTafseer')}
+                value={tafseerSearch}
+                onChange={e => setTafseerSearch(e.target.value)}
                 className={cn(
-                  "focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 font-bold",
-                  isRTL ? "text-right" : "text-left",
+                  'w-full h-9 rounded-md border border-emerald-300 bg-transparent px-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
+                  isRTL ? 'pr-9 text-right' : 'pl-9 text-left',
                   textSizeClasses.text
                 )}
-              >
-                {tafseer.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              />
+            </div>
+            <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-36">
+              {filteredTafseers.map((tafseer, index) => (
+                <button
+                  key={tafseer.id}
+                  ref={tafseer.id === selectedTafseerId ? selectedTafseerRef : null}
+                  onClick={() => {
+                    setSelectedTafseerId(tafseer.id);
+                    setShowTafseerPicker(false);
+                    setTafseerSearch('');
+                  }}
+                  className={cn(
+                    'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+                    'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
+                    tafseer.id === selectedTafseerId && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                    textSizeClasses.text,
+                    isRTL ? 'text-right' : 'text-left'
+                  )}
+                >
+                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
+                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">{tafseer.name}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
       </div>
 

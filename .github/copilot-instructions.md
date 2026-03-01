@@ -234,6 +234,84 @@ className="bg-amber-500"                        // Gold backgrounds
 </div>
 ```
 
+### Default Scrollable List / Dropdown Styles
+**ALWAYS use this exact pattern for any searchable scrollable list or dropdown picker** (reciters, surahs, pages, juz, etc.).
+The canonical reference implementation is the reciter picker in [src/components/config/ReciterView.tsx](src/components/config/ReciterView.tsx).
+
+```tsx
+// ── Search input (native <input>, not shadcn Input, for IME compatibility) ──
+<div className="relative mt-2 mb-1 shrink-0">
+  <Search className={cn(
+    'absolute top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 dark:text-emerald-400',
+    isRTL ? 'right-3' : 'left-3'
+  )} />
+  <input
+    ref={searchInputRef}
+    type="text"
+    placeholder={t('searchPlaceholder')}
+    className={cn(
+      'w-full h-9 rounded-md border border-emerald-300 bg-transparent px-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
+      isRTL ? 'pr-9 text-right' : 'pl-9 text-left',
+      textSizeClasses.text
+    )}
+  />
+</div>
+
+// ── Scrollable list container ──
+<div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg">
+  {items.map((item, index) => (
+    <button
+      key={item.id}
+      ref={selectedItem?.id === item.id ? selectedRef : null}
+      onClick={() => handleSelect(item)}
+      className={cn(
+        'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+        'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
+        selectedItem?.id === item.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+        textSizeClasses.text,
+        isRTL ? 'text-right' : 'text-left'
+      )}
+    >
+      <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+        <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
+        <span className="flex-1 text-emerald-800 dark:text-emerald-200">
+          {language === 'ar' ? item.nameAr : item.name}
+        </span>
+        {/* optional badge e.g. source badge */}
+      </div>
+    </button>
+  ))}
+</div>
+```
+
+**Selected-item chip (shown after selection, entire chip is clickable to re-open picker):**
+```tsx
+<button
+  onClick={() => setShowPicker(true)}
+  title={t('searchPlaceholder')}
+  className={cn(
+    'w-full flex items-center gap-2 mb-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 shrink-0 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
+    isRTL ? 'flex-row-reverse' : 'flex-row'
+  )}
+>
+  <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-start', textSizeClasses.text)}>
+    {language === 'ar' ? selectedItem.nameAr : selectedItem.name}
+  </span>
+  {/* optional badge */}
+  <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+</button>
+```
+
+**Key rules:**
+- ✅ Use native `<input>` (not shadcn `<Input>`) for search — required for Android IME compatibility
+- ✅ Entire selected-item chip is the click target — not just the pencil icon
+- ✅ Hover: `hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10`
+- ✅ Selected: `bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold`
+- ✅ Container border: `border border-emerald-200 dark:border-emerald-800 rounded-lg`
+- ✅ Row divider: `border-b border-emerald-100 dark:border-emerald-900 last:border-b-0`
+- ✅ Auto-scroll selected item into view on mount: `ref={isSelected ? selectedRef : null}` + `useEffect(() => { selectedRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' }); }, [selectedId])`
+- ❌ Never use shadcn `<Select>` for long lists — use this scrollable pattern instead
+
 ### Arabic Input & IME Handling (Android/Mobile)
 **CRITICAL:** Android Arabic keyboards use **Input Method Editor (IME)** which "composes" text before committing. React state updates don't synchronize properly with IME, causing buttons to stay disabled even after valid input.
 
