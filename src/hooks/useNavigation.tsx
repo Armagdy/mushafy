@@ -18,7 +18,8 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
       .replace(/[ىي]/g, 'ي') // Normalize yaa
       .replace(/ة/g, 'ه') // Normalize taa marboota
       .replace(/ؤ/g, 'و') // Normalize waw with hamza
-      .replace(/ئ/g, 'ي') // Normalize yaa with hamza
+      .replace(/ئ/g, 'ي') // Normalize yaa with hamza (ئ → ي, e.g. خطيئة matches خطيـٔته in Uthmani)
+      .replace(/([\u0600-\u06ff])\1+/g, '$1') // Collapse consecutive identical Arabic letters (e.g. خطيي→خطي after ئ→ي)
       .replace(/\s+/g, '') // Remove spaces
       .toLowerCase();
   }, []);
