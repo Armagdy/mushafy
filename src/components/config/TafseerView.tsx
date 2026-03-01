@@ -44,7 +44,7 @@ export default function TafseerView() {
   const [dragOffset, setDragOffset] = useState(0);              // live drag preview
   const [swipeHint, setSwipeHint] = useState<'left' | 'right' | null>(null);
 
-  // Dropdown picker state
+  // Dropdown picker state — search strings driven by 50ms polling (Android IME fix)
   const [surahSearch, setSurahSearch] = useState('');
   const [tafseerSearch, setTafseerSearch] = useState('');
   const [showSurahPicker, setShowSurahPicker] = useState(false);
@@ -57,6 +57,22 @@ export default function TafseerView() {
   const selectedSurahRef = useRef<HTMLButtonElement>(null);
   const selectedAyahRef = useRef<HTMLButtonElement>(null);
   const selectedTafseerRef = useRef<HTMLButtonElement>(null);
+
+  // 50ms polling — bypasses Android IME React state desync for both search inputs
+  useEffect(() => {
+    const id = setInterval(() => {
+      const v = surahSearchRef.current?.value ?? '';
+      setSurahSearch(prev => prev !== v ? v : prev);
+    }, 50);
+    return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const v = tafseerSearchRef.current?.value ?? '';
+      setTafseerSearch(prev => prev !== v ? v : prev);
+    }, 50);
+    return () => clearInterval(id);
+  }, []);
 
   // Helper function to convert numbers based on language
   const formatNumber = (num: number | string): string => {
@@ -77,6 +93,7 @@ export default function TafseerView() {
     const newSurahNumber = typeof value === 'string' ? parseInt(value) : value;
     setCurrentSurahNumber(newSurahNumber);
     setCurrentAyahNumber(1);
+    if (surahSearchRef.current) surahSearchRef.current.value = '';
     setSurahSearch('');
     setShowSurahPicker(false);
     setShowAyahPicker(false);
@@ -299,8 +316,6 @@ export default function TafseerView() {
                     ref={surahSearchRef}
                     type="text"
                     placeholder={t('search')}
-                    value={surahSearch}
-                    onChange={e => setSurahSearch(e.target.value)}
                     autoFocus
                     className={cn(
                       'w-full h-8 rounded-md border border-emerald-300 bg-transparent px-2 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
@@ -511,8 +526,7 @@ export default function TafseerView() {
                 ref={tafseerSearchRef}
                 type="text"
                 placeholder={t('selectTafseer')}
-                value={tafseerSearch}
-                onChange={e => setTafseerSearch(e.target.value)}
+                autoFocus
                 className={cn(
                   'w-full h-9 rounded-md border border-emerald-300 bg-transparent px-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
                   isRTL ? 'pr-9 text-right' : 'pl-9 text-left',
@@ -528,7 +542,8 @@ export default function TafseerView() {
                   onClick={() => {
                     setSelectedTafseerId(tafseer.id);
                     setShowTafseerPicker(false);
-                    setTafseerSearch('');
+          setTafseerSearch('');
+          if (tafseerSearchRef.current) tafseerSearchRef.current.value = '';
                   }}
                   className={cn(
                     'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',

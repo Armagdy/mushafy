@@ -30,7 +30,7 @@ export function TopBar({
   const { t, isRTL, language } = useLanguage();
 
   return (
-    <div className="w-full flex justify-center bg-gradient-to-b from-emerald-800 to-emerald-600 pt-10">
+    <div className="w-full flex justify-center bg-gradient-to-b from-emerald-800 to-emerald-600 pt-8">
       <header className="w-full max-w-[1600px]">
         {/* Main Header */}
         <div className="relative">
