@@ -198,7 +198,7 @@ export const translations = {
     download: 'تحميل',
     downloadMushafPages: 'تحميل صفحات المصحف',
     downloadEveryAyahAudio: 'تحميل تلاوة (كل آية)',
-    downloadMp3QuranAudio: 'تحميل تلاوة (صوتي كامل)',
+    downloadMp3QuranAudio: 'تحميل تلاوة ',
     downloadPages: 'تحميل الصفحات',
     downloadSurah: 'تحميل السورة',
     downloadAyah: 'تحميل الآية',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { HardDriveDownload, Search, WifiOff, StopCircle, CheckCircle2, XCircle } from "lucide-react";
+import { HardDriveDownload, Search, WifiOff, StopCircle, CheckCircle2, XCircle, Pencil } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { MushafType } from "@/contexts/MushafContext";
@@ -424,7 +424,7 @@ export function Download() {
                 setShowDownloadTypeScroll(false);
               }}
               className={cn(
-                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
+                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-right",
                 downloadType === 'pages' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
                 textSizeClasses.text
               )}
@@ -441,7 +441,7 @@ export function Download() {
                 setShowDownloadTypeScroll(false);
               }}
               className={cn(
-                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
+                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-right",
                 downloadType === 'everyayah' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
                 textSizeClasses.text
               )}
@@ -457,7 +457,7 @@ export function Download() {
                 setShowDownloadTypeScroll(false);
               }}
               className={cn(
-                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
+                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-right",
                 downloadType === 'mp3quran' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
                 textSizeClasses.text
               )}
@@ -468,18 +468,20 @@ export function Download() {
             </button>
           </div>
         ) : (
-          <div className="border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setShowDownloadTypeScroll(true)}
-              className="w-full px-3 py-2.5 bg-emerald-500/20 dark:bg-emerald-500/20 transition-colors text-left"
-            >
-              <span className={cn("text-emerald-800 dark:text-emerald-200 font-semibold", textSizeClasses.text)}>
-                {downloadType === 'pages' && t('downloadMushafPages')}
-                {downloadType === 'everyayah' && t('downloadEveryAyahAudio')}
-                {downloadType === 'mp3quran' && t('downloadMp3QuranAudio')}
-              </span>
-            </button>
-          </div>
+          <button
+            onClick={() => setShowDownloadTypeScroll(true)}
+            className={cn(
+              "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-500/20 dark:bg-emerald-500/20 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors",
+              isRTL ? 'flex-row-reverse' : 'flex-row'
+            )}
+          >
+            <span className={cn("flex-1 text-emerald-800 dark:text-emerald-200 font-semibold text-right", textSizeClasses.text)}>
+              {downloadType === 'pages' && t('downloadMushafPages')}
+              {downloadType === 'everyayah' && t('downloadEveryAyahAudio')}
+              {downloadType === 'mp3quran' && t('downloadMp3QuranAudio')}
+            </span>
+            <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          </button>
         )}
       </div>
       
@@ -540,22 +542,21 @@ export function Download() {
                 </button>
               </div>
             ) : (
-              <div className="border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setShowMushafTypeScroll(true)}
-                  className={cn(
-                    "w-full px-3 py-2.5 bg-emerald-500/20 dark:bg-emerald-500/20 transition-colors",
-                    textSizeClasses.text,
-                    isRTL ? 'text-right' : 'text-left'
-                  )}
-                >
-                  <span className="text-emerald-800 dark:text-emerald-200 font-semibold">
-                    {downloadMushafType === 'mwdoa' && t('mushafMwdoa')}
-                    {downloadMushafType === 'tashel' && t('mushafTashel')}
-                    {downloadMushafType === 'madinah' && t('mushafMadinah')}
-                  </span>
-                </button>
-              </div>
+              <button
+                onClick={() => setShowMushafTypeScroll(true)}
+                className={cn(
+                  "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-500/20 dark:bg-emerald-500/20 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors",
+                  isRTL ? 'flex-row-reverse' : 'flex-row',
+                  textSizeClasses.text
+                )}
+              >
+                <span className="flex-1 text-emerald-800 dark:text-emerald-200 font-semibold text-right">
+                  {downloadMushafType === 'mwdoa' && t('mushafMwdoa')}
+                  {downloadMushafType === 'tashel' && t('mushafTashel')}
+                  {downloadMushafType === 'madinah' && t('mushafMadinah')}
+                </span>
+                <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              </button>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -660,31 +661,27 @@ export function Download() {
                 <Search className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('reciter')}</label>
               </div>
-              <div className="border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden">
-                <div className={cn(
-                  'flex items-center gap-2 px-3 py-2 bg-emerald-500/20 dark:bg-emerald-500/20',
+              <button
+                onClick={() => setShowReciterScroll(true)}
+                title={t('searchReciter')}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-500/20 dark:bg-emerald-500/20 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
                   isRTL ? 'flex-row-reverse' : 'flex-row'
+                )}
+              >
+                <span className="flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-right">
+                  {language === 'ar' ? selectedUnifiedReciter.nameAr : selectedUnifiedReciter.name}
+                </span>
+                <span className={cn(
+                  'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+                  selectedUnifiedReciter.source === 'everyayah'
+                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                    : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
                 )}>
-                  <span className="flex-1 font-semibold text-emerald-800 dark:text-emerald-200">
-                    {language === 'ar' ? selectedUnifiedReciter.nameAr : selectedUnifiedReciter.name}
-                  </span>
-                  <span className={cn(
-                    'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
-                    selectedUnifiedReciter.source === 'everyayah'
-                      ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                      : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
-                  )}>
-                    {selectedUnifiedReciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
-                  </span>
-                  <button
-                    onClick={() => setShowReciterScroll(true)}
-                    className="shrink-0 p-1.5 rounded-md text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-800 transition-colors"
-                    title={t('searchReciter')}
-                  >
-                    <Search className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+                  {selectedUnifiedReciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
+                </span>
+                <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              </button>
               
               {/* Reading/Style/Quality Selection for EveryAyah */}
               {selectedUnifiedReciter.source === 'everyayah' && (
@@ -926,31 +923,27 @@ export function Download() {
                 <Search className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('reciter')}</label>
               </div>
-              <div className="border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden">
-                <div className={cn(
-                  'flex items-center gap-2 px-3 py-2 bg-emerald-500/20 dark:bg-emerald-500/20',
+              <button
+                onClick={() => setShowReciterScroll(true)}
+                title={t('searchReciter')}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-500/20 dark:bg-emerald-500/20 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
                   isRTL ? 'flex-row-reverse' : 'flex-row'
+                )}
+              >
+                <span className="flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-right">
+                  {language === 'ar' ? selectedUnifiedReciter.nameAr : selectedUnifiedReciter.name}
+                </span>
+                <span className={cn(
+                  'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+                  selectedUnifiedReciter.source === 'everyayah'
+                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                    : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
                 )}>
-                  <span className="flex-1 font-semibold text-emerald-800 dark:text-emerald-200">
-                    {language === 'ar' ? selectedUnifiedReciter.nameAr : selectedUnifiedReciter.name}
-                  </span>
-                  <span className={cn(
-                    'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
-                    selectedUnifiedReciter.source === 'everyayah'
-                      ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                      : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
-                  )}>
-                    {selectedUnifiedReciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
-                  </span>
-                  <button
-                    onClick={() => setShowReciterScroll(true)}
-                    className="shrink-0 p-1.5 rounded-md text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-800 transition-colors"
-                    title={t('searchReciter')}
-                  >
-                    <Search className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+                  {selectedUnifiedReciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
+                </span>
+                <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              </button>
               
               {/* Moshaf Selection (only for mp3quran) */}
               {selectedUnifiedReciter.source === 'mp3quran' && selectedUnifiedReciter.moshaf && selectedUnifiedReciter.moshaf.length > 0 && (

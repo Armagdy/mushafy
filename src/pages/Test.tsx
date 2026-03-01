@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useQuranData } from '@/hooks/useQuranData';
@@ -11,8 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TestSettingsDialog, TestRange, TestMode } from '@/components/quran/TestSettingsDialog';
 import { TestViewSettings } from '@/components/quran/TestViewSettings';
 import { surahs } from '@/data/surahs';
-import { Settings, Eye, ArrowRight, ArrowLeft, Lightbulb, ChevronLeft } from 'lucide-react';
+import { Settings, Eye, ArrowRight, ArrowLeft, Lightbulb, ChevronLeft, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useDialogTextSize, getDialogTextSizeClasses } from '@/contexts/DialogTextSizeContext';
 
 interface AyahData {
   text: string;
@@ -44,6 +45,8 @@ interface TikrarQuestion {
 export default function Test() {
   const navigate = useNavigate();
   const { t, isRTL, language } = useLanguage();
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   const { ayahData, isAyahDataLoading } = useQuranData();
   
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -65,6 +68,24 @@ export default function Test() {
   const [usedTikrarPhrases, setUsedTikrarPhrases] = useState<Set<string>>(new Set());
   const [usedTikrarAyahs, setUsedTikrarAyahs] = useState<Set<string>>(new Set());
   const [allTestsCompleted, setAllTestsCompleted] = useState(false);
+
+  // Picker open/closed state (chip pattern)
+  const [showTestModePicker, setShowTestModePicker] = useState(false);
+  const [showStartSurahPicker, setShowStartSurahPicker] = useState(false);
+  const [showEndSurahPicker, setShowEndSurahPicker] = useState(false);
+  const [showStartJuzPicker, setShowStartJuzPicker] = useState(false);
+  const [showEndJuzPicker, setShowEndJuzPicker] = useState(false);
+
+  // Refs for auto-scrolling selected items in scrollable lists
+  const startSurahRef = useRef<HTMLButtonElement>(null);
+  const endSurahRef = useRef<HTMLButtonElement>(null);
+  const startJuzRef = useRef<HTMLButtonElement>(null);
+  const endJuzRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => { startSurahRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' }); }, [startSurah]);
+  useEffect(() => { endSurahRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' }); }, [endSurah]);
+  useEffect(() => { startJuzRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' }); }, [startJuz]);
+  useEffect(() => { endJuzRef.current?.scrollIntoView({ behavior: 'auto', block: 'center' }); }, [endJuz]);
 
   // Format number based on language
   const formatNumber = (num: number): string => {
@@ -798,20 +819,41 @@ export default function Test() {
             <div className="space-y-4">
               {/* Test Type Selector */}
               <div className="space-y-2">
-                <Label className="text-base md:text-lg font-medium text-emerald-800 dark:text-emerald-300">{t('testType')}</Label>
-                <Select
-                  value={testMode}
-                  onValueChange={(v) => setTestMode(v as TestMode)}
-                >
-                  <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-lg", isRTL && "text-right")}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#FBF9F4] dark:bg-emerald-950">
-                    <SelectItem value="hifz" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">{t('testTypeHifz')}</SelectItem>
-                    <SelectItem value="tikrar" className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">{t('testTypeTikrar')}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm md:text-base text-emerald-600 dark:text-emerald-400">
+                <Label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>{t('testType')}</Label>
+                {!showTestModePicker ? (
+                  <button
+                    onClick={() => setShowTestModePicker(true)}
+                    dir="ltr"
+                    className={cn(
+                      'w-full flex flex-row items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
+                    )}
+                  >
+                    <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-right', textSizeClasses.text)}>
+                      {testMode === 'hifz' ? t('testTypeHifz') : t('testTypeTikrar')}
+                    </span>
+                    <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  </button>
+                ) : (
+                  <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                    {(['hifz', 'tikrar'] as TestMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => { setTestMode(mode); setShowTestModePicker(false); }}
+                        className={cn(
+                          'w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+                          testMode === mode && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                          textSizeClasses.text,
+                          isRTL ? 'text-right' : 'text-left'
+                        )}
+                      >
+                        <span className="text-emerald-800 dark:text-emerald-200">
+                          {mode === 'hifz' ? t('testTypeHifz') : t('testTypeTikrar')}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
                   {testMode === 'hifz' ? t('testTypeHifzDesc') : t('testTypeTikrarDesc')}
                 </p>
               </div>
@@ -837,83 +879,165 @@ export default function Test() {
 
                 <TabsContent value="surah" className="space-y-4 mt-4">
                   <div className="space-y-2">
-                    <Label className="text-base md:text-lg font-medium text-emerald-800 dark:text-emerald-300">{t('startSurah')}</Label>
-                    <Select
-                      value={startSurah.toString()}
-                      onValueChange={(v) => setStartSurah(parseInt(v))}
-                    >
-                      <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-lg", isRTL && "text-right")}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
+                    <Label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>{t('startSurah')}</Label>
+                    {!showStartSurahPicker ? (
+                      <button
+                        onClick={() => setShowStartSurahPicker(true)}
+                        dir="ltr"
+                        className={cn(
+                          'w-full flex flex-row items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
+                        )}
+                      >
+                        <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-right', textSizeClasses.text)}>
+                          {formatNumber(startSurah)}. {language === 'ar' ? surahs[startSurah - 1]?.name : surahs[startSurah - 1]?.englishName}
+                        </span>
+                        <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      </button>
+                    ) : (
+                      <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-40">
                         {surahs.map((surah) => (
-                          <SelectItem key={surah.id} value={surah.id.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">
-                            {formatNumber(surah.id)}. {language === 'ar' ? surah.name : surah.englishName}
-                          </SelectItem>
+                          <button
+                            key={surah.id}
+                            ref={startSurah === surah.id ? startSurahRef : null}
+                            onClick={() => {
+                              setStartSurah(surah.id);
+                              if (surah.id > endSurah) setEndSurah(surah.id);
+                              setShowStartSurahPicker(false);
+                            }}
+                            className={cn(
+                              'w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+                              startSurah === surah.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                              textSizeClasses.text,
+                              'text-right'
+                            )}
+                          >
+                            <div className="flex items-center gap-2 flex-row-reverse">
+                              <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{formatNumber(surah.id)}.</span>
+                              <span className="text-emerald-800 dark:text-emerald-200">{language === 'ar' ? surah.name : surah.englishName}</span>
+                            </div>
+                          </button>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-base md:text-lg font-medium text-emerald-800 dark:text-emerald-300">{t('endSurah')}</Label>
-                    <Select
-                      value={endSurah.toString()}
-                      onValueChange={(v) => setEndSurah(parseInt(v))}
-                    >
-                      <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-lg", isRTL && "text-right")}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
+                    <Label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>{t('endSurah')}</Label>
+                    {!showEndSurahPicker ? (
+                      <button
+                        onClick={() => setShowEndSurahPicker(true)}
+                        dir="ltr"
+                        className={cn(
+                          'w-full flex flex-row items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
+                        )}
+                      >
+                        <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-right', textSizeClasses.text)}>
+                          {formatNumber(endSurah)}. {language === 'ar' ? surahs[endSurah - 1]?.name : surahs[endSurah - 1]?.englishName}
+                        </span>
+                        <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      </button>
+                    ) : (
+                      <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-40">
                         {surahs.filter(s => s.id >= startSurah).map((surah) => (
-                          <SelectItem key={surah.id} value={surah.id.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">
-                            {formatNumber(surah.id)}. {language === 'ar' ? surah.name : surah.englishName}
-                          </SelectItem>
+                          <button
+                            key={surah.id}
+                            ref={endSurah === surah.id ? endSurahRef : null}
+                            onClick={() => { setEndSurah(surah.id); setShowEndSurahPicker(false); }}
+                            className={cn(
+                              'w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+                              endSurah === surah.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                              textSizeClasses.text,
+                              'text-right'
+                            )}
+                          >
+                            <div className="flex items-center gap-2 flex-row-reverse">
+                              <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{formatNumber(surah.id)}.</span>
+                              <span className="text-emerald-800 dark:text-emerald-200">{language === 'ar' ? surah.name : surah.englishName}</span>
+                            </div>
+                          </button>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
 
                 <TabsContent value="juz" className="space-y-4 mt-4">
                   <div className="space-y-2">
-                    <Label className="text-base md:text-lg font-medium text-emerald-800 dark:text-emerald-300">{t('startJuz')}</Label>
-                    <Select
-                      value={startJuz.toString()}
-                      onValueChange={(v) => setStartJuz(parseInt(v))}
-                    >
-                      <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-lg", isRTL && "text-right")}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
+                    <Label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>{t('startJuz')}</Label>
+                    {!showStartJuzPicker ? (
+                      <button
+                        onClick={() => setShowStartJuzPicker(true)}
+                        dir="ltr"
+                        className={cn(
+                          'w-full flex flex-row items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
+                        )}
+                      >
+                        <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-right', textSizeClasses.text)}>
+                          {t('juz')} {formatNumber(startJuz)}
+                        </span>
+                        <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      </button>
+                    ) : (
+                      <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-40">
                         {Array.from({ length: 30 }, (_, i) => i + 1).map((juz) => (
-                          <SelectItem key={juz} value={juz.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">
-                            {t('juz')} {formatNumber(juz)}
-                          </SelectItem>
+                          <button
+                            key={juz}
+                            ref={startJuz === juz ? startJuzRef : null}
+                            onClick={() => {
+                              setStartJuz(juz);
+                              if (juz > endJuz) setEndJuz(juz);
+                              setShowStartJuzPicker(false);
+                            }}
+                            className={cn(
+                              'w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+                              startJuz === juz && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                              textSizeClasses.text,
+                              'text-right'
+                            )}
+                          >
+                            <span className="text-emerald-800 dark:text-emerald-200">{t('juz')} {formatNumber(juz)}</span>
+                          </button>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-base md:text-lg font-medium text-emerald-800 dark:text-emerald-300">{t('endJuz')}</Label>
-                    <Select
-                      value={endJuz.toString()}
-                      onValueChange={(v) => setEndJuz(parseInt(v))}
-                    >
-                      <SelectTrigger className={cn("border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-lg", isRTL && "text-right")}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60 bg-[#FBF9F4] dark:bg-emerald-950">
+                    <Label className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>{t('endJuz')}</Label>
+                    {!showEndJuzPicker ? (
+                      <button
+                        onClick={() => setShowEndJuzPicker(true)}
+                        dir="ltr"
+                        className={cn(
+                          'w-full flex flex-row items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
+                        )}
+                      >
+                        <span className={cn('flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-right', textSizeClasses.text)}>
+                          {t('juz')} {formatNumber(endJuz)}
+                        </span>
+                        <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      </button>
+                    ) : (
+                      <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-40">
                         {Array.from({ length: 30 }, (_, i) => i + 1)
                           .filter(juz => juz >= startJuz)
                           .map((juz) => (
-                            <SelectItem key={juz} value={juz.toString()} className="focus:bg-emerald-100 focus:text-emerald-900 dark:focus:bg-emerald-800 dark:focus:text-emerald-100 text-base md:text-lg">
-                              {t('juz')} {formatNumber(juz)}
-                            </SelectItem>
+                            <button
+                              key={juz}
+                              ref={endJuz === juz ? endJuzRef : null}
+                              onClick={() => { setEndJuz(juz); setShowEndJuzPicker(false); }}
+                              className={cn(
+                                'w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+                                endJuz === juz && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                                textSizeClasses.text,
+                                'text-right'
+                              )}
+                            >
+                              <span className="text-emerald-800 dark:text-emerald-200">{t('juz')} {formatNumber(juz)}</span>
+                            </button>
                           ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>
