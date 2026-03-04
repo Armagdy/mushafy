@@ -18,6 +18,7 @@ function excludeMushafImagesPlugin() {
         'mushuf_mwdoa_images'
       ];
       
+      // Remove entire mushaf directories
       mushafDirs.forEach(dir => {
         const dirPath = path.join(distAssetsPath, dir);
         if (fs.existsSync(dirPath)) {
@@ -25,6 +26,26 @@ function excludeMushafImagesPlugin() {
           console.log(`✓ Excluded ${dir} from build (will be downloaded on-demand)`);
         }
       });
+      
+      // Recursively remove all .webp files and _optimized_temp.webp files from dist/assets
+      function removeWebpFiles(directory: string) {
+        if (!fs.existsSync(directory)) return;
+        
+        const files = fs.readdirSync(directory);
+        files.forEach(file => {
+          const filePath = path.join(directory, file);
+          const stat = fs.statSync(filePath);
+          
+          if (stat.isDirectory()) {
+            removeWebpFiles(filePath);
+          } else if (file.endsWith('.webp') || file.includes('_optimized_temp.webp')) {
+            fs.unlinkSync(filePath);
+          }
+        });
+      }
+      
+      removeWebpFiles(distAssetsPath);
+      console.log('✓ Excluded all .webp and _optimized_temp.webp files from build');
     }
   };
 }

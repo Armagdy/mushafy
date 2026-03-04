@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 
-const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/Armagdy/mushafy/master/public/assets';
+// Using jsDelivr CDN for faster global downloads with edge caching
+const GITHUB_RAW_URL = 'https://cdn.jsdelivr.net/gh/Armagdy/mushafy@master/public/assets';
 
 // Base URL for fetching JSON data assets (reciters.json, quran-meta-data.json, etc.)
 // These are always bundled inside the app (native or web).
