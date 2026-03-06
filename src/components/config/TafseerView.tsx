@@ -46,30 +46,21 @@ export default function TafseerView() {
 
   // Dropdown picker state — search strings driven by 50ms polling (Android IME fix)
   const [surahSearch, setSurahSearch] = useState('');
-  const [tafseerSearch, setTafseerSearch] = useState('');
   const [showSurahPicker, setShowSurahPicker] = useState(false);
   const [showAyahPicker, setShowAyahPicker] = useState(false);
   const [showTafseerPicker, setShowTafseerPicker] = useState(false);
 
   // Refs for scrollable pickers
   const surahSearchRef = useRef<HTMLInputElement>(null);
-  const tafseerSearchRef = useRef<HTMLInputElement>(null);
   const selectedSurahRef = useRef<HTMLButtonElement>(null);
   const selectedAyahRef = useRef<HTMLButtonElement>(null);
   const selectedTafseerRef = useRef<HTMLButtonElement>(null);
 
-  // 50ms polling — bypasses Android IME React state desync for both search inputs
+  // 50ms polling — bypasses Android IME React state desync for surah search input
   useEffect(() => {
     const id = setInterval(() => {
       const v = surahSearchRef.current?.value ?? '';
       setSurahSearch(prev => prev !== v ? v : prev);
-    }, 50);
-    return () => clearInterval(id);
-  }, []);
-  useEffect(() => {
-    const id = setInterval(() => {
-      const v = tafseerSearchRef.current?.value ?? '';
-      setTafseerSearch(prev => prev !== v ? v : prev);
     }, 50);
     return () => clearInterval(id);
   }, []);
@@ -232,12 +223,6 @@ export default function TafseerView() {
       s.id.toString().includes(q)
     );
   }, [surahSearch]);
-
-  const filteredTafseers = useMemo(() => {
-    const q = tafseerSearch.trim().toLowerCase();
-    if (!q) return allTafseers;
-    return allTafseers.filter(t => t.name.toLowerCase().includes(q));
-  }, [tafseerSearch, allTafseers]);
 
   // Auto-scroll selected surah into view
   useEffect(() => {
@@ -514,53 +499,32 @@ export default function TafseerView() {
             <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
           </button>
         )}
-        {/* Picker — search + scrollable list */}
+        {/* Picker — scrollable list only (no search) */}
         {(showTafseerPicker || !selectedTafseerInfo) && (
-          <>
-            <div className="relative shrink-0">
-              <Search className={cn(
-                'absolute top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 dark:text-emerald-400',
-                isRTL ? 'right-3' : 'left-3'
-              )} />
-              <input
-                ref={tafseerSearchRef}
-                type="text"
-                placeholder={t('selectTafseer')}
-                autoFocus
+          <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-36">
+            {allTafseers.map((tafseer, index) => (
+              <button
+                key={tafseer.id}
+                ref={tafseer.id === selectedTafseerId ? selectedTafseerRef : null}
+                onClick={() => {
+                  setSelectedTafseerId(tafseer.id);
+                  setShowTafseerPicker(false);
+                }}
                 className={cn(
-                  'w-full h-9 rounded-md border border-emerald-300 bg-transparent px-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
-                  isRTL ? 'pr-9 text-right' : 'pl-9 text-left',
-                  textSizeClasses.text
+                  'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+                  'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
+                  tafseer.id === selectedTafseerId && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                  textSizeClasses.text,
+                  isRTL ? 'text-right' : 'text-left'
                 )}
-              />
-            </div>
-            <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-36">
-              {filteredTafseers.map((tafseer, index) => (
-                <button
-                  key={tafseer.id}
-                  ref={tafseer.id === selectedTafseerId ? selectedTafseerRef : null}
-                  onClick={() => {
-                    setSelectedTafseerId(tafseer.id);
-                    setShowTafseerPicker(false);
-          setTafseerSearch('');
-          if (tafseerSearchRef.current) tafseerSearchRef.current.value = '';
-                  }}
-                  className={cn(
-                    'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
-                    'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
-                    tafseer.id === selectedTafseerId && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
-                    textSizeClasses.text,
-                    isRTL ? 'text-right' : 'text-left'
-                  )}
-                >
-                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
-                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
-                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">{tafseer.name}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </>
+              >
+                <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+                  <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
+                  <span className="flex-1 text-emerald-800 dark:text-emerald-200">{tafseer.name}</span>
+                </div>
+              </button>
+            ))}
+          </div>
         )}
       </div>
       </div>
