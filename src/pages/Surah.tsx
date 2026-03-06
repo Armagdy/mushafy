@@ -612,7 +612,14 @@ const Surah = () => {
           setCurrentSurahId(surah);
           setCurrentPageAyah(ayah);
           setCurrentPlayingAyah({ surah, ayah });
+          
+          // If audio is currently playing, start playing the newly selected ayah
+          if (isPlaying) {
+            console.log('Audio is playing - starting newly selected ayah:', surah, ayah);
+            playAyah(surah, ayah);
+          }
         }}
+        currentPlayingAyah={currentPlayingAyah}
       />
 
       {/* Preloading indicator overlay */}

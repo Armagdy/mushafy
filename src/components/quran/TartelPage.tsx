@@ -37,9 +37,10 @@ interface TartelPageProps {
   onClick?: () => void;
   className?: string;
   onAyahSelect?: (surah: number, ayah: number) => void;
+  currentPlayingAyah?: { surah: number; ayah: number } | null;
 }
 
-const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect }: TartelPageProps) => {
+const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah }: TartelPageProps) => {
   const { language, t } = useLanguage();
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -175,18 +176,20 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect }: 
         console.log('Haptics not available:', error);
       }
       
-      // Clear any previous selection and highlight the new ayah
-      setHoveredAyah(verseKey);
-      
       // Extract surah and ayah from verseKey (format: "surahNum:ayahNum")
       const [surahStr, ayahStr] = verseKey.split(':');
       const surahNum = parseInt(surahStr);
       const ayahNum = parseInt(ayahStr);
       
       // Notify parent component of ayah selection
+      // Parent's currentPlayingAyah will now handle the highlighting
       if (onAyahSelect) {
         onAyahSelect(surahNum, ayahNum);
       }
+      
+      // Clear local hover state - parent's currentPlayingAyah will maintain the highlight
+      // This ensures only one ayah is highlighted at a time
+      setHoveredAyah(null);
     }, 400);
   };
 
@@ -285,7 +288,10 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect }: 
               <div className={`line-content ${line.is_centered ? 'text-center' : 'text-center'}`}>
                 {line.words.map((word, widx) => {
                   const isLastWord = word.position === ayahLastWords.get(word.verse_key);
-                  const isHighlighted = hoveredAyah === word.verse_key;
+                  // Highlight if locally hovered OR if it matches the currently selected ayah from parent
+                  const isCurrentlySelected = currentPlayingAyah && 
+                    word.verse_key === `${currentPlayingAyah.surah}:${currentPlayingAyah.ayah}`;
+                  const isHighlighted = hoveredAyah === word.verse_key || isCurrentlySelected;
                   
                   return (
                     <span

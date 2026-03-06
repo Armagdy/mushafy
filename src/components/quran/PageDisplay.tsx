@@ -24,6 +24,7 @@ interface PageDisplayProps {
   isFullscreen: boolean;
   onImageClick: () => void;
   onAyahSelect?: (surah: number, ayah: number) => void;
+  currentPlayingAyah?: { surah: number; ayah: number } | null;
 }
 
 export function PageDisplay({
@@ -43,7 +44,8 @@ export function PageDisplay({
   onScroll,
   isFullscreen,
   onImageClick,
-  onAyahSelect
+  onAyahSelect,
+  currentPlayingAyah
 }: PageDisplayProps) {
   const { t, isRTL } = useLanguage();
   const { getMushafPath, mushafType } = useMushaf();
@@ -62,6 +64,7 @@ export function PageDisplay({
           pageNumber={pageNum}
           onClick={onImageClick}
           onAyahSelect={onAyahSelect}
+          currentPlayingAyah={currentPlayingAyah}
           className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto mx-auto cursor-pointer transition-all duration-300`}
         />
       );
