@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { IMAGES_BASE_URL } from '@/config/assets';
 
-export type MushafType = 'mwdoa' | 'tashel' | 'madinah' | 'tartel';
+export type MushafType = 'mwdoa' | 'tashel' | 'madinah' | 'tarteel';
 
 interface MushafContextType {
   mushafType: MushafType;
@@ -14,7 +14,7 @@ const MushafContext = createContext<MushafContextType | undefined>(undefined);
 export const MushafProvider = ({ children }: { children: ReactNode }) => {
   const [mushafType, setMushafType] = useState<MushafType>(() => {
     const saved = localStorage.getItem('quran-app-mushaf');
-    return (saved as MushafType) || 'mwdoa';
+    return (saved as MushafType) || 'tarteel';
   });
 
   useEffect(() => {
@@ -22,8 +22,8 @@ export const MushafProvider = ({ children }: { children: ReactNode }) => {
   }, [mushafType]);
 
   const getMushafPath = (): string => {
-    // Tartel is text-based, doesn't use images
-    if (mushafType === 'tartel') return '';
+    // Tarteel is text-based, doesn't use images
+    if (mushafType === 'tarteel') return '';
     
     const folder = mushafType === 'mwdoa' 
       ? 'mushuf_mwdoa_images' 

@@ -66,14 +66,14 @@ export function PageDisplay({
   // Cache category for auto-caching viewed pages
   const cacheCategory = `mushaf-${mushafType}`;
   
-  // Long-press detection for non-Tartel mushaf
+  // Long-press detection for non-Tarteel mushaf
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTriggeredRef = useRef(false);
   
-  // Handle touch start for long press detection (non-Tartel mushaf only)
+  // Handle touch start for long press detection (non-Tarteel mushaf only)
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (mushafType === 'tartel') return;
+    if (mushafType === 'tarteel') return;
     
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
@@ -116,7 +116,7 @@ export function PageDisplay({
   
   // Handle touch move - cancel long press if finger moves too much
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (mushafType === 'tartel' || !touchStartPosRef.current) return;
+    if (mushafType === 'tarteel' || !touchStartPosRef.current) return;
     
     const touch = e.touches[0];
     const deltaX = Math.abs(touch.clientX - touchStartPosRef.current.x);
@@ -133,7 +133,7 @@ export function PageDisplay({
   
   // Handle touch end - cleanup
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (mushafType === 'tartel') return;
+    if (mushafType === 'tarteel') return;
     
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -151,7 +151,7 @@ export function PageDisplay({
 
   // Helper to render the appropriate page component based on mushaf type
   const renderPage = (pageNum: number) => {
-    if (mushafType === 'tartel') {
+    if (mushafType === 'tarteel') {
       return (
         <TartelPage
           pageNumber={pageNum}
@@ -162,8 +162,8 @@ export function PageDisplay({
         />
       );
     }
-    
-    // For non-Tartel mushaf, wrap with long-press detection
+
+    // For non-Tarteel mushaf, wrap with long-press detection
     return (
       <div
         onTouchStart={handleTouchStart}
