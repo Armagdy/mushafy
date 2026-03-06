@@ -105,6 +105,10 @@ export default {
           from: { backgroundPosition: "200% 0" },
           to: { backgroundPosition: "-200% 0" },
         },
+        "flash-gold": {
+          "0%, 100%": { backgroundColor: "rgba(21, 128, 61, 0.5)", borderColor: "rgba(242, 227, 187, 0.3)" },
+          "50%": { backgroundColor: "rgba(217, 119, 6, 0.7)", borderColor: "rgba(245, 158, 11, 0.8)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -113,6 +117,7 @@ export default {
         "slide-in": "slide-in 0.4s ease-out",
         "scale-in": "scale-in 0.3s ease-out",
         shimmer: "shimmer 3s linear infinite",
+        "flash-gold": "flash-gold 0.5s ease-in-out 6",
       },
     },
   },

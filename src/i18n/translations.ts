@@ -93,6 +93,8 @@ export const translations = {
     mp3Quran: 'مصحف صوتي',
     everyAyahExplanation: 'يتم تشغيل كل آية بشكل منفصل مع إمكانية التنقل بين الآيات',
     mp3QuranExplanation: 'لا يمكن استخدام التكرار و اختيار الايات مع بعض هؤلاء القراء',
+    cannotSelectAyahWithReciter: 'لا يمكن اختيار آية محددة مع هذا القارئ',
+    pleaseChooseAnotherReciter: 'الرجاء اختيار قارئ آخر يدعم التحديد الدقيق للآيات',
     hafs: 'حفص',
     warsh: 'ورش',
     qalon: 'قالون',
@@ -243,6 +245,7 @@ export const translations = {
     pageRangeError: 'يرجى إدخال رقم صفحة بين 1 و 604',
     back: 'رجوع',
     navigation: 'التنقل',
+    ayahSelectionNotAvailableForMushaf: 'الرجاء تحديد الآية من منتقي الآيات لهذا المصحف',
   },
   en: {
     appName: 'Mushafy',
@@ -337,6 +340,8 @@ export const translations = {
     mp3Quran: 'Full Surah',
     everyAyahExplanation: 'Each verse plays individually with the ability to navigate between verses',
     mp3QuranExplanation: 'The entire surah plays continuously from beginning to end',
+    cannotSelectAyahWithReciter: 'Cannot select specific ayah with this reciter',
+    pleaseChooseAnotherReciter: 'Please choose another reciter that supports precise ayah selection',
     hafs: 'Hafs',
     warsh: 'Warsh',
     qalon: 'Qalon',
@@ -487,6 +492,7 @@ export const translations = {
     pageRangeError: 'Please enter a page number between 1 and 604',
     back: 'Back',
     navigation: 'Navigation',
+    ayahSelectionNotAvailableForMushaf: 'Please select ayah from ayah picker for this mushaf',
   },
 };
 

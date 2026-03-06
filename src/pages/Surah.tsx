@@ -122,6 +122,7 @@ const Surah = () => {
     const saved = localStorage.getItem('quran-show-bottom-bar-text');
     return saved !== null ? saved === 'true' : true;
   });
+  const [flashAyahPickerIcon, setFlashAyahPickerIcon] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
@@ -609,6 +610,17 @@ const Surah = () => {
         }}
         onAyahSelect={(surah: number, ayah: number) => {
           console.log('Ayah selected in TartelPage:', surah, ayah);
+          
+          // Check if MP3Quran reciter without ayah timing is selected
+          if (audioSource === 'mp3quran' && !hasAyahTimings) {
+            toast({
+              title: t('cannotSelectAyahWithReciter'),
+              description: t('pleaseChooseAnotherReciter'),
+              variant: 'destructive',
+            });
+            return;
+          }
+          
           setCurrentSurahId(surah);
           setCurrentPageAyah(ayah);
           setCurrentPlayingAyah({ surah, ayah });
@@ -620,6 +632,12 @@ const Surah = () => {
           }
         }}
         currentPlayingAyah={currentPlayingAyah}
+        onLongPressNotification={() => {
+          setFlashAyahPickerIcon(true);
+          setTimeout(() => setFlashAyahPickerIcon(false), 3000);
+        }}
+        audioSource={audioSource}
+        hasAyahTimings={hasAyahTimings}
       />
 
       {/* Preloading indicator overlay */}
@@ -753,6 +771,7 @@ const Surah = () => {
           preloadProgress={preloadProgress}
           audioSource={audioSource}
           hasAyahTimings={hasAyahTimings}
+          flashAyahPickerIcon={flashAyahPickerIcon}
           currentSurahName={
             // For MP3Quran mode, prioritize currentSurahAudio to show the surah being played
             // This ensures the surah name doesn't change when user navigates pages manually

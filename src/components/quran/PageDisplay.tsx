@@ -5,6 +5,9 @@ import { useMushaf } from '@/contexts/MushafContext';
 import { getPageImageFilename } from '@/lib/quran-mapping';
 import { CachedImage } from './CachedImage';
 import TartelPage from './TartelPage';
+import { useRef } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 interface PageDisplayProps {
   currentPageNum: number;
@@ -25,6 +28,9 @@ interface PageDisplayProps {
   onImageClick: () => void;
   onAyahSelect?: (surah: number, ayah: number) => void;
   currentPlayingAyah?: { surah: number; ayah: number } | null;
+  onLongPressNotification?: () => void;
+  audioSource?: 'everyayah' | 'mp3quran';
+  hasAyahTimings?: boolean;
 }
 
 export function PageDisplay({
@@ -45,16 +51,103 @@ export function PageDisplay({
   isFullscreen,
   onImageClick,
   onAyahSelect,
-  currentPlayingAyah
+  currentPlayingAyah,
+  onLongPressNotification,
+  audioSource = 'everyayah',
+  hasAyahTimings = true
 }: PageDisplayProps) {
   const { t, isRTL } = useLanguage();
   const { getMushafPath, mushafType } = useMushaf();
+  const { toast } = useToast();
   
   // All mushaf types now use the same styling
   const isTashelOrMadinah = true;
   
   // Cache category for auto-caching viewed pages
   const cacheCategory = `mushaf-${mushafType}`;
+  
+  // Long-press detection for non-Tartel mushaf
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressTriggeredRef = useRef(false);
+  
+  // Handle touch start for long press detection (non-Tartel mushaf only)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (mushafType === 'tartel') return;
+    
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    longPressTriggeredRef.current = false;
+    
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      
+      // Haptic feedback
+      try {
+        Haptics.impact({ style: ImpactStyle.Medium });
+      } catch (error) {
+        console.log('Haptics not supported');
+      }
+      
+      // Check if ayah selection is available with current reciter
+      if (audioSource === 'mp3quran' && !hasAyahTimings) {
+        // Reciter doesn't support ayah timing - show error
+        toast({
+          title: t('cannotSelectAyahWithReciter'),
+          description: t('pleaseChooseAnotherReciter'),
+          duration: 3000,
+          variant: 'destructive',
+        });
+        // Don't trigger flash animation since ayah picker won't work
+      } else {
+        // Ayah selection is available - guide user to ayah picker
+        toast({
+          title: t('ayahSelectionNotAvailableForMushaf'),
+          duration: 3000,
+        });
+        
+        // Trigger flash animation on ayah picker icon
+        if (onLongPressNotification) {
+          onLongPressNotification();
+        }
+      }
+    }, 500); // 500ms long press
+  };
+  
+  // Handle touch move - cancel long press if finger moves too much
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (mushafType === 'tartel' || !touchStartPosRef.current) return;
+    
+    const touch = e.touches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartPosRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);
+    
+    // Cancel if moved more than 10px
+    if (deltaX > 10 || deltaY > 10) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    }
+  };
+  
+  // Handle touch end - cleanup
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (mushafType === 'tartel') return;
+    
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    
+    // If long press was triggered, prevent click event
+    if (longPressTriggeredRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    touchStartPosRef.current = null;
+  };
 
   // Helper to render the appropriate page component based on mushaf type
   const renderPage = (pageNum: number) => {
@@ -70,15 +163,28 @@ export function PageDisplay({
       );
     }
     
+    // For non-Tartel mushaf, wrap with long-press detection
     return (
-      <CachedImage
-        src={`${getMushafPath()}/${getPageImageFilename(pageNum)}`}
-        alt={`${t('page')} ${pageNum}`}
-        className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
-        loading="lazy"
-        cacheCategory={cacheCategory}
-        onClick={onImageClick}
-      />
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+      >
+        <CachedImage
+          src={`${getMushafPath()}/${getPageImageFilename(pageNum)}`}
+          alt={`${t('page')} ${pageNum}`}
+          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
+          loading="lazy"
+          cacheCategory={cacheCategory}
+          onClick={(e) => {
+            // Only trigger click if long press wasn't triggered
+            if (!longPressTriggeredRef.current) {
+              onImageClick();
+            }
+          }}
+        />
+      </div>
     );
   };
 
