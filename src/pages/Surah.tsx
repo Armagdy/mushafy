@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, BookText, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { surahs } from '@/data/surahs';
@@ -673,7 +673,8 @@ const Surah = () => {
 
       {/* Add Bookmark Button in Fullscreen Mode */}
       {isFullscreen && (
-        <div className="absolute bottom-40 left-4 z-50">
+        <div className="absolute bottom-40 left-4 z-50 flex gap-4">
+          {/* Bookmark Button */}
           <div className="relative flex items-end">
             {/* Add Bookmark Button - Icon Only */}
             <motion.button
@@ -763,6 +764,28 @@ const Surah = () => {
                 </button>
               </motion.div>
             )}
+          </div>
+
+          {/* Tafseer Button */}
+          <div className="relative flex items-end">
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={() => {
+                // Save current playing ayah or page ayah for TafseerView
+                if (currentPlayingAyah) {
+                  localStorage.setItem('quran-tafseer-surah', currentPlayingAyah.surah.toString());
+                  localStorage.setItem('quran-tafseer-ayah', currentPlayingAyah.ayah.toString());
+                } else {
+                  localStorage.setItem('quran-tafseer-surah', currentSurahId.toString());
+                  localStorage.setItem('quran-tafseer-ayah', (currentPageAyah || 1).toString());
+                }
+                setConfigOverlayType('tafseer');
+              }}
+              className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+            >
+              <BookText className="w-7 h-7" />
+            </motion.button>
           </div>
         </div>
       )}
