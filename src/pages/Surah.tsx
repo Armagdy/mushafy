@@ -677,21 +677,16 @@ const Surah = () => {
           {/* Bookmark Button */}
           <div className="relative flex items-end">
             {/* Add Bookmark Button - Icon Only */}
-            <motion.button
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+            <button
               onClick={() => setShowBookmarkTypeSelector(!showBookmarkTypeSelector)}
               className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
             >
               <Bookmark className="w-7 h-7" />
-            </motion.button>
+            </button>
             
             {/* Bookmark Type Options - Shows to the top-right of button when open */}
             {showBookmarkTypeSelector && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+              <div
                 className="absolute bottom-0 left-10 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-2xl border border-emerald-200 dark:border-emerald-700 p-2 flex flex-col gap-1"
               >
                 {/* Quick Bookmark */}
@@ -762,15 +757,13 @@ const Surah = () => {
                     {isRTL ? 'تعديل العلامات' : 'Edit Bookmark'}
                   </span>
                 </button>
-              </motion.div>
+              </div>
             )}
           </div>
 
           {/* Tafseer Button */}
           <div className="relative flex items-end">
-            <motion.button
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+            <button
               onClick={() => {
                 // Save current playing ayah or page ayah for TafseerView
                 if (currentPlayingAyah) {
@@ -785,7 +778,7 @@ const Surah = () => {
               className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
             >
               <BookText className="w-7 h-7" />
-            </motion.button>
+            </button>
           </div>
         </div>
       )}
