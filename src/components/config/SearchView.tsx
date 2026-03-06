@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 
 interface SearchViewProps {
-  onNavigate?: (page: number) => void;
+  onNavigate?: (page: number, ayah?: { surah: number; ayah: number }) => void;
   onClose?: () => void;
 }
 
@@ -212,9 +212,10 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
     }
   };
 
-  const handleResultClick = (page: number) => {
+  const handleResultClick = (page: number, surahNumber: number, ayahNumber: number) => {
     if (onNavigate) {
-      onNavigate(page);
+      // Pass ayah information for search result navigation
+      onNavigate(page, { surah: surahNumber, ayah: ayahNumber });
       onClose?.();
     } else {
       navigate(`/page/${page}`);
@@ -334,7 +335,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
                   whileHover={{ scale: 1.02 }}
-                  onClick={() => handleResultClick(result.page)}
+                  onClick={() => handleResultClick(result.page, result.surahNumber, result.ayahNumber)}
                   className={cn(
                     "w-full p-3 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-[#FBF9F4] dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-gray-700 transition-all",
                     isRTL ? "text-right" : "text-left"
