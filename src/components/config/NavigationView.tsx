@@ -10,7 +10,7 @@ import { surahs } from "@/data/surahs";
 import { BookOpen, Hash, FileText, Layers, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Search } from "lucide-react";
 
 interface NavigationViewProps {
-  onNavigate?: (page: number) => void;
+  onNavigate?: (page: number, ayah?: { surah: number; ayah: number }) => void;
   onClose?: () => void;
   initialType?: 'surah' | 'juz' | 'page' | 'quarter';
   initialSurah?: number;
@@ -527,7 +527,8 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
       const quarterData = allQuartersData.find(q => q.quarterNumber === parseInt(selectedQuarter));
       if (quarterData) {
         if (onNavigate) {
-          onNavigate(quarterData.pageNumber);
+          // Pass ayah information for quarter navigation
+          onNavigate(quarterData.pageNumber, { surah: quarterData.surahId, ayah: quarterData.ayahNumber });
           onClose?.();
         } else {
           navigate(`/page/${quarterData.pageNumber}`);

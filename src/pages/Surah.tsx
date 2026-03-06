@@ -997,7 +997,12 @@ const Surah = () => {
           initialNavigationSurah={initialNavigationSurah}
           initialNavigationJuz={initialNavigationJuz}
           initialNavigationPage={initialNavigationPage}
-          onNavigate={(page) => {
+          onNavigate={(page, ayah) => {
+            if (ayah) {
+              // Quarter/Rob3 navigation with specific ayah
+              isAyahNavigation.current = true;
+              setCurrentPlayingAyah(ayah);
+            }
             navigate(`/page/${page}`);
             setConfigOverlayType(null);
           }}

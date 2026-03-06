@@ -28,7 +28,7 @@ interface ConfigOverlayProps {
   currentPage: number;
   currentSurahId: number;
   currentPlayingAyah: { surah: number; ayah: number } | null;
-  onNavigate: (page: number) => void;
+  onNavigate: (page: number, ayah?: { surah: number; ayah: number }) => void;
   viewMode: 'single' | 'double';
   onViewModeToggle: () => void;
   showBottomBarText: boolean;
