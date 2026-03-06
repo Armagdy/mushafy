@@ -158,7 +158,7 @@ export function PageDisplay({
           onClick={onImageClick}
           onAyahSelect={onAyahSelect}
           currentPlayingAyah={currentPlayingAyah}
-          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto mx-auto cursor-pointer transition-all duration-300`}
+          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto mx-auto cursor-pointer"
         />
       );
     }
@@ -174,7 +174,7 @@ export function PageDisplay({
         <CachedImage
           src={`${getMushafPath()}/${getPageImageFilename(pageNum)}`}
           alt={`${t('page')} ${pageNum}`}
-          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
+          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain mx-auto cursor-pointer"
           loading="lazy"
           cacheCategory={cacheCategory}
           onClick={(e) => {
