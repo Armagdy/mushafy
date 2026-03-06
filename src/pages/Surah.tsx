@@ -551,7 +551,7 @@ const Surah = () => {
           stiffness: 300,
           damping: 30,
         }}
-        className={cn(isFullscreen && "pointer-events-none")}
+        className={cn("z-50", isFullscreen && "pointer-events-none")}
       >
       <TopBar
         currentSurah={currentSurah}
@@ -584,6 +584,34 @@ const Surah = () => {
         }}
       />
       </motion.div>
+
+      {/* Fullscreen Info Overlay - Shows when bars are hidden */}
+      {isFullscreen && (
+      <div
+        className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between pt-12 pb-3 px-6"
+      >
+        {/* Juz */}
+        <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
+          {t('juz')} {formatNumber(currentJuz)}
+        </div>
+        
+        {/* Ornament separator */}
+        <div className="flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent"></div>
+        
+        {/* Surah Name */}
+        <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
+          {language === 'ar' ? currentSurah.name : currentSurah.englishName}
+        </div>
+        
+        {/* Ornament separator */}
+        <div className="flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent"></div>
+        
+        {/* Page */}
+        <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
+          {t('page')} {formatNumber(currentPageNum)}
+        </div>
+      </div>
+      )}
 
       {/* Main Content - Two Page Display */}
       <PageDisplay
@@ -668,7 +696,7 @@ const Surah = () => {
           stiffness: 300,
           damping: 30,
         }}
-        className={cn((isFullscreen || !currentPlayingAyah) && "pointer-events-none")}
+        className={cn("z-50", (isFullscreen || !currentPlayingAyah) && "pointer-events-none")}
       >
         <AudioProgressBar
             currentTime={currentTime}
@@ -756,7 +784,7 @@ const Surah = () => {
           stiffness: 300,
           damping: 30,
         }}
-        className={cn("w-full bg-gradient-to-t from-emerald-800 to-emerald-600", isFullscreen && "pointer-events-none")}
+        className={cn("w-full bg-gradient-to-t from-emerald-800 to-emerald-600 z-50", isFullscreen && "pointer-events-none")}
       >
         <div className="w-full max-w-[1600px] mx-auto rounded-t-2xl">
         {/* Audio Player Bottom Bar */}
