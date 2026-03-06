@@ -37,6 +37,7 @@ interface ConfigOverlayProps {
   initialNavigationSurah?: number;
   initialNavigationJuz?: number;
   initialNavigationPage?: number;
+  initialBookmarkCategory?: string | null;
   
   // Audio player props for ReciterView
   audioSource: 'everyayah' | 'mp3quran';
@@ -110,6 +111,7 @@ export default function ConfigOverlay({
   initialNavigationSurah,
   initialNavigationJuz,
   initialNavigationPage,
+  initialBookmarkCategory,
   audioSource,
   onAudioSourceChange,
   selectedReciter,
@@ -271,6 +273,7 @@ export default function ConfigOverlay({
             onRemoveReadingBookmark={removeReadingBookmark}
             onAddBookmarkByType={addBookmarkByType}
             onUpdateBookmark={updateBookmark}
+            initialCategory={initialBookmarkCategory}
           />
         );
       case 'navigation':

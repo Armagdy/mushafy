@@ -28,6 +28,7 @@ interface BookmarksViewProps {
   onRemoveReadingBookmark: (page: number) => void;
   onAddBookmarkByType: (type: string, surahId: number, ayahNum: number) => Promise<void>;
   onUpdateBookmark: (oldPage: number, newPage: number, surahId: number, ayahNum: number, type: string) => Promise<void>;
+  initialCategory?: string | null;
 }
 
 export default function BookmarksView({
@@ -46,6 +47,7 @@ export default function BookmarksView({
   onRemoveReadingBookmark,
   onAddBookmarkByType,
   onUpdateBookmark,
+  initialCategory = null,
 }: BookmarksViewProps) {
   const { t, isRTL, language } = useLanguage();
   const { toast } = useToast();
@@ -103,10 +105,14 @@ export default function BookmarksView({
   // Active category from URL (null = show list, string = show that category's content)
   const activeCategory = searchParams.get('category');
   
-  // Reset search params on mount to always show full list
+  // Set initial category on mount if provided, otherwise reset to show full list
   useLayoutEffect(() => {
-    setSearchParams({});
-  }, []);
+    if (initialCategory) {
+      setSearchParams({ category: initialCategory });
+    } else {
+      setSearchParams({});
+    }
+  }, [initialCategory]);
 
   // Auto-scroll to selected page in Add bookmark view (on mount and when page changes)
   useEffect(() => {

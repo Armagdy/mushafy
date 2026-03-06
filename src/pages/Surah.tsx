@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
@@ -33,6 +33,7 @@ import { isNativePlatform } from '@/lib/native-storage';
 const Surah = () => {
   const { page } = useParams<{ page: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t, isRTL, language, setLanguage } = useLanguage();
   const { getMushafPath, mushafType, setMushafType } = useMushaf();
   const { toast } = useToast();
@@ -106,6 +107,7 @@ const Surah = () => {
   const [initialNavigationSurah, setInitialNavigationSurah] = useState<number | undefined>(undefined);
   const [initialNavigationJuz, setInitialNavigationJuz] = useState<number | undefined>(undefined);
   const [initialNavigationPage, setInitialNavigationPage] = useState<number | undefined>(undefined);
+  const [initialBookmarkCategory, setInitialBookmarkCategory] = useState<string | null>(null);
   const [currentHezb, setCurrentHezb] = useState(1);
   const [currentQuarter, setCurrentQuarter] = useState(1);
   const [viewMode, setViewMode] = useState<'single' | 'double'>(
@@ -124,6 +126,7 @@ const Surah = () => {
   });
   const [flashAyahPickerIcon, setFlashAyahPickerIcon] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showBookmarkTypeSelector, setShowBookmarkTypeSelector] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -668,6 +671,102 @@ const Surah = () => {
         hasAyahTimings={hasAyahTimings}
       />
 
+      {/* Add Bookmark Button in Fullscreen Mode */}
+      {isFullscreen && (
+        <div className="absolute bottom-40 left-4 z-50">
+          <div className="relative flex items-end">
+            {/* Add Bookmark Button - Icon Only */}
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={() => setShowBookmarkTypeSelector(!showBookmarkTypeSelector)}
+              className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+            >
+              <Bookmark className="w-7 h-7" />
+            </motion.button>
+            
+            {/* Bookmark Type Options - Shows to the top-right of button when open */}
+            {showBookmarkTypeSelector && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="absolute bottom-0 left-10 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-2xl border border-emerald-200 dark:border-emerald-700 p-2 flex flex-col gap-1"
+              >
+                {/* Quick Bookmark */}
+                <button
+                  onClick={async () => {
+                    toggleBookmark(currentPageNum);
+                    setShowBookmarkTypeSelector(false);
+                    toast({
+                      title: bookmarks.includes(currentPageNum) ? t('bookmarkRemoved') : t('bookmarkAdded'),
+                      description: `${t('page')} ${formatNumber(currentPageNum)}`,
+                    });
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                >
+                  <Bookmark className="w-5 h-5 text-amber-600" />
+                  <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
+                    {t('bookmark')}
+                  </span>
+                </button>
+                
+                {/* Memorization Bookmark */}
+                <button
+                  onClick={async () => {
+                    await addBookmarkByType('memorization', currentSurahId, currentPageAyah || 1);
+                    setShowBookmarkTypeSelector(false);
+                    toast({
+                      title: t('bookmarkAdded'),
+                      description: `${t('memorization')} - ${t('page')} ${formatNumber(currentPageNum)}`,
+                    });
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                >
+                  <BookMarked className="w-5 h-5 text-emerald-600" />
+                  <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
+                    {t('memorization')}
+                  </span>
+                </button>
+                
+                {/* Reading Bookmark */}
+                <button
+                  onClick={async () => {
+                    await addBookmarkByType('reading', currentSurahId, currentPageAyah || 1);
+                    setShowBookmarkTypeSelector(false);
+                    toast({
+                      title: t('bookmarkAdded'),
+                      description: `${t('reading')} - ${t('page')} ${formatNumber(currentPageNum)}`,
+                    });
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                >
+                  <BookOpen className="w-5 h-5 text-blue-600" />
+                  <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
+                    {t('reading')}
+                  </span>
+                </button>
+                
+                {/* Edit Bookmark */}
+                <button
+                  onClick={() => {
+                    setShowBookmarkTypeSelector(false);
+                    setInitialBookmarkCategory('update');
+                    setConfigOverlayType('bookmarks');
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors border-t border-emerald-100 dark:border-emerald-800"
+                >
+                  <BookmarkCheck className="w-5 h-5 text-purple-600" />
+                  <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
+                    {isRTL ? 'تعديل العلامات' : 'Edit Bookmark'}
+                  </span>
+                </button>
+              </motion.div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Preloading indicator overlay */}
       {isPreloadingAyahs && (
         <div 
@@ -859,6 +958,7 @@ const Surah = () => {
           // Save current page/surah to localStorage for Bookmarks view
           localStorage.setItem('quran-current-page', currentPageNum.toString());
           localStorage.setItem('quran-current-surah', currentSurahId.toString());
+          setInitialBookmarkCategory(null); // Reset to show main menu
           setConfigOverlayType('bookmarks');
         }}
         onSettingsClick={() => setConfigOverlayType('settings')}
@@ -1016,7 +1116,10 @@ const Surah = () => {
       {configOverlayType && (
         <ConfigOverlay
           type={configOverlayType}
-          onClose={() => setConfigOverlayType(null)}
+          onClose={() => {
+            setConfigOverlayType(null);
+            setInitialBookmarkCategory(null);
+          }}
           onChangeView={(view) => setConfigOverlayType(view)}
           currentPage={currentPageNum}
           currentSurahId={currentSurahId}
@@ -1025,6 +1128,7 @@ const Surah = () => {
           initialNavigationSurah={initialNavigationSurah}
           initialNavigationJuz={initialNavigationJuz}
           initialNavigationPage={initialNavigationPage}
+          initialBookmarkCategory={initialBookmarkCategory}
           onNavigate={(page, ayah) => {
             if (ayah) {
               // Quarter/Rob3 navigation with specific ayah
