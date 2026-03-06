@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, memo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { surahs } from '@/data/surahs';
 
 interface Word {
   word_id: number;
@@ -18,8 +19,6 @@ interface Line {
   is_centered: boolean;
   words?: Word[];
   surah_number?: number;
-  surah_name_ar?: string;
-  surah_name_en?: string;
 }
 
 interface PageData {
@@ -313,10 +312,17 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
                 })}
               </div>
             ) : line.line_type === 'surah_name' ? (
-              <div className="surah-header-line text-center">
-                <span className="surah-name">
-                  {language === 'ar' ? line.surah_name_ar : line.surah_name_en}
-                </span>
+              // Surah name decorative header
+              <div className="surah-header-container text-center">
+                <div className="surah-header-ornament">
+                  <div className="ornament-left"></div>
+                  <span className="surah-name-text">
+                    {line.surah_number && surahs[line.surah_number - 1] 
+                      ? `سُورَةُ ${surahs[line.surah_number - 1].name}`
+                      : ''}
+                  </span>
+                  <div className="ornament-right"></div>
+                </div>
               </div>
             ) : line.line_type === 'basmallah' ? (
               <div className="bismillah-line text-center">
@@ -402,20 +408,90 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           vertical-align: baseline;
         }
 
+        .surah-header-container {
+          padding: 0;
+          margin: 0;
+          line-height: 1.75;
+          height: auto;
+        }
+
+        .surah-header-ornament {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          padding: 0;
+          border: none;
+          background: transparent;
+          position: relative;
+          line-height: 1.75;
+          height: auto;
+        }
+
+        .ornament-left, .ornament-right {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(to right, transparent, #065f46, transparent);
+          max-width: 60px;
+        }
+
+        .surah-name-text {
+          font-family: 'Amiri', 'Traditional Arabic', serif;
+          font-size: min(max(2.5vw, 1.75rem), 2.5rem);
+          font-weight: bold;
+          color: #065f46;
+          white-space: nowrap;
+          padding: 0 0.5rem;
+          text-shadow: none;
+          line-height: 1.75;
+        }
+
         .surah-header-line {
           font-size: min(max(2vw, 1.5rem), 2.25rem);
-          color: #8b7355;
-          font-weight: bold;
-          padding: 0.5rem 0;
-          margin: 0.3rem 0;
+          line-height: 1.75;
+          color: #065f46;
+          font-weight: normal;
+          padding: 0;
+          margin: 0;
+          text-align: center;
+          letter-spacing: 0;
+          white-space: nowrap;
+          overflow: visible;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          text-rendering: optimizeLegibility;
+          font-kerning: none;
+          -webkit-font-kerning: none;
+          font-feature-settings: normal;
+          -webkit-font-feature-settings: normal;
+        }
+
+        .surah-name-char {
+          display: inline;
+          color: inherit;
+          font-size: inherit;
+          font-weight: inherit;
+          margin: 0;
+          padding: 0;
+          letter-spacing: 0;
+        }
+
+        .surah-name {
+          display: inline;
+          color: inherit;
+          font-size: inherit;
+          font-weight: inherit;
+          margin: 0;
+          padding: 0;
         }
 
         .bismillah-line {
           font-size: min(max(1.8vw, 1.4rem), 2rem);
           color: #8b7355;
           font-weight: 600;
-          padding: 0.5rem 0;
-          margin: 0.3rem 0;
+          padding: 0;
+          margin: 0;
+          line-height: 1.75;
         }
 
         @media (min-width: 768px) {
@@ -424,16 +500,25 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
             line-height: 2;
           }
           
-          .surah-header-line {
-            font-size: 2.25rem;
-            padding: 1rem 0;
-            margin: 0.5rem 0;
+          .surah-name-text {
+            font-size: 2.5rem;
+            line-height: 2;
+          }
+          
+          .surah-header-container {
+            line-height: 2;
+          }
+          
+          .surah-header-ornament {
+            padding: 0;
+            line-height: 2;
           }
           
           .bismillah-line {
             font-size: 2rem;
-            padding: 0.75rem 0;
-            margin: 0.5rem 0;
+            padding: 0;
+            margin: 0;
+            line-height: 2;
           }
         }
       `}</style>
