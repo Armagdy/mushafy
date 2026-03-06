@@ -124,6 +124,7 @@ export default function SettingsView() {
           { value: 'mwdoa', label: t('mushafMwdoa') },
           { value: 'tashel', label: t('mushafTashel') },
           { value: 'madinah', label: t('mushafMadinah') },
+          { value: 'tartel', label: t('mushafTartel') },
         ];
         
         return (

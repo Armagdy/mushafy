@@ -607,6 +607,12 @@ const Surah = () => {
             setIsFullscreen(!isFullscreen);
           }
         }}
+        onAyahSelect={(surah: number, ayah: number) => {
+          console.log('Ayah selected in TartelPage:', surah, ayah);
+          setCurrentSurahId(surah);
+          setCurrentPageAyah(ayah);
+          setCurrentPlayingAyah({ surah, ayah });
+        }}
       />
 
       {/* Preloading indicator overlay */}

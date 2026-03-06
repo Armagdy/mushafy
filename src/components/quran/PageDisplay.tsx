@@ -4,6 +4,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useMushaf } from '@/contexts/MushafContext';
 import { getPageImageFilename } from '@/lib/quran-mapping';
 import { CachedImage } from './CachedImage';
+import TartelPage from './TartelPage';
 
 interface PageDisplayProps {
   currentPageNum: number;
@@ -22,6 +23,7 @@ interface PageDisplayProps {
   onScroll: () => void;
   isFullscreen: boolean;
   onImageClick: () => void;
+  onAyahSelect?: (surah: number, ayah: number) => void;
 }
 
 export function PageDisplay({
@@ -40,7 +42,8 @@ export function PageDisplay({
   onNextPage,
   onScroll,
   isFullscreen,
-  onImageClick
+  onImageClick,
+  onAyahSelect
 }: PageDisplayProps) {
   const { t, isRTL } = useLanguage();
   const { getMushafPath, mushafType } = useMushaf();
@@ -50,6 +53,31 @@ export function PageDisplay({
   
   // Cache category for auto-caching viewed pages
   const cacheCategory = `mushaf-${mushafType}`;
+
+  // Helper to render the appropriate page component based on mushaf type
+  const renderPage = (pageNum: number) => {
+    if (mushafType === 'tartel') {
+      return (
+        <TartelPage
+          pageNumber={pageNum}
+          onClick={onImageClick}
+          onAyahSelect={onAyahSelect}
+          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto mx-auto cursor-pointer transition-all duration-300`}
+        />
+      );
+    }
+    
+    return (
+      <CachedImage
+        src={`${getMushafPath()}/${getPageImageFilename(pageNum)}`}
+        alt={`${t('page')} ${pageNum}`}
+        className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
+        loading="lazy"
+        cacheCategory={cacheCategory}
+        onClick={onImageClick}
+      />
+    );
+  };
 
   return (
     <main className="flex-1 flex items-center justify-center gap-6 overflow-hidden min-h-0 bg-[#FBF9F4]">
@@ -93,14 +121,7 @@ export function PageDisplay({
                             )}
                           </div>
                         )}
-                        <CachedImage
-                          src={`${getMushafPath()}/${getPageImageFilename(leftPageNum)}`}
-                          alt={`${t('page')} ${leftPageNum}`}
-                          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
-                          loading="lazy"
-                          cacheCategory={cacheCategory}
-                          onClick={onImageClick}
-                        />
+                        {renderPage(leftPageNum)}
                       </div>
                     </div>
                   )}
@@ -121,14 +142,7 @@ export function PageDisplay({
                             )}
                           </div>
                         )}
-                        <CachedImage
-                          src={`${getMushafPath()}/${getPageImageFilename(rightPageNum)}`}
-                          alt={`${t('page')} ${rightPageNum}`}
-                          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
-                          loading="lazy"
-                          cacheCategory={cacheCategory}
-                          onClick={onImageClick}
-                        />
+                        {renderPage(rightPageNum)}
                       </div>
                     </div>
                   )}
@@ -152,14 +166,7 @@ export function PageDisplay({
                             )}
                           </div>
                         )}
-                        <CachedImage
-                          src={`${getMushafPath()}/${getPageImageFilename(rightPageNum)}`}
-                          alt={`${t('page')} ${rightPageNum}`}
-                          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
-                          loading="lazy"
-                          cacheCategory={cacheCategory}
-                          onClick={onImageClick}
-                        />
+                        {renderPage(rightPageNum)}
                       </div>
                     </div>
                   )}
@@ -180,14 +187,7 @@ export function PageDisplay({
                             )}
                           </div>
                         )}
-                        <CachedImage
-                          src={`${getMushafPath()}/${getPageImageFilename(leftPageNum)}`}
-                          alt={`${t('page')} ${leftPageNum}`}
-                          className={`relative max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] shadow-2xl rounded-xl border-4 border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
-                          loading="lazy"
-                          cacheCategory={cacheCategory}
-                          onClick={onImageClick}
-                        />
+                        {renderPage(leftPageNum)}
                       </div>
                     </div>
                   )}
@@ -283,14 +283,7 @@ export function PageDisplay({
                       </defs>
                     </svg>
                   </div>
-                  <CachedImage
-                    src={`${getMushafPath()}/${imageFilename}`}
-                    alt={`${t('page')} ${pageNum}`}
-                    className={`max-w-full ${isFullscreen ? 'h-[100dvh]' : 'max-h-[calc(100dvh-170px)] md:shadow-2xl md:rounded-xl md:border-4 md:border-white'} w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300`}
-                    loading="eager"
-                    cacheCategory={cacheCategory}
-                    onClick={onImageClick}
-                  />
+                  {renderPage(pageNum)}
                 </div>
               </div>
             );})}
