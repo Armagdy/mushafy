@@ -1042,13 +1042,20 @@ const Surah = () => {
             }
           }}
           onReciterNavigateToSurah={async (surahId) => {
-            stopAudio();
-            setCurrentPlayingAyah({ surah: surahId, ayah: 1 });
-            isAyahNavigation.current = true;
-            const firstPage = await getAyahPage(surahId, 1);
-            if (firstPage) {
-              navigate(`/page/${firstPage}`);
+            // Check if user is changing to a different surah
+            const isDifferentSurah = surahId !== currentSurahId;
+            
+            if (isDifferentSurah) {
+              stopAudio();
+              setCurrentPlayingAyah({ surah: surahId, ayah: 1 });
+              isAyahNavigation.current = true;
+              const firstPage = await getAyahPage(surahId, 1);
+              if (firstPage) {
+                navigate(`/page/${firstPage}`);
+              }
             }
+            
+            // Close the overlay (whether same surah or different)
             setConfigOverlayType(null);
           }}
           onStopAudio={stopAudio}
