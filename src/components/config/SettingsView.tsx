@@ -49,6 +49,7 @@ export default function SettingsView() {
     const saved = localStorage.getItem('quran-show-bottom-bar-text');
     return saved !== null ? saved === 'true' : true;
   });
+  // Swiper mode is now always enabled (default)
   
   const handleSaveMushaf = () => {
     setMushafType(selectedMushaf);

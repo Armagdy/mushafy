@@ -257,3 +257,82 @@
     -webkit-tap-highlight-color: transparent;
   }
 }
+
+/* ========================================
+   Swiper.js Custom Styles
+   ======================================== */
+
+/* Swiper Core Styles */
+@import 'swiper/css';
+@import 'swiper/css/navigation';
+@import 'swiper/css/virtual';
+
+/* Custom Swiper Navigation Buttons - Match App Theme */
+.swiper-button-next,
+.swiper-button-prev {
+  width: 3.5rem !important;
+  height: 3.5rem !important;
+  background: linear-gradient(to bottom right, #15803d, #047857) !important;
+  color: #F2E3BB !important;
+  border-radius: 50% !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid rgba(5, 150, 105, 0.3) !important;
+  transition: all 0.2s ease !important;
+}
+
+.swiper-button-next:hover,
+.swiper-button-prev:hover {
+  background: linear-gradient(to bottom right, #166534, #065f46) !important;
+  transform: scale(1.1);
+}
+
+.swiper-button-next.swiper-button-disabled,
+.swiper-button-prev.swiper-button-disabled {
+  opacity: 0.3 !important;
+  cursor: not-allowed !important;
+}
+
+.swiper-button-next::after,
+.swiper-button-prev::after {
+  font-size: 1.5rem !important;
+  font-weight: bold !important;
+}
+
+/* Hide navigation on mobile */
+@media (max-width: 768px) {
+  .swiper-button-next,
+  .swiper-button-prev {
+    display: none !important;
+  }
+}
+
+/* Hardware acceleration for smooth transitions */
+.swiper {
+  transform: translate3d(0, 0, 0);
+}
+
+/* Smooth slide transitions */
+.swiper-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease;
+}
+
+/* RTL Swiper Adjustments */
+.swiper-rtl .swiper-button-next {
+  left: 10px !important;
+  right: auto !important;
+}
+
+.swiper-rtl .swiper-button-prev {
+  right: 10px !important;
+  left: auto !important;
+}
+
+/* Fullscreen mode adjustments */
+.swiper-fullscreen .swiper-button-next,
+.swiper-fullscreen .swiper-button-prev {
+  opacity: 0;
+  pointer-events: none;
+}

@@ -50,6 +50,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTriggeredRef = useRef(false);
+  const isSwipingRef = useRef(false); // Track if user is performing a swipe gesture
   
   // Detect if device has touch capability
   const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -152,6 +153,9 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   const handleTouchStart = (e: React.TouchEvent, verseKey: string) => {
     // Don't prevent default - let single tap bubble up to parent onClick
     
+    // Reset swipe tracking
+    isSwipingRef.current = false;
+    
     // Store touch start position
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
@@ -199,8 +203,19 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       const deltaX = Math.abs(touch.clientX - touchStartPosRef.current.x);
       const deltaY = Math.abs(touch.clientY - touchStartPosRef.current.y);
       
-      // If moved more than 10px, cancel the long-press
-      if (deltaX > 10 || deltaY > 10) {
+      // Detect horizontal swipe (for Swiper navigation)
+      if (deltaX > 15 && deltaX > deltaY) {
+        // This is a horizontal swipe - allow it to pass through to Swiper
+        isSwipingRef.current = true;
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+        longPressTriggeredRef.current = false;
+        // Don't prevent default - let Swiper handle the swipe
+        return;
+      }
+      
+      // If moved more than 10px vertically, cancel the long-press
+      if (deltaY > 10) {
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
         longPressTriggeredRef.current = false;
@@ -209,6 +224,18 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    // If this was a horizontal swipe, don't prevent it - let Swiper handle it
+    if (isSwipingRef.current) {
+      isSwipingRef.current = false;
+      touchStartPosRef.current = null;
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+      // Don't prevent default or stop propagation - let Swiper navigate
+      return;
+    }
+    
     // Clear timer
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);

@@ -97,6 +97,8 @@ export function StyleSettings({
         </div>
       )}
 
+      {/* Swiper Mode Toggle (Hidden - Swiper is now default) */}
+
       {/* Bottom Bar Text Toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 sm:gap-3">
