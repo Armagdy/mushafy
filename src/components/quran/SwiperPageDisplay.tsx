@@ -105,8 +105,15 @@ export function SwiperPageDisplay({
           duration: 3000,
           variant: 'destructive',
         });
+        // Don't trigger flash animation since ayah picker won't work
       } else {
-        // Show success notification
+        // Ayah selection is available - guide user to ayah picker
+        toast({
+          title: t('ayahSelectionNotAvailableForMushaf'),
+          duration: 3000,
+        });
+        
+        // Trigger flash animation on ayah picker icon
         if (onLongPressNotification) {
           onLongPressNotification();
         }
