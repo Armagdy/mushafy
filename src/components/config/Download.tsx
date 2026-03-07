@@ -540,6 +540,38 @@ export function Download() {
                     {t('mushafMadinah')}
                   </span>
                 </button>
+                <button
+                  onClick={() => {
+                    setDownloadMushafType('tarteel');
+                    setShowMushafTypeScroll(false);
+                  }}
+                  className={cn(
+                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                    downloadMushafType === 'tarteel' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                    textSizeClasses.text,
+                    isRTL ? 'text-right' : 'text-left'
+                  )}
+                >
+                  <span className="text-emerald-800 dark:text-emerald-200">
+                    {t('mushafTarteel')}
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    setDownloadMushafType('tajweed');
+                    setShowMushafTypeScroll(false);
+                  }}
+                  className={cn(
+                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                    downloadMushafType === 'tajweed' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                    textSizeClasses.text,
+                    isRTL ? 'text-right' : 'text-left'
+                  )}
+                >
+                  <span className="text-emerald-800 dark:text-emerald-200">
+                    {t('mushafTajweed')}
+                  </span>
+                </button>
               </div>
             ) : (
               <button
@@ -554,6 +586,8 @@ export function Download() {
                   {downloadMushafType === 'mwdoa' && t('mushafMwdoa')}
                   {downloadMushafType === 'tashel' && t('mushafTashel')}
                   {downloadMushafType === 'madinah' && t('mushafMadinah')}
+                  {downloadMushafType === 'tarteel' && t('mushafTarteel')}
+                  {downloadMushafType === 'tajweed' && t('mushafTajweed')}
                 </span>
                 <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
               </button>

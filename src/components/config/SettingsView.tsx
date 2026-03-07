@@ -126,6 +126,7 @@ export default function SettingsView() {
           { value: 'tashel', label: t('mushafTashel') },
           { value: 'madinah', label: t('mushafMadinah') },
           { value: 'tarteel', label: t('mushafTarteel') },
+          { value: 'tajweed', label: t('mushafTajweed') },
         ];
         
         return (

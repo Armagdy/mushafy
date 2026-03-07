@@ -69,14 +69,14 @@ export function PageDisplay({
   // Cache category for auto-caching viewed pages
   const cacheCategory = `mushaf-${mushafType}`;
   
-  // Long-press detection for non-Tarteel mushaf
+// Long-press detection for non-Tarteel and non-Tajweed mushaf
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTriggeredRef = useRef(false);
-  
-  // Handle touch start for long press detection (non-Tarteel mushaf only)
+
+  // Handle touch start for long press detection (non-Tarteel and non-Tajweed mushaf only)
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (mushafType === 'tarteel') return;
+    if (mushafType === 'tarteel' || mushafType === 'tajweed') return;
     
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
@@ -119,7 +119,7 @@ export function PageDisplay({
   
   // Handle touch move - cancel long press if finger moves too much
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (mushafType === 'tarteel' || !touchStartPosRef.current) return;
+    if (mushafType === 'tarteel' || mushafType === 'tajweed' || !touchStartPosRef.current) return;
     
     const touch = e.touches[0];
     const deltaX = Math.abs(touch.clientX - touchStartPosRef.current.x);
@@ -136,7 +136,7 @@ export function PageDisplay({
   
   // Handle touch end - cleanup
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (mushafType === 'tarteel') return;
+    if (mushafType === 'tarteel' || mushafType === 'tajweed') return;
     
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
@@ -154,19 +154,20 @@ export function PageDisplay({
 
   // Helper to render the appropriate page component based on mushaf type
   const renderPage = (pageNum: number) => {
-    if (mushafType === 'tarteel') {
+    if (mushafType === 'tarteel' || mushafType === 'tajweed') {
       return (
         <TartelPage
           pageNumber={pageNum}
           onClick={onImageClick}
           onAyahSelect={onAyahSelect}
           currentPlayingAyah={currentPlayingAyah}
+          mushafType={mushafType as 'tarteel' | 'tajweed'}
           className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto mx-auto cursor-pointer"
         />
       );
     }
 
-    // For non-Tarteel mushaf, wrap with long-press detection
+    // For non-Tarteel and non-Tajweed mushaf, wrap with long-press detection
     return (
       <div
         onTouchStart={handleTouchStart}

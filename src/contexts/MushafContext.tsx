@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { IMAGES_BASE_URL } from '@/config/assets';
 
-export type MushafType = 'mwdoa' | 'tashel' | 'madinah' | 'tarteel';
+export type MushafType = 'mwdoa' | 'tashel' | 'madinah' | 'tarteel' | 'tajweed';
 
 interface MushafContextType {
   mushafType: MushafType;
@@ -22,8 +22,8 @@ export const MushafProvider = ({ children }: { children: ReactNode }) => {
   }, [mushafType]);
 
   const getMushafPath = (): string => {
-    // Tarteel is text-based, doesn't use images
-    if (mushafType === 'tarteel') return '';
+    // Tarteel and Tajweed are text-based, don't use images
+    if (mushafType === 'tarteel' || mushafType === 'tajweed') return '';
     
     const folder = mushafType === 'mwdoa' 
       ? 'mushuf_mwdoa_images' 

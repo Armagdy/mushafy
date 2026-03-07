@@ -76,14 +76,14 @@ export function SwiperPageDisplay({
   // Cache category for images
   const cacheCategory = `mushaf-${mushafType}`;
   
-  // Long-press detection for non-Tarteel mushaf
+  // Long-press detection for non-Tarteel and non-Tajweed mushaf
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTriggeredRef = useRef(false);
   
-  // Handle touch start for long press detection (non-Tarteel mushaf only)
+  // Handle touch start for long press detection (non-Tarteel and non-Tajweed mushaf only)
   const handleTouchStart = useCallback((e: React.TouchEvent, pageNum: number) => {
-    if (mushafType === 'tarteel') return;
+    if (mushafType === 'tarteel' || mushafType === 'tajweed') return;
     
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
@@ -244,7 +244,7 @@ export function SwiperPageDisplay({
     
     const isOddPage = pageNum % 2 !== 0;
     
-    if (mushafType === 'tarteel') {
+    if (mushafType === 'tarteel' || mushafType === 'tajweed') {
       return (
         <div className="relative">
           {renderBookmarkIcons(pageNum, isOddPage ? 'right' : 'left')}
@@ -257,13 +257,14 @@ export function SwiperPageDisplay({
             }}
             onAyahSelect={onAyahSelect}
             currentPlayingAyah={isTransitioning ? null : currentPlayingAyah}
+            mushafType={mushafType as 'tarteel' | 'tajweed'}
             className="max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto mx-auto cursor-pointer"
           />
         </div>
       );
     }
     
-    // For non-Tarteel mushaf, wrap with long-press detection
+    // For non-Tarteel/Tajweed mushaf, wrap with long-press detection
     return (
       <div className="relative">
         {renderBookmarkIcons(pageNum, isOddPage ? 'right' : 'left')}

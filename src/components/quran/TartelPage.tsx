@@ -37,9 +37,10 @@ interface TartelPageProps {
   className?: string;
   onAyahSelect?: (surah: number, ayah: number) => void;
   currentPlayingAyah?: { surah: number; ayah: number } | null;
+  mushafType?: 'tarteel' | 'tajweed';
 }
 
-const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah }: TartelPageProps) => {
+const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel' }: TartelPageProps) => {
   const { language, t } = useLanguage();
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -88,7 +89,8 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
     const loadFont = async () => {
       try {
-        const fontName = `p${pageNumber}`;
+        // Font name includes mushaf type to avoid conflicts
+        const fontName = `p${pageNumber}-${mushafType}`;
         
         // Check if font is already loaded in document.fonts
         const existingFont = Array.from(document.fonts).find(
@@ -103,10 +105,15 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           return;
         }
 
-        console.log(`Loading font: ${fontName}`);
+        // Determine font path based on mushaf type
+        const fontPath = mushafType === 'tajweed' 
+          ? `/assets/fonts/qpc_v4_font/p${pageNumber}.ttf`
+          : `/assets/fonts/qpc_v2_font/p${pageNumber}.woff`;
+
+        console.log(`Loading font: ${fontName} from ${fontPath}`);
         const font = new FontFace(
           fontName,
-          `url(/assets/fonts/p${pageNumber}.ttf)`
+          `url(${fontPath})`
         );
 
         await font.load();
@@ -133,7 +140,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     return () => {
       mounted = false;
     };
-  }, [pageNumber]);
+  }, [pageNumber, mushafType]);
 
   const handleWordHover = (verseKey: string) => {
     // Only allow hover on non-touch devices (desktop)
@@ -300,7 +307,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       ref={containerRef}
       className={`tartel-page flex flex-col items-center justify-center bg-transparent ${className}`}
       style={{ 
-        fontFamily: `'p${pageNumber}', 'Amiri', serif`,
+        fontFamily: `'p${pageNumber}-${mushafType}', 'Amiri', serif`,
         direction: 'rtl',
         maxHeight: '100%',
         height: 'auto',
