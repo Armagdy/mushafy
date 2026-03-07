@@ -1,5 +1,4 @@
 import { useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -8,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 interface AyahSelectorViewProps {
   onClose: () => void;
+  onNavigate: (page: number, ayah?: { surah: number; ayah: number }) => void;
   ayahData: any[];
   currentPageNum: number;
   secondPageNum: number;
@@ -25,6 +25,7 @@ interface AyahSelectorViewProps {
 
 export default function AyahSelectorView({
   onClose,
+  onNavigate,
   ayahData,
   currentPageNum,
   secondPageNum,
@@ -42,7 +43,6 @@ export default function AyahSelectorView({
   const { t, isRTL, language } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
-  const navigate = useNavigate();
   const ayahListRef = useRef<HTMLDivElement>(null);
 
   // Helper function to convert numbers based on language
@@ -88,9 +88,9 @@ export default function AyahSelectorView({
     console.log('Set isAyahNavigation flag to true');
     // Set current playing ayah BEFORE navigation to ensure it persists
     onSetCurrentPlayingAyah({ surah: surahNum, ayah: ayahNum });
-    // Navigate to the page containing this ayah (use verse.page directly)
+    // Navigate to the page containing this ayah (use onNavigate for Swiper support)
     // Note: Audio will NOT auto-play - user can manually press play if desired
-    navigate(`/page/${versePage}#${surahNum}-${ayahNum}`);
+    onNavigate(versePage, { surah: surahNum, ayah: ayahNum });
     onClose();
   };
 

@@ -348,6 +348,7 @@ export default function ConfigOverlay({
         return (
           <AyahSelectorView
             onClose={onClose}
+            onNavigate={onNavigate}
             ayahData={ayahData}
             currentPageNum={currentPage}
             secondPageNum={secondPageNum}

@@ -1079,7 +1079,12 @@ const Surah = () => {
         onOpenChange={setSearchOpen}
         mode={searchMode}
         ayahData={ayahData}
-        onNavigate={(page) => navigate(`/page/${page}`)}
+        onNavigate={(page) => {
+          navigate(`/page/${page}`);
+          if (navigateToPage) {
+            navigateToPage(page);
+          }
+        }}
         formatNumber={formatNumber}
         currentSurahId={currentSurahId}
         currentAyah={currentPageAyah}
@@ -1156,6 +1161,9 @@ const Surah = () => {
           if (firstPage) {
             setTimeout(() => {
               navigate(`/page/${firstPage}`);
+              if (navigateToPage) {
+                navigateToPage(firstPage);
+              }
             }, 0);
           }
           
@@ -1230,7 +1238,12 @@ const Surah = () => {
               isAyahNavigation.current = true;
               setCurrentPlayingAyah(ayah);
             }
+            // Update URL for browser history
             navigate(`/page/${page}`);
+            // Navigate the Swiper to the target page (required for Swiper mode)
+            if (navigateToPage) {
+              navigateToPage(page);
+            }
             setConfigOverlayType(null);
           }}
           viewMode={viewMode}
@@ -1279,6 +1292,9 @@ const Surah = () => {
               const firstPage = await getAyahPage(surahId, 1);
               if (firstPage) {
                 navigate(`/page/${firstPage}`);
+                if (navigateToPage) {
+                  navigateToPage(firstPage);
+                }
               }
             }
             
