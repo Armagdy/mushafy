@@ -5,7 +5,6 @@ import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDown
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMushaf, MushafType } from "@/contexts/MushafContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
-import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Download } from "./Download";
 import { StyleSettings } from "./StyleSettings";
@@ -19,7 +18,6 @@ export default function SettingsView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, isRTL, language } = useLanguage();
   const { mushafType, setMushafType } = useMushaf();
-  const { toast } = useToast();
   const { dialogTextSize, setDialogTextSize } = useDialogTextSize();
   
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
@@ -31,9 +29,6 @@ export default function SettingsView() {
   useEffect(() => {
     setSearchParams({});
   }, []);
-  
-  const [selectedMushaf, setSelectedMushaf] = useState<MushafType>(mushafType);
-  const hasUnsavedChanges = selectedMushaf !== mushafType;
   
   const [isMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
   const [viewMode, setViewMode] = useState<'single' | 'double'>(() => {
@@ -51,12 +46,8 @@ export default function SettingsView() {
   });
   // Swiper mode is now always enabled (default)
   
-  const handleSaveMushaf = () => {
-    setMushafType(selectedMushaf);
-    toast({
-      title: isRTL ? 'تم التحديث' : 'Updated',
-      description: isRTL ? 'تم تغيير المصحف بنجاح' : 'Mushaf changed successfully',
-    });
+  const handleMushafChange = (mushaf: MushafType) => {
+    setMushafType(mushaf);
   };
   
   const updatePagesToLoad = (pages: number) => {
@@ -121,39 +112,66 @@ export default function SettingsView() {
   const renderCategoryContent = () => {
     switch (activeCategory) {
       case 'mushaf':
-        const mushafOptions: { value: MushafType; label: string }[] = [
-          { value: 'mwdoa', label: t('mushafMwdoa') },
-          { value: 'tashel', label: t('mushafTashel') },
-          { value: 'madinah', label: t('mushafMadinah') },
-          { value: 'tarteel', label: t('mushafTarteel') },
-          { value: 'tajweed', label: t('mushafTajweed') },
+        const mushafOptions: { value: MushafType; label: string; image: string }[] = [
+          { value: 'mwdoa', label: t('mushafMwdoa'), image: '/assets/mushaf_snippets/mwdoaa.jpg' },
+          { value: 'tashel', label: t('mushafTashel'), image: '/assets/mushaf_snippets/tayseer.jpg' },
+          { value: 'madinah', label: t('mushafMadinah'), image: '/assets/mushaf_snippets/madinah.jpg' },
+          { value: 'tarteel', label: t('mushafTarteel'), image: '/assets/mushaf_snippets/tarteel.jpg' },
+          { value: 'tajweed', label: t('mushafTajweed'), image: '/assets/mushaf_snippets/tajweed.jpg' },
         ];
         
         return (
-          <div className="space-y-5">
-            <div className="flex flex-col gap-2">
+          <div className="space-y-5 pb-12">
+            <div className="flex flex-col gap-4">
               <div className="flex items-center gap-2 sm:gap-3">
                 <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>{t('mushafType')}</span>
               </div>
               
-              {/* Scrollable list of mushaf options */}
-              <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent max-h-[300px]">
+              {/* Cards Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 pb-4">
                 {mushafOptions.map((option) => {
-                  const isSelected = selectedMushaf === option.value;
+                  const isSelected = mushafType === option.value;
                   
                   return (
                     <button
                       key={option.value}
-                      onClick={() => setSelectedMushaf(option.value)}
+                      onClick={() => handleMushafChange(option.value)}
                       className={cn(
-                        "w-full px-3 py-3 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
-                        isSelected && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                        "text-center",
-                        textSizeClasses.text
+                        "relative flex flex-col gap-2 p-2 rounded-lg border-2 transition-all duration-200 hover:shadow-lg overflow-hidden",
+                        isSelected 
+                          ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 shadow-md" 
+                          : "border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 hover:border-emerald-400"
                       )}
                     >
-                      <div className="text-emerald-800 dark:text-emerald-200">
+                      {/* Image */}
+                      <div className="relative w-full aspect-[3/4] rounded overflow-hidden bg-emerald-50 dark:bg-emerald-900/20">
+                        <img 
+                          src={option.image} 
+                          alt={option.label}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        {/* Selected Overlay */}
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-emerald-600/20 dark:bg-emerald-500/30 flex items-center justify-center">
+                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-emerald-600 dark:bg-emerald-500 flex items-center justify-center shadow-lg">
+                              <svg className="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Title */}
+                      <div className={cn(
+                        "text-center font-medium px-1",
+                        isSelected 
+                          ? "text-emerald-800 dark:text-emerald-200 font-semibold" 
+                          : "text-emerald-700 dark:text-emerald-300",
+                        textSizeClasses.text
+                      )}>
                         {option.label}
                       </div>
                     </button>
@@ -161,16 +179,6 @@ export default function SettingsView() {
                 })}
               </div>
             </div>
-            
-            <button
-              onClick={handleSaveMushaf}
-              disabled={!hasUnsavedChanges}
-              className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 md:px-4 h-12 border border-emerald-600 shadow-md transition-all"
-            >
-              <span className={cn("text-[#F2E3BB] font-bold", textSizeClasses.button)}>
-                {isRTL ? 'حفظ' : 'Save'}
-              </span>
-            </button>
           </div>
         );
         

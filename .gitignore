@@ -38,8 +38,9 @@ android/app/release/
 android/build/
 android/.gradle/
 android/local.properties
+android/capacitor.settings.gradle
+android/app/capacitor.build.gradle
 *.keystore
 *.jks
-
 # Keep android source but ignore build artifacts
 !android/app/src/
