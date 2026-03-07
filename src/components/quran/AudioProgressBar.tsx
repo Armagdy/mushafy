@@ -480,7 +480,7 @@ export function AudioProgressBar({
         {/* Playhead */}
         <div
           className={cn(
-            "absolute top-1/2 -translate-y-1/2 w-6 h-6 md:w-5 md:h-5 bg-[#F2E3BB] rounded-full shadow-lg cursor-grab active:cursor-grabbing z-20",
+            "absolute top-1/2 -translate-y-1/2 w-6 h-6 md:w-5 md:h-5 bg-[#F2E3BB] rounded-full shadow-lg cursor-grab active:cursor-grabbing z-[110]",
             !isDragging && "transition-all duration-100",
             isDragging && "will-change-[left,transform]",
             (isDragging || isPlaying) && "opacity-100",
@@ -501,7 +501,7 @@ export function AudioProgressBar({
         return (
           <div
             className={cn(
-              `absolute ${topClass} px-4 py-2 bg-emerald-800/90 text-[#F2E3BB] text-base md:text-lg rounded-lg pointer-events-none whitespace-nowrap flex flex-col items-center`,
+              `absolute ${topClass} px-4 py-2 bg-emerald-800/90 text-[#F2E3BB] text-base md:text-lg rounded-lg pointer-events-none whitespace-nowrap flex flex-col items-center z-[120]`,
               isRTL ? "rtl" : "ltr"
             )}
             style={{ left: `${(hoverTime / duration) * 100}%`, transform: 'translateX(-50%)' }}

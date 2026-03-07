@@ -66,9 +66,6 @@ const Surah = () => {
     reloadAyahData
   } = useQuranData();
   
-  // All mushaf types now use the same styling
-  const isTashelOrMadinah = true;
-  
   // Helper function to convert numbers based on language
   const formatNumber = (num: number | string): string => {
     const numStr = num.toString();
@@ -880,6 +877,7 @@ const Surah = () => {
       )}
 
       {/* Audio Progress Bar - between page and controls */}
+      {!configOverlayType && (
       <motion.div
         initial={false}
         animate={{
@@ -891,7 +889,7 @@ const Surah = () => {
           stiffness: 300,
           damping: 30,
         }}
-        className={cn("z-50", (isFullscreen || !currentPlayingAyah) && "pointer-events-none")}
+        className={cn("z-[100]", (isFullscreen || !currentPlayingAyah) && "pointer-events-none")}
       >
         <AudioProgressBar
             currentTime={currentTime}
@@ -967,6 +965,7 @@ const Surah = () => {
           }}
         />
         </motion.div>
+      )}
 
       {/* Combined Audio & Navigation Bar */}
       <motion.div
