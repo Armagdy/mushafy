@@ -55,6 +55,9 @@ export function SwiperPageDisplay({
   const { toast } = useToast();
   const swiperRef = useRef<SwiperType | null>(null);
   
+  // Track if we're currently transitioning between slides
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  
   // Track which pages are loaded (for virtual slides optimization)
   const [loadedPages, setLoadedPages] = useState<Set<number>>(() => {
     const initial = new Set<number>();
@@ -150,6 +153,7 @@ export function SwiperPageDisplay({
   // Pre-load adjacent pages when slide changes
   const handleSlideChange = useCallback((swiper: SwiperType) => {
     const currentPage = swiper.realIndex + 1; // Swiper is 0-indexed
+    setIsTransitioning(true); // Mark as transitioning
     onPageChange(currentPage);
     
     // Mark current page and adjacent pages as loaded
@@ -181,6 +185,11 @@ export function SwiperPageDisplay({
     
     setLoadedPages(pagesToLoad);
   }, [onPageChange, viewMode]);
+  
+  // Handle transition end - enable highlighting after animation completes
+  const handleTransitionEnd = useCallback(() => {
+    setIsTransitioning(false);
+  }, []);
   
   // Expose navigation method via callback
   useEffect(() => {
@@ -241,13 +250,13 @@ export function SwiperPageDisplay({
           {renderBookmarkIcons(pageNum, isOddPage ? 'right' : 'left')}
           <TartelPage
             pageNumber={pageNum}
-            onClick={(e) => {
+            onClick={() => {
               if (!longPressTriggeredRef.current) {
                 onImageClick();
               }
             }}
             onAyahSelect={onAyahSelect}
-            currentPlayingAyah={currentPlayingAyah}
+            currentPlayingAyah={isTransitioning ? null : currentPlayingAyah}
             className="max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto mx-auto cursor-pointer"
           />
         </div>
@@ -289,6 +298,7 @@ export function SwiperPageDisplay({
     onImageClick,
     onAyahSelect,
     currentPlayingAyah,
+    isTransitioning,
     handleTouchStart,
     handleTouchMove,
     handleTouchEnd,
@@ -310,6 +320,7 @@ export function SwiperPageDisplay({
           swiperRef.current = swiper;
         }}
         onSlideChange={handleSlideChange}
+        onTransitionEnd={handleTransitionEnd}
         initialSlide={initialPage - 1} // Swiper is 0-indexed
         slidesPerView={slidesPerView}
         slidesPerGroup={slidesPerGroup}
