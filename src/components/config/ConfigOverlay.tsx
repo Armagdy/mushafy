@@ -169,6 +169,9 @@ export default function ConfigOverlay({
     bookmarkPageSurahs,
     bookmarkPageAyahs,
     bookmarkPageSurahIds,
+    bookmarkTimestamps,
+    memorizationTimestamps,
+    readingTimestamps,
     toggleBookmark,
     removeMemorizationBookmark,
     removeReadingBookmark,
@@ -261,6 +264,9 @@ export default function ConfigOverlay({
             bookmarkPageSurahs={bookmarkPageSurahs}
             bookmarkPageAyahs={bookmarkPageAyahs}
             bookmarkPageSurahIds={bookmarkPageSurahIds}
+            bookmarkTimestamps={bookmarkTimestamps}
+            memorizationTimestamps={memorizationTimestamps}
+            readingTimestamps={readingTimestamps}
             currentSurahId={currentSurahId}
             currentPage={currentPage}
             currentPlayingAyah={currentPlayingAyah}

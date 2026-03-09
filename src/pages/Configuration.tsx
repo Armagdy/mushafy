@@ -43,6 +43,9 @@ export default function Configuration() {
     bookmarkPageSurahs,
     bookmarkPageAyahs,
     bookmarkPageSurahIds,
+    bookmarkTimestamps,
+    memorizationTimestamps,
+    readingTimestamps,
     toggleBookmark,
     removeMemorizationBookmark,
     removeReadingBookmark,
@@ -158,6 +161,9 @@ export default function Configuration() {
             bookmarkPageSurahs={bookmarkPageSurahs}
             bookmarkPageAyahs={bookmarkPageAyahs}
             bookmarkPageSurahIds={bookmarkPageSurahIds}
+            bookmarkTimestamps={bookmarkTimestamps}
+            memorizationTimestamps={memorizationTimestamps}
+            readingTimestamps={readingTimestamps}
             currentSurahId={currentSurahId}
             currentPage={currentPage}
             currentPlayingAyah={null}

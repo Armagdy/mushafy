@@ -107,7 +107,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         // Determine font path based on mushaf type
         const fontPath = mushafType === 'tajweed' 
-          ? `/assets/fonts/qpc_v4_font/p${pageNumber}.ttf`
+          ? `/assets/fonts/qpc_v4_font/p${pageNumber}.woff`
           : `/assets/fonts/qpc_v2_font/p${pageNumber}.woff`;
 
         console.log(`Loading font: ${fontName} from ${fontPath}`);
@@ -528,6 +528,31 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           line-height: 1.75;
         }
 
+        /* Slightly smaller font sizes for tajweed mushaf */
+        ${mushafType === 'tajweed' ? `
+          .line-content {
+            font-size: min(max(2.2vw, 1.55rem), 2.2rem);
+          }
+
+          @media (min-width: 640px) {
+            .line-content {
+              font-size: min(max(2vw, 1.75rem), 2.2rem);
+            }
+          }
+
+          .surah-name-text {
+            font-size: min(max(2.2vw, 1.55rem), 2.2rem);
+          }
+
+          .surah-header-line {
+            font-size: min(max(1.8vw, 1.35rem), 2rem);
+          }
+
+          .bismillah-line {
+            font-size: min(max(1.6vw, 1.25rem), 1.8rem);
+          }
+        ` : ''}
+
         @media (min-width: 768px) {
           .line-content {
             font-size: 2.5rem;
@@ -554,6 +579,21 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
             margin: 0;
             line-height: 2;
           }
+
+          /* Smaller sizes for tajweed at larger screens */
+          ${mushafType === 'tajweed' ? `
+            .line-content {
+              font-size: 2.2rem;
+            }
+            
+            .surah-name-text {
+              font-size: 2.2rem;
+            }
+            
+            .bismillah-line {
+              font-size: 1.8rem;
+            }
+          ` : ''}
         }
       `}</style>
     </div>

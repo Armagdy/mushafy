@@ -12,6 +12,11 @@ import { getPageSurahInfo, getPageOfSurahFirstAyah } from "@/lib/quran-mapping";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 
+interface BookmarkTimestamps {
+  created: Record<number, number>;
+  lastEdited: Record<number, number>;
+}
+
 interface BookmarksViewProps {
   bookmarks: number[];
   memorizationBookmarks: number[];
@@ -19,6 +24,9 @@ interface BookmarksViewProps {
   bookmarkPageSurahs: Record<number, string>;
   bookmarkPageAyahs: Record<number, number>;
   bookmarkPageSurahIds: Record<number, number>;
+  bookmarkTimestamps: BookmarkTimestamps;
+  memorizationTimestamps: BookmarkTimestamps;
+  readingTimestamps: BookmarkTimestamps;
   currentSurahId: number;
   currentPage: number;
   currentPlayingAyah: { surah: number; ayah: number } | null;
@@ -38,6 +46,9 @@ export default function BookmarksView({
   bookmarkPageSurahs,
   bookmarkPageAyahs,
   bookmarkPageSurahIds,
+  bookmarkTimestamps,
+  memorizationTimestamps,
+  readingTimestamps,
   currentSurahId,
   currentPage,
   currentPlayingAyah,
@@ -160,6 +171,43 @@ export default function BookmarksView({
     if (safeMemorizationBookmarks.includes(page)) return 'memorization';
     if (safeReadingBookmarks.includes(page)) return 'reading';
     return 'bookmark';
+  };
+
+  // Get the last updated/created bookmark
+  const getLastBookmark = (): { page: number; type: 'bookmark' | 'memorization' | 'reading' } | null => {
+    let lastPage: number | null = null;
+    let lastTime = 0;
+    let lastType: 'bookmark' | 'memorization' | 'reading' = 'bookmark';
+
+    // Check all bookmark types for the most recent
+    safeBookmarks.forEach(page => {
+      const time = bookmarkTimestamps?.lastEdited?.[page] || bookmarkTimestamps?.created?.[page] || 0;
+      if (time > lastTime) {
+        lastTime = time;
+        lastPage = page;
+        lastType = 'bookmark';
+      }
+    });
+
+    safeMemorizationBookmarks.forEach(page => {
+      const time = memorizationTimestamps?.lastEdited?.[page] || memorizationTimestamps?.created?.[page] || 0;
+      if (time > lastTime) {
+        lastTime = time;
+        lastPage = page;
+        lastType = 'memorization';
+      }
+    });
+
+    safeReadingBookmarks.forEach(page => {
+      const time = readingTimestamps?.lastEdited?.[page] || readingTimestamps?.created?.[page] || 0;
+      if (time > lastTime) {
+        lastTime = time;
+        lastPage = page;
+        lastType = 'reading';
+      }
+    });
+
+    return lastPage !== null ? { page: lastPage, type: lastType } : null;
   };
 
   return (
@@ -473,6 +521,53 @@ export default function BookmarksView({
               animate={{ opacity: 1, y: 0 }}
               className="flex flex-col h-full max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-16rem)]"
             >
+              {/* Last Bookmark Section */}
+              {(() => {
+                const lastBookmark = getLastBookmark();
+                if (!lastBookmark) return null;
+                
+                const { page, type } = lastBookmark;
+                const Icon = type === 'bookmark' ? Bookmark : type === 'memorization' ? BookMarked : BookOpen;
+                
+                return (
+                  <div className="mb-4 flex-shrink-0">
+                    <div className={cn(
+                      "font-semibold px-2 py-1 mb-2",
+                      type === 'bookmark' && "text-amber-600 dark:text-amber-400",
+                      type === 'memorization' && "text-emerald-600 dark:text-emerald-400",
+                      type === 'reading' && "text-blue-600 dark:text-blue-400",
+                      textSizeClasses.text
+                    )}>
+                      {t('lastBookmark')}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setSelectedUpdatePage(page);
+                        setUpdateNewPage(currentPage);
+                        setUpdateNewSurahId(currentSurahId);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-3 rounded-lg transition-colors shadow-sm",
+                        type === 'bookmark' && "hover:bg-amber-100/50 dark:hover:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 bg-gradient-to-r from-amber-50 to-white dark:from-amber-950/20 dark:to-emerald-950/30",
+                        type === 'memorization' && "hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-900/30 dark:to-emerald-950/30",
+                        type === 'reading' && "hover:bg-blue-100/50 dark:hover:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-emerald-950/30",
+                        isRTL ? 'text-right' : 'text-left'
+                      )}
+                    >
+                      <Icon className={cn(
+                        "w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0",
+                        type === 'bookmark' && "text-amber-500",
+                        type === 'memorization' && "text-emerald-600",
+                        type === 'reading' && "text-blue-600"
+                      )} />
+                      <div className={cn("flex-1 min-w-0 font-medium truncate", textSizeClasses.text)}>
+                        {t('page')} {formatNumber(page)} - {safeBookmarkPageSurahs[page] || '...'}
+                      </div>
+                    </button>
+                  </div>
+                );
+              })()}
+
               <div className="flex-1 overflow-y-auto">
                 {/* Quick Bookmarks */}
                 {safeBookmarks.length > 0 && (
@@ -731,6 +826,51 @@ export default function BookmarksView({
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col h-full max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-16rem)]"
           >
+            {/* Last Bookmark Section */}
+            {(() => {
+              const lastBookmark = getLastBookmark();
+              if (!lastBookmark) return null;
+              
+              const { page, type } = lastBookmark;
+              const Icon = type === 'bookmark' ? Bookmark : type === 'memorization' ? BookMarked : BookOpen;
+              
+              return (
+                <div className="mb-4 flex-shrink-0">
+                  <div className={cn(
+                    "font-semibold px-2 py-1 mb-2",
+                    type === 'bookmark' && "text-amber-600 dark:text-amber-400",
+                    type === 'memorization' && "text-emerald-600 dark:text-emerald-400",
+                    type === 'reading' && "text-blue-600 dark:text-blue-400",
+                    textSizeClasses.text
+                  )}>
+                    {t('lastBookmark')}
+                  </div>
+                  <button
+                    onClick={() => {
+                      onNavigate(page, safeBookmarkPageSurahIds[page], safeBookmarkPageAyahs[page]);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-3 rounded-lg transition-colors shadow-sm",
+                      type === 'bookmark' && "hover:bg-amber-100/50 dark:hover:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 bg-gradient-to-r from-amber-50 to-white dark:from-amber-950/20 dark:to-emerald-950/30",
+                      type === 'memorization' && "hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-900/30 dark:to-emerald-950/30",
+                      type === 'reading' && "hover:bg-blue-100/50 dark:hover:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-emerald-950/30",
+                      isRTL ? 'text-right' : 'text-left'
+                    )}
+                  >
+                    <Icon className={cn(
+                      "w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0",
+                      type === 'bookmark' && "text-amber-500",
+                      type === 'memorization' && "text-emerald-600",
+                      type === 'reading' && "text-blue-600"
+                    )} />
+                    <div className={cn("flex-1 min-w-0 font-medium truncate", textSizeClasses.text)}>
+                      {t('page')} {formatNumber(page)} - {safeBookmarkPageSurahs[page] || '...'}
+                    </div>
+                  </button>
+                </div>
+              );
+            })()}
+
             <div className="flex-1 overflow-y-auto">
             {/* Quick Bookmarks */}
             {safeBookmarks.length > 0 && (

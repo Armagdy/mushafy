@@ -55,7 +55,9 @@ const Surah = () => {
     addBookmarkByType,
     getSurahNameForPage,
     getTotalBookmarks,
-    isBookmarked
+    isBookmarked,
+    getLastBookmark,
+    updateLastBookmark
   } = useBookmarks(language);
   
   const {
@@ -387,6 +389,7 @@ const Surah = () => {
       if (event.key === 'Tab') {
         event.preventDefault();
         setIsFullscreen(prev => !prev);
+        setShowBookmarkTypeSelector(false);
       }
     };
     
@@ -565,7 +568,26 @@ const Surah = () => {
   const minSwipeDistance = 50;
 
   return (
-    <div className="w-full h-screen max-h-screen bg-[#FBF9F4] dark:bg-gray-900 flex flex-col overflow-hidden" style={{ height: '100dvh', maxHeight: '100dvh' }}>
+    <div 
+      className="w-full h-screen max-h-screen bg-[#FBF9F4] dark:bg-gray-900 flex flex-col overflow-hidden" 
+      style={{ height: '100dvh', maxHeight: '100dvh' }}
+      onClick={(e) => {
+        // Only toggle fullscreen on native platforms (Android/iOS)
+        if (!isNativePlatform()) return;
+        
+        // Don't toggle if clicking on interactive elements
+        const target = e.target as HTMLElement;
+        const isInteractive = target.closest('button, a, input, select, textarea, [role="button"], [onClick]') !== null;
+        
+        // Don't toggle if clicking on the bookmark dropdown or its trigger
+        const isBookmarkElement = target.closest('[class*="bookmark"]') !== null;
+        
+        if (!isInteractive && !isBookmarkElement) {
+          setIsFullscreen(!isFullscreen);
+          setShowBookmarkTypeSelector(false);
+        }
+      }}
+    >
       {/* Enhanced Islamic Top Header */}
       <motion.div
         initial={false}
@@ -680,6 +702,7 @@ const Surah = () => {
             // Only toggle fullscreen on native platforms (Android/iOS)
             if (isNativePlatform()) {
               setIsFullscreen(!isFullscreen);
+              setShowBookmarkTypeSelector(false);
             }
           }}
           audioSource={audioSource}
@@ -713,6 +736,7 @@ const Surah = () => {
             // Only toggle fullscreen on native platforms (Android/iOS)
             if (isNativePlatform()) {
               setIsFullscreen(!isFullscreen);
+              setShowBookmarkTypeSelector(false);
             }
           }}
           onAyahSelect={(surah: number, ayah: number) => {
@@ -762,86 +786,142 @@ const Surah = () => {
             </button>
             
             {/* Bookmark Type Options - Shows to the top-right of button when open */}
-            {showBookmarkTypeSelector && (
-              <div
-                className="absolute bottom-0 left-10 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-2xl border border-emerald-200 dark:border-emerald-700 p-2 flex flex-col gap-1"
-              >
-                {/* Quick Bookmark */}
-                <button
-                  onClick={async () => {
-                    toggleBookmark(currentPageNum);
-                    setShowBookmarkTypeSelector(false);
-                    toast({
-                      title: bookmarks.includes(currentPageNum) ? t('bookmarkRemoved') : t('bookmarkAdded'),
-                      description: `${t('page')} ${formatNumber(currentPageNum)}`,
-                    });
-                  }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+            {showBookmarkTypeSelector && (() => {
+              const lastBookmark = getLastBookmark();
+              const lastBookmarkIcon = lastBookmark?.type === 'bookmark' 
+                ? Bookmark 
+                : lastBookmark?.type === 'memorization' 
+                ? BookMarked 
+                : BookOpen;
+              const lastBookmarkColor = lastBookmark?.type === 'bookmark' 
+                ? 'text-amber-600' 
+                : lastBookmark?.type === 'memorization' 
+                ? 'text-emerald-600' 
+                : 'text-blue-600';
+              const lastBookmarkTypeLabel = lastBookmark?.type === 'bookmark' 
+                ? t('bookmark') 
+                : lastBookmark?.type === 'memorization' 
+                ? t('memorization') 
+                : t('reading');
+              const LastBookmarkIcon = lastBookmarkIcon;
+              
+              return (
+                <div
+                  className="absolute bottom-0 left-10 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-lg shadow-2xl border border-emerald-200 dark:border-emerald-700 p-2 flex flex-col gap-1"
                 >
-                  <Bookmark className="w-5 h-5 text-amber-600" />
-                  <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
-                    {t('bookmark')}
-                  </span>
-                </button>
-                
-                {/* Memorization Bookmark */}
-                <button
-                  onClick={async () => {
-                    await addBookmarkByType('memorization', currentSurahId, currentPageAyah || 1);
-                    setShowBookmarkTypeSelector(false);
-                    toast({
-                      title: t('bookmarkAdded'),
-                      description: `${t('memorization')} - ${t('page')} ${formatNumber(currentPageNum)}`,
-                    });
-                  }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
-                >
-                  <BookMarked className="w-5 h-5 text-emerald-600" />
-                  <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
-                    {t('memorization')}
-                  </span>
-                </button>
-                
-                {/* Reading Bookmark */}
-                <button
-                  onClick={async () => {
-                    await addBookmarkByType('reading', currentSurahId, currentPageAyah || 1);
-                    setShowBookmarkTypeSelector(false);
-                    toast({
-                      title: t('bookmarkAdded'),
-                      description: `${t('reading')} - ${t('page')} ${formatNumber(currentPageNum)}`,
-                    });
-                  }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
-                >
-                  <BookOpen className="w-5 h-5 text-blue-600" />
-                  <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
-                    {t('reading')}
-                  </span>
-                </button>
-                
-                {/* Edit Bookmark */}
-                <button
-                  onClick={() => {
-                    setShowBookmarkTypeSelector(false);
-                    setInitialBookmarkCategory('update');
-                    setConfigOverlayType('bookmarks');
-                  }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors border-t border-emerald-100 dark:border-emerald-800"
-                >
-                  <BookmarkCheck className="w-5 h-5 text-purple-600" />
-                  <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
-                    {isRTL ? 'تعديل العلامات' : 'Edit Bookmark'}
-                  </span>
-                </button>
-              </div>
-            )}
+                  {/* Quick Bookmark */}
+                  <button
+                    onClick={async () => {
+                      toggleBookmark(currentPageNum);
+                      setShowBookmarkTypeSelector(false);
+                      toast({
+                        title: bookmarks.includes(currentPageNum) ? t('bookmarkRemoved') : t('bookmarkAdded'),
+                        description: `${t('page')} ${formatNumber(currentPageNum)}`,
+                      });
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                  >
+                    <Bookmark className="w-5 h-5 text-amber-600" />
+                    <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
+                      {t('bookmark')}
+                    </span>
+                  </button>
+                  
+                  {/* Memorization Bookmark */}
+                  <button
+                    onClick={async () => {
+                      await addBookmarkByType('memorization', currentSurahId, currentPageAyah || 1);
+                      setShowBookmarkTypeSelector(false);
+                      toast({
+                        title: t('bookmarkAdded'),
+                        description: `${t('memorization')} - ${t('page')} ${formatNumber(currentPageNum)}`,
+                      });
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                  >
+                    <BookMarked className="w-5 h-5 text-emerald-600" />
+                    <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
+                      {t('memorization')}
+                    </span>
+                  </button>
+                  
+                  {/* Reading Bookmark */}
+                  <button
+                    onClick={async () => {
+                      await addBookmarkByType('reading', currentSurahId, currentPageAyah || 1);
+                      setShowBookmarkTypeSelector(false);
+                      toast({
+                        title: t('bookmarkAdded'),
+                        description: `${t('reading')} - ${t('page')} ${formatNumber(currentPageNum)}`,
+                      });
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                  >
+                    <BookOpen className="w-5 h-5 text-blue-600" />
+                    <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
+                      {t('reading')}
+                    </span>
+                  </button>
+                  
+                  {/* Update Last Bookmark */}
+                  {lastBookmark ? (
+                    <button
+                      onClick={async () => {
+                        await updateLastBookmark(currentPageNum, currentSurahId, currentPageAyah || 1);
+                        setShowBookmarkTypeSelector(false);
+                      }}
+                      className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors border-t border-emerald-100 dark:border-emerald-800"
+                    >
+                      <div className="flex items-center gap-2">
+                        <LastBookmarkIcon className={cn("w-5 h-5", lastBookmarkColor)} />
+                        <div className="flex flex-col items-start">
+                          <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
+                            {t('updateLastBookmark')}
+                          </span>
+                          <span className="text-xs text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                            {lastBookmarkTypeLabel} - {t('page')} {formatNumber(lastBookmark.page)}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  ) : (
+                    <button
+                      disabled
+                      className="flex items-center gap-3 px-4 py-3 rounded-md opacity-50 cursor-not-allowed"
+                    >
+                      <BookmarkCheck className="w-5 h-5 text-gray-400" />
+                      <span className="text-base font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        {t('noBookmarksToUpdate')}
+                      </span>
+                    </button>
+                  )}
+                  
+                  {/* Edit Bookmark */}
+                  <button
+                    onClick={() => {
+                      setShowBookmarkTypeSelector(false);
+                      setInitialBookmarkCategory('update');
+                      setConfigOverlayType('bookmarks');
+                    }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors"
+                  >
+                    <BookmarkCheck className="w-5 h-5 text-purple-600" />
+                    <span className="text-base font-medium text-emerald-800 dark:text-emerald-200 whitespace-nowrap">
+                      {isRTL ? 'تعديل العلامات' : 'Edit Bookmark'}
+                    </span>
+                  </button>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Tafseer Button */}
           <div className="relative flex items-end">
             <button
               onClick={() => {
+                // Close bookmark dropdown
+                setShowBookmarkTypeSelector(false);
+                
                 // Save current playing ayah or page ayah for TafseerView
                 if (currentPlayingAyah) {
                   localStorage.setItem('quran-tafseer-surah', currentPlayingAyah.surah.toString());
