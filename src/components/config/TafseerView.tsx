@@ -447,7 +447,7 @@ export default function TafseerView() {
               )}
             </AnimatePresence>
 
-            <div className="max-h-[250px] md:max-h-[300px] overflow-y-auto p-4">
+            <div className="max-h-[100px] md:max-h-[220px] overflow-y-auto p-4">
               <AnimatePresence mode="wait" custom={animDirection}>
                 {ayahText ? (
                   <motion.div
