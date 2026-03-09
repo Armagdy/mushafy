@@ -1120,10 +1120,11 @@ const Surah = () => {
         activeButton={null}
         onGoToClick={() => {
           // Reset navigation initial values to show main menu (no specific type selected)
+          // But keep current page for page navigation
           setInitialNavigationType(undefined);
           setInitialNavigationSurah(undefined);
           setInitialNavigationJuz(undefined);
-          setInitialNavigationPage(undefined);
+          setInitialNavigationPage(currentPageNum);
           setConfigOverlayType('navigation');
         }}
         onSearchClick={() => {

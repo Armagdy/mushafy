@@ -36,41 +36,42 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   // Active navigation type from URL
   const activeNavType = searchParams.get('type') as 'surah' | 'juz' | 'page' | 'quarter' | null;
   
+  // Juz boundaries: which surah/ayah each juz starts with
+  const juzStarts = [
+    { juz: 1, surah: 1, ayah: 1 },      // Al-Fatiha
+    { juz: 2, surah: 2, ayah: 142 },    // Al-Baqarah continues (started in Juz 1)
+    { juz: 3, surah: 2, ayah: 253 },    // Al-Baqarah continues
+    { juz: 4, surah: 3, ayah: 93 },     // Aal-i-Imran (started in Juz 3)
+    { juz: 5, surah: 4, ayah: 24 },     // An-Nisaa
+    { juz: 6, surah: 4, ayah: 148 },    // An-Nisaa continues  
+    { juz: 7, surah: 5, ayah: 82 },     // Al-Maidah (started in Juz 6)
+    { juz: 8, surah: 6, ayah: 111 },    // Al-An'am (started in Juz 7)
+    { juz: 9, surah: 7, ayah: 88 },     // Al-A'raf (started in Juz 8)
+    { juz: 10, surah: 8, ayah: 41 },    // Al-Anfal (started in Juz 9)
+    { juz: 11, surah: 9, ayah: 93 },    // At-Tawbah (started in Juz 10)
+    { juz: 12, surah: 11, ayah: 6 },    // Hud
+    { juz: 13, surah: 12, ayah: 53 },   // Yusuf (started in Juz 12)
+    { juz: 14, surah: 15, ayah: 1 },    // Al-Hijr
+    { juz: 15, surah: 17, ayah: 1 },    // Al-Isra
+    { juz: 16, surah: 18, ayah: 75 },   // Al-Kahf (started in Juz 15)
+    { juz: 17, surah: 21, ayah: 1 },    // Al-Anbiya
+    { juz: 18, surah: 23, ayah: 1 },    // Al-Mu'minun
+    { juz: 19, surah: 25, ayah: 21 },   // Al-Furqan (started in Juz 18)
+    { juz: 20, surah: 27, ayah: 56 },   // An-Naml (started in Juz 19)
+    { juz: 21, surah: 29, ayah: 46 },   // Al-Ankabut (started in Juz 20)
+    { juz: 22, surah: 33, ayah: 31 },   // Al-Ahzab (started in Juz 21)
+    { juz: 23, surah: 36, ayah: 28 },   // Ya-Sin (started in Juz 22)
+    { juz: 24, surah: 39, ayah: 32 },   // Az-Zumar (started in Juz 23)
+    { juz: 25, surah: 41, ayah: 47 },   // Fussilat (started in Juz 24)
+    { juz: 26, surah: 46, ayah: 1 },    // Al-Ahqaf
+    { juz: 27, surah: 51, ayah: 31 },   // Adh-Dhariyat (started in Juz 26)
+    { juz: 28, surah: 58, ayah: 1 },    // Al-Mujadila
+    { juz: 29, surah: 67, ayah: 1 },    // Al-Mulk
+    { juz: 30, surah: 78, ayah: 1 },    // An-Naba
+  ];
+  
   // Map surah ID to Juz range (based on Quran structure)
   const getSurahJuzRange = (surahId: number): { start: number; end: number } => {
-    // Juz boundaries: which surah/ayah each juz starts with
-    const juzStarts = [
-      { juz: 1, surah: 1, ayah: 1 },      // Al-Fatiha
-      { juz: 2, surah: 2, ayah: 142 },    // Al-Baqarah continues (started in Juz 1)
-      { juz: 3, surah: 2, ayah: 253 },    // Al-Baqarah continues
-      { juz: 4, surah: 3, ayah: 93 },     // Aal-i-Imran (started in Juz 3)
-      { juz: 5, surah: 4, ayah: 24 },     // An-Nisaa
-      { juz: 6, surah: 4, ayah: 148 },    // An-Nisaa continues  
-      { juz: 7, surah: 5, ayah: 82 },     // Al-Maidah (started in Juz 6)
-      { juz: 8, surah: 6, ayah: 111 },    // Al-An'am (started in Juz 7)
-      { juz: 9, surah: 7, ayah: 88 },     // Al-A'raf (started in Juz 8)
-      { juz: 10, surah: 8, ayah: 41 },    // Al-Anfal (started in Juz 9)
-      { juz: 11, surah: 9, ayah: 93 },    // At-Tawbah (started in Juz 10)
-      { juz: 12, surah: 11, ayah: 6 },    // Hud
-      { juz: 13, surah: 12, ayah: 53 },   // Yusuf (started in Juz 12)
-      { juz: 14, surah: 15, ayah: 1 },    // Al-Hijr
-      { juz: 15, surah: 17, ayah: 1 },    // Al-Isra
-      { juz: 16, surah: 18, ayah: 75 },   // Al-Kahf (started in Juz 15)
-      { juz: 17, surah: 21, ayah: 1 },    // Al-Anbiya
-      { juz: 18, surah: 23, ayah: 1 },    // Al-Mu'minun
-      { juz: 19, surah: 25, ayah: 21 },   // Al-Furqan (started in Juz 18)
-      { juz: 20, surah: 27, ayah: 56 },   // An-Naml (started in Juz 19)
-      { juz: 21, surah: 29, ayah: 46 },   // Al-Ankabut (started in Juz 20)
-      { juz: 22, surah: 33, ayah: 31 },   // Al-Ahzab (started in Juz 21)
-      { juz: 23, surah: 36, ayah: 28 },   // Ya-Sin (started in Juz 22)
-      { juz: 24, surah: 39, ayah: 32 },   // Az-Zumar (started in Juz 23)
-      { juz: 25, surah: 41, ayah: 47 },   // Fussilat (started in Juz 24)
-      { juz: 26, surah: 46, ayah: 1 },    // Al-Ahqaf
-      { juz: 27, surah: 51, ayah: 31 },   // Adh-Dhariyat (started in Juz 26)
-      { juz: 28, surah: 58, ayah: 1 },    // Al-Mujadila
-      { juz: 29, surah: 67, ayah: 1 },    // Al-Mulk
-      { juz: 30, surah: 78, ayah: 1 },    // An-Naba
-    ];
     
     // Find which juz entries mention this surah
     const juzEntriesForSurah = juzStarts.filter(j => j.surah === surahId);
@@ -180,6 +181,11 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   const [pageValidationError, setPageValidationError] = useState<string>('');
   const [isPageButtonEnabled, setIsPageButtonEnabled] = useState(false); // Polled button state
   const pageInputRef = useRef<HTMLInputElement>(null); // Direct DOM access
+  const [selectedPage, setSelectedPage] = useState(() => {
+    if (initialPage) return initialPage;
+    return 1;
+  });
+  const selectedPageRef = useRef<HTMLButtonElement>(null); // For auto-scrolling to selected page
 
   // Quarter tab state
   const [selectedQuarter, setSelectedQuarter] = useState(() => {
@@ -220,6 +226,13 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   useEffect(() => {
     if (selectedQuarter) localStorage.setItem('quran-search-quarter', selectedQuarter);
   }, [selectedQuarter]);
+
+  // Initialize page input with current page when page tab becomes active
+  useEffect(() => {
+    if (activeNavType === 'page' && pageInputRef.current) {
+      pageInputRef.current.value = formatNumber(selectedPage);
+    }
+  }, [activeNavType, selectedPage, formatNumber]);
 
   // Fetch all quarters data when quarter tab is active
   useEffect(() => {
@@ -314,6 +327,13 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
     return () => clearInterval(intervalId);
   }, [activeNavType, quarterSearchQuery]);
 
+  // Auto-scroll to selected page when it changes
+  useEffect(() => {
+    if (activeNavType === 'page' && selectedPageRef.current) {
+      selectedPageRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
+    }
+  }, [selectedPage, activeNavType]);
+
   // Polling approach: Check input value every 50ms (Android WebView IME fix)
   useEffect(() => {
     if (activeNavType !== 'page') {
@@ -347,6 +367,10 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
       } else {
         setIsPageButtonEnabled(true);
         setPageValidationError('');
+        // Update selected page when input is valid
+        if (selectedPage !== pageNum) {
+          setSelectedPage(pageNum);
+        }
       }
     };
 
@@ -357,7 +381,7 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
     const intervalId = setInterval(checkInput, 50);
 
     return () => clearInterval(intervalId);
-  }, [activeNavType, parseArabicNumber, t]);
+  }, [activeNavType, parseArabicNumber, t, selectedPage]);
 
   // Update selected surah ayahs when surah changes
   useEffect(() => {
@@ -847,6 +871,9 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
               )}>
                 {Array.from({ length: 30 }, (_, i) => i + 1).map(juzNum => {
                   const isSelected = searchJuz === juzNum.toString();
+                  // Get the surah info for this Juz
+                  const juzInfo = juzStarts.find(j => j.juz === juzNum);
+                  const surahInfo = juzInfo ? surahs.find(s => s.id === juzInfo.surah) : null;
                   
                   return (
                     <button
@@ -864,9 +891,16 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
                       )}
                     >
                       <div className="text-emerald-800 dark:text-emerald-200">
-                        {isRTL 
-                          ? `الجزء ${formatNumber(juzNum)}` 
-                          : `Juz ${juzNum}`}
+                        <div className="font-semibold">
+                          {isRTL 
+                            ? `الجزء ${formatNumber(juzNum)}` 
+                            : `Juz ${juzNum}`}
+                        </div>
+                        {surahInfo && (
+                          <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                            {isRTL ? surahInfo.name : surahInfo.englishName}
+                          </div>
+                        )}
                       </div>
                     </button>
                   );
@@ -933,9 +967,9 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-4"
+            className="flex flex-col h-full max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-16rem)]"
           >
-            <label className={cn("font-medium mb-2 block text-emerald-800 dark:text-emerald-300", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
+            <label className={cn("font-medium mb-2 block text-emerald-800 dark:text-emerald-300 flex-shrink-0", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
               {t('pageNumber')}
             </label>
             <input
@@ -952,23 +986,53 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
                   input.value = filteredValue;
                 }
               }}
-              className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2", isRTL ? "text-right" : "text-left", textSizeClasses.text)}
+              className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 mb-3 flex-shrink-0", isRTL ? "text-right" : "text-left", textSizeClasses.text)}
             />
             
             {/* Validation Error Message */}
             {pageValidationError && (
-              <div className={cn("text-red-600 dark:text-red-400 text-center font-medium bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800", textSizeClasses.text)}>
+              <div className={cn("text-red-600 dark:text-red-400 text-center font-medium bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 mb-3 flex-shrink-0", textSizeClasses.text)}>
                 {pageValidationError}
               </div>
             )}
             
-            <Button
-              onClick={handleGoToSearchPage}
-              disabled={!isPageButtonEnabled}
-              className={cn("w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
-            >
-              {t('goToPage')}
-            </Button>
+            {/* Scrollable Page List */}
+            <div className="flex-1 overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent mb-3">
+              {Array.from({ length: 604 }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  ref={selectedPage === page ? selectedPageRef : null}
+                  onClick={() => {
+                    setSelectedPage(page);
+                    // Update input field with selected page
+                    if (pageInputRef.current) {
+                      pageInputRef.current.value = formatNumber(page);
+                    }
+                  }}
+                  className={cn(
+                    "w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                    selectedPage === page && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                    "text-center",
+                    textSizeClasses.text
+                  )}
+                >
+                  <div className="text-emerald-800 dark:text-emerald-200">
+                    {isRTL ? `صفحة ${formatNumber(page)}` : `Page ${page}`}
+                  </div>
+                </button>
+              ))}
+            </div>
+            
+            {/* Navigation Button - Fixed at Bottom */}
+            <div className="mt-auto pt-3 pb-4 border-t border-emerald-100 dark:border-emerald-900 bg-gradient-to-b from-transparent via-[#FBF9F4]/80 to-[#FBF9F4] dark:from-transparent dark:via-gray-900/80 dark:to-gray-900 flex-shrink-0">
+              <Button
+                onClick={handleGoToSearchPage}
+                disabled={!isPageButtonEnabled}
+                className={cn("w-full bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
+              >
+                {t('goToPage')}
+              </Button>
+            </div>
           </motion.div>
         );
         
