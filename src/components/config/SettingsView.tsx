@@ -36,10 +36,6 @@ export default function SettingsView() {
     const saved = localStorage.getItem('quran-view-mode');
     return (saved as 'single' | 'double') || 'double';
   });
-  const [pagesToLoad, setPagesToLoad] = useState<number>(() => {
-    const saved = localStorage.getItem('quran-pages-to-load');
-    return saved ? parseInt(saved) : 1;
-  });
   const [showBottomBarText, setShowBottomBarText] = useState<boolean>(() => {
     const saved = localStorage.getItem('quran-show-bottom-bar-text');
     return saved !== null ? saved === 'true' : true;
@@ -48,11 +44,6 @@ export default function SettingsView() {
   
   const handleMushafChange = (mushaf: MushafType) => {
     setMushafType(mushaf);
-  };
-  
-  const updatePagesToLoad = (pages: number) => {
-    setPagesToLoad(pages);
-    localStorage.setItem('quran-pages-to-load', String(pages));
   };
   
   const updateViewMode = (mode: 'single' | 'double') => {
@@ -189,15 +180,6 @@ export default function SettingsView() {
               isMobile={isMobile}
               viewMode={viewMode}
               onViewModeChange={updateViewMode}
-              pagesToLoad={pagesToLoad}
-              onPagesToLoadChange={(pages) => {
-                setPagesToLoad(pages);
-                localStorage.setItem('quran-pages-to-load', String(pages));
-                // Notify other components about the setting change
-                window.dispatchEvent(new CustomEvent('quran-setting-changed', {
-                  detail: { key: 'quran-pages-to-load', value: String(pages) }
-                }));
-              }}
               showBottomBarText={showBottomBarText}
               onShowBottomBarTextChange={(checked) => {
                 setShowBottomBarText(checked);

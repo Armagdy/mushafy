@@ -4,6 +4,7 @@ import { cacheAsset, isAssetCached } from '@/lib/asset-cache';
 import { getPageImageFilename } from '@/lib/quran-mapping';
 import { getSurahAudioUrl } from '@/lib/mp3quran-service';
 import { IMAGES_BASE_URL } from '@/config/assets';
+import { cacheFont, isFontCached } from '@/lib/font-cache';
 import type { Mp3QuranMoshaf } from '@/lib/mp3quran-service';
 
 export interface DownloadJob {
@@ -199,6 +200,44 @@ async function downloadPages(
     throw new Error('Invalid page download parameters');
   }
 
+  // For tarteel/tajweed, download fonts instead of images
+  if (mushafType === 'tarteel' || mushafType === 'tajweed') {
+    const pageCount = toPage - fromPage + 1;
+    const pages = Array.from({ length: pageCount }, (_, i) => fromPage + i);
+    
+    onProgress({ current: 0, total: pageCount });
+    
+    // Check which fonts are already cached
+    console.log(`[Download] Checking ${pages.length} ${mushafType} fonts for existing cache...`);
+    const cacheChecks = await Promise.all(
+      pages.map(async (page) => {
+        const cached = await isFontCached(page, mushafType);
+        return { page, cached };
+      })
+    );
+    
+    const uncachedFonts = cacheChecks.filter(f => !f.cached);
+    const cachedCount = pages.length - uncachedFonts.length;
+    
+    if (cachedCount > 0) {
+      console.log(`[Download] ✓ ${cachedCount} fonts already cached, downloading ${uncachedFonts.length} fonts`);
+    }
+
+    // Download only uncached fonts in parallel (10 at a time - fonts are small)
+    await downloadInParallel(
+      uncachedFonts,
+      async (item, sig) => {
+        await cacheFont(item.page, mushafType, sig);
+        return true;
+      },
+      signal,
+      (current, totalCount) => onProgress({ current: current + cachedCount, total: pageCount }),
+      10
+    );
+    return;
+  }
+
+  // For image-based mushafs (mwdoa, tashel, madinah)
   const total = toPage - fromPage + 1;
   onProgress({ current: 0, total });
 
@@ -340,3 +379,4 @@ async function downloadMp3Quran(
     5 // 5 concurrent downloads (increased from 3)
   );
 }
+

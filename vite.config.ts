@@ -27,6 +27,16 @@ function excludeMushafImagesPlugin() {
         }
       });
       
+      // Remove font directories (fonts are too large ~604 files each)
+      const fontDirs = ['fonts'];
+      fontDirs.forEach(dir => {
+        const dirPath = path.join(distAssetsPath, dir);
+        if (fs.existsSync(dirPath)) {
+          fs.rmSync(dirPath, { recursive: true, force: true });
+          console.log(`✓ Excluded ${dir} from build (fonts will be downloaded on-demand)`);
+        }
+      });
+      
       // Recursively remove all .webp files and _optimized_temp.webp files from dist/assets
       function removeWebpFiles(directory: string) {
         if (!fs.existsSync(directory)) return;

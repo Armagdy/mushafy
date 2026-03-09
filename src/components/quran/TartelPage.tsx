@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, memo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { surahs } from '@/data/surahs';
+import { loadCachedFont } from '@/lib/font-cache';
 
 interface Word {
   word_id: number;
@@ -41,9 +42,10 @@ interface TartelPageProps {
 }
 
 const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel' }: TartelPageProps) => {
-  const { language, t } = useLanguage();
+  const { language, t, isRTL } = useLanguage();
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [hoveredAyah, setHoveredAyah] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -52,6 +54,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const longPressTriggeredRef = useRef(false);
   const isSwipingRef = useRef(false); // Track if user is performing a swipe gesture
+  const [fontLoadTrigger, setFontLoadTrigger] = useState(0);
   
   // Detect if device has touch capability
   const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -83,64 +86,60 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     };
   }, [pageNumber]);
 
-  // Load page-specific font
+  // Load page-specific font from cache/network
   useEffect(() => {
     let mounted = true;
+    let abortController = new AbortController();
 
     const loadFont = async () => {
       try {
-        // Font name includes mushaf type to avoid conflicts
-        const fontName = `p${pageNumber}-${mushafType}`;
-        
-        // Check if font is already loaded in document.fonts
-        const existingFont = Array.from(document.fonts).find(
-          (font: any) => font.family === fontName
-        );
-        
-        if (existingFont && existingFont.status === 'loaded') {
-          if (mounted) {
-            console.log(`Font ${fontName} already loaded`);
-            setFontLoaded(true);
-          }
-          return;
-        }
-
-        // Determine font path based on mushaf type
-        const fontPath = mushafType === 'tajweed' 
-          ? `/assets/fonts/qpc_v4_font/p${pageNumber}.woff`
-          : `/assets/fonts/qpc_v2_font/p${pageNumber}.woff`;
-
-        console.log(`Loading font: ${fontName} from ${fontPath}`);
-        const font = new FontFace(
-          fontName,
-          `url(${fontPath})`
-        );
-
-        await font.load();
-        document.fonts.add(font);
-        
-        // Wait for fonts to be fully ready
-        await document.fonts.ready;
+        // Load font with caching (downloads if not cached)
+        const fontName = await loadCachedFont(pageNumber, mushafType, abortController.signal);
         
         if (mounted) {
-          console.log(`Font ${fontName} loaded and ready`);
+          console.log(`Font ${fontName} loaded successfully`);
           setFontLoaded(true);
+          setLoadError(false);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Error loading font for page ${pageNumber}:`, error);
         if (mounted) {
-          setFontLoaded(true); // Continue with fallback font
+          // If font is not cached and we're offline, show error
+          if (error.message === 'FONT_NOT_CACHED_OFFLINE') {
+            setLoadError(true);
+            setFontLoaded(false);
+          } else {
+            // For other errors, continue with fallback (network errors, etc.)
+            setFontLoaded(true);
+            setLoadError(false);
+          }
         }
       }
     };
 
     setFontLoaded(false);
+    setLoadError(false);
     loadFont();
 
     return () => {
       mounted = false;
+      abortController.abort();
     };
-  }, [pageNumber, mushafType]);
+  }, [pageNumber, mushafType, fontLoadTrigger]);
+
+  // Listen for online/offline events to retry failed loads
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[TartelPage] 🌐 Network came back online');
+      if (loadError) {
+        console.log('[TartelPage] 🔄 Retrying failed font load...');
+        setFontLoadTrigger(prev => prev + 1);
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [loadError]);
 
   const handleWordHover = (verseKey: string) => {
     // Only allow hover on non-touch devices (desktop)
@@ -281,6 +280,44 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     };
   }, []);
 
+  // Show error state if font not cached and offline
+  if (loadError) {
+    return (
+      <div 
+        className={className}
+        style={{ 
+          backgroundColor: '#f3f4f6',
+          minHeight: '200px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem',
+          textAlign: 'center'
+        }}
+      >
+        <svg 
+          className="w-12 h-12 text-gray-400 mb-2" 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth={2} 
+            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+          />
+        </svg>
+        <span className={`text-gray-500 text-sm md:text-base font-semibold mb-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+          {t('offlinePageNotCached')}
+        </span>
+        <span className="text-gray-400 text-sm md:text-base">{t('page')} {pageNumber}</span>
+      </div>
+    );
+  }
+
+  // Show loading state
   if (!pageData || !fontLoaded) {
     return (
       <div className={`flex items-center justify-center bg-[#FBF9F4] ${className}`}>

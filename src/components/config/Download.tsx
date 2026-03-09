@@ -491,55 +491,7 @@ export function Download() {
           <div className="flex flex-col gap-2">
             <label className={cn("text-emerald-700 dark:text-emerald-300", textSizeClasses.label)}>{t('mushafType')}</label>
             {showMushafTypeScroll ? (
-              <div className="flex flex-col gap-1 border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden bg-transparent max-h-40 overflow-y-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
-                <button
-                  onClick={() => {
-                    setDownloadMushafType('mwdoa');
-                    setShowMushafTypeScroll(false);
-                  }}
-                  className={cn(
-                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
-                    downloadMushafType === 'mwdoa' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                    textSizeClasses.text,
-                    isRTL ? 'text-right' : 'text-left'
-                  )}
-                >
-                  <span className="text-emerald-800 dark:text-emerald-200">
-                    {t('mushafMwdoa')}
-                  </span>
-                </button>
-                <button
-                  onClick={() => {
-                    setDownloadMushafType('tashel');
-                    setShowMushafTypeScroll(false);
-                  }}
-                  className={cn(
-                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
-                    downloadMushafType === 'tashel' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                    textSizeClasses.text,
-                    isRTL ? 'text-right' : 'text-left'
-                  )}
-                >
-                  <span className="text-emerald-800 dark:text-emerald-200">
-                    {t('mushafTashel')}
-                  </span>
-                </button>
-                <button
-                  onClick={() => {
-                    setDownloadMushafType('madinah');
-                    setShowMushafTypeScroll(false);
-                  }}
-                  className={cn(
-                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
-                    downloadMushafType === 'madinah' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                    textSizeClasses.text,
-                    isRTL ? 'text-right' : 'text-left'
-                  )}
-                >
-                  <span className="text-emerald-800 dark:text-emerald-200">
-                    {t('mushafMadinah')}
-                  </span>
-                </button>
+              <div className="flex flex-col gap-1 border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden bg-transparent max-h-72 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <button
                   onClick={() => {
                     setDownloadMushafType('tarteel');
@@ -548,13 +500,15 @@ export function Download() {
                   className={cn(
                     "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
                     downloadMushafType === 'tarteel' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                    textSizeClasses.text,
-                    isRTL ? 'text-right' : 'text-left'
+                    textSizeClasses.text
                   )}
                 >
-                  <span className="text-emerald-800 dark:text-emerald-200">
-                    {t('mushafTarteel')}
-                  </span>
+                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">1.</span>
+                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">
+                      {t('mushafTarteel')}
+                    </span>
+                  </div>
                 </button>
                 <button
                   onClick={() => {
@@ -564,13 +518,69 @@ export function Download() {
                   className={cn(
                     "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
                     downloadMushafType === 'tajweed' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                    textSizeClasses.text,
-                    isRTL ? 'text-right' : 'text-left'
+                    textSizeClasses.text
                   )}
                 >
-                  <span className="text-emerald-800 dark:text-emerald-200">
-                    {t('mushafTajweed')}
-                  </span>
+                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">2.</span>
+                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">
+                      {t('mushafTajweed')}
+                    </span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setDownloadMushafType('mwdoa');
+                    setShowMushafTypeScroll(false);
+                  }}
+                  className={cn(
+                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                    downloadMushafType === 'mwdoa' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                    textSizeClasses.text
+                  )}
+                >
+                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">3.</span>
+                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">
+                      {t('mushafMwdoa')}
+                    </span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setDownloadMushafType('tashel');
+                    setShowMushafTypeScroll(false);
+                  }}
+                  className={cn(
+                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                    downloadMushafType === 'tashel' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                    textSizeClasses.text
+                  )}
+                >
+                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">4.</span>
+                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">
+                      {t('mushafTashel')}
+                    </span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setDownloadMushafType('madinah');
+                    setShowMushafTypeScroll(false);
+                  }}
+                  className={cn(
+                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
+                    downloadMushafType === 'madinah' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                    textSizeClasses.text
+                  )}
+                >
+                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">5.</span>
+                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">
+                      {t('mushafMadinah')}
+                    </span>
+                  </div>
                 </button>
               </div>
             ) : (
