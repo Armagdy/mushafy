@@ -492,7 +492,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         }
 
         .surah-header-container {
-          padding: 0.5rem 0;
+          padding: 0;
           margin: 0;
           line-height: 1.75;
           height: auto;
@@ -504,7 +504,9 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         .surah-icon-wrapper {
           position: relative;
-          width: 100%;
+          width: 120%;
+          margin-left: -1%;
+          margin-right: -1%;
           display: flex;
           justify-content: center;
           align-items: center;
@@ -512,7 +514,6 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         .surah-icon {
           width: 100%;
-          max-width: 100%;
           height: auto;
           display: block;
         }
@@ -545,7 +546,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           }
           
           .surah-header-container {
-            padding: 0.75rem 0;
+            padding: 0;
           }
         }
 
