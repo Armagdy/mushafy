@@ -36,6 +36,7 @@ interface UseBookmarksReturn {
   removeReadingBookmark: (page: number) => void;
   addBookmarkByType: (type: string, surahId: number, ayahNum: number) => Promise<void>;
   updateBookmark: (oldPage: number, newPage: number, surahId: number, ayahNum: number, type: string) => Promise<void>;
+  touchBookmark: (page: number, type: 'bookmark' | 'memorization' | 'reading') => void;
   
   // Helper functions
   getSurahNameForPage: (page: number) => Promise<string>;
@@ -544,6 +545,37 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
     return true;
   };
 
+  // Touch a bookmark to update its lastEdited timestamp (when navigating to it)
+  const touchBookmark = (page: number, type: 'bookmark' | 'memorization' | 'reading'): void => {
+    const now = Date.now();
+    
+    if (type === 'bookmark' && bookmarks.includes(page)) {
+      const newTimestamps = {
+        ...bookmarkTimestamps,
+        lastEdited: { ...bookmarkTimestamps.lastEdited, [page]: now }
+      };
+      setBookmarkTimestamps(newTimestamps);
+      // Immediately save to localStorage synchronously
+      localStorage.setItem('quran-bookmark-timestamps', JSON.stringify(newTimestamps));
+    } else if (type === 'memorization' && memorizationBookmarks.includes(page)) {
+      const newTimestamps = {
+        ...memorizationTimestamps,
+        lastEdited: { ...memorizationTimestamps.lastEdited, [page]: now }
+      };
+      setMemorizationTimestamps(newTimestamps);
+      // Immediately save to localStorage synchronously
+      localStorage.setItem('quran-memorization-timestamps', JSON.stringify(newTimestamps));
+    } else if (type === 'reading' && readingBookmarks.includes(page)) {
+      const newTimestamps = {
+        ...readingTimestamps,
+        lastEdited: { ...readingTimestamps.lastEdited, [page]: now }
+      };
+      setReadingTimestamps(newTimestamps);
+      // Immediately save to localStorage synchronously
+      localStorage.setItem('quran-reading-timestamps', JSON.stringify(newTimestamps));
+    }
+  };
+
   return {
     // States
     bookmarks,
@@ -566,6 +598,7 @@ export function useBookmarks(language: 'ar' | 'en'): UseBookmarksReturn {
     removeReadingBookmark,
     addBookmarkByType,
     updateBookmark,
+    touchBookmark,
     
     // Helpers
     getSurahNameForPage,

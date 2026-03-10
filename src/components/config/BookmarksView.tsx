@@ -36,6 +36,7 @@ interface BookmarksViewProps {
   onRemoveReadingBookmark: (page: number) => void;
   onAddBookmarkByType: (type: string, surahId: number, ayahNum: number) => Promise<void>;
   onUpdateBookmark: (oldPage: number, newPage: number, surahId: number, ayahNum: number, type: string) => Promise<void>;
+  onTouchBookmark: (page: number, type: 'bookmark' | 'memorization' | 'reading') => void;
   initialCategory?: string | null;
 }
 
@@ -58,6 +59,7 @@ export default function BookmarksView({
   onRemoveReadingBookmark,
   onAddBookmarkByType,
   onUpdateBookmark,
+  onTouchBookmark,
   initialCategory = null,
 }: BookmarksViewProps) {
   const { t, isRTL, language } = useLanguage();
@@ -76,8 +78,6 @@ export default function BookmarksView({
     return numStr;
   };
 
-  console.log('📖 BookmarksView received props:', { currentPage, currentSurahId });
-
   // Defensive checks - ensure arrays are always defined
   const safeBookmarks = bookmarks || [];
   const safeMemorizationBookmarks = memorizationBookmarks || [];
@@ -89,6 +89,9 @@ export default function BookmarksView({
   const [selectedBookmarkType, setSelectedBookmarkType] = useState<string>('bookmark');
   const [bookmarkPage, setBookmarkPage] = useState(currentPage || 1);
   const [bookmarkSurahId, setBookmarkSurahId] = useState(currentSurahId || 1);
+  
+  // State to track timestamp changes for re-rendering Last Bookmark section
+  const [timestampUpdateTrigger, setTimestampUpdateTrigger] = useState(0);
   
   // Refs for auto-scrolling to selected items
   const selectedPageRef = useRef<HTMLButtonElement>(null);
@@ -103,15 +106,6 @@ export default function BookmarksView({
   
   // Delete confirmation state
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ page: number; type: 'quick' | 'memorization' | 'reading' } | null>(null);
-
-  console.log('📖 BookmarksView state:', { 
-    currentPage, 
-    currentSurahId,
-    bookmarkPage,
-    bookmarkSurahId,
-    updateNewPage,
-    updateNewSurahId
-  });
   
   // Active category from URL (null = show list, string = show that category's content)
   const activeCategory = searchParams.get('category');
@@ -153,9 +147,25 @@ export default function BookmarksView({
     }
   }, [activeCategory, selectedUpdatePage, updateNewSurahId]);
 
+  // Listen for bookmark timestamp changes to trigger re-render
+  useEffect(() => {
+    const handleTimestampChange = (event: any) => {
+      // Force re-render when timestamps change
+      const detail = event?.detail;
+      if (detail?.type?.includes('timestamp')) {
+        setTimestampUpdateTrigger(prev => prev + 1);
+      }
+    };
+
+    window.addEventListener('quran-bookmarks-changed' as any, handleTimestampChange);
+    
+    return () => {
+      window.removeEventListener('quran-bookmarks-changed' as any, handleTimestampChange);
+    };
+  }, []);
+
   // Update dropdowns when current page/surah changes
   useLayoutEffect(() => {
-    console.log('📖 BookmarksView useLayoutEffect: Updating dropdowns with:', { currentPage, currentSurahId });
     setBookmarkPage(currentPage);
     setBookmarkSurahId(currentSurahId);
     // Only update the "new" values if not actively updating a bookmark
@@ -175,13 +185,22 @@ export default function BookmarksView({
 
   // Get the last updated/created bookmark
   const getLastBookmark = (): { page: number; type: 'bookmark' | 'memorization' | 'reading' } | null => {
+    // Read fresh timestamps from localStorage to ensure we have the latest values
+    const freshBookmarkTimestamps = localStorage.getItem('quran-bookmark-timestamps');
+    const freshMemorizationTimestamps = localStorage.getItem('quran-memorization-timestamps');
+    const freshReadingTimestamps = localStorage.getItem('quran-reading-timestamps');
+    
+    const currentBookmarkTimestamps = freshBookmarkTimestamps ? JSON.parse(freshBookmarkTimestamps) : bookmarkTimestamps || { created: {}, lastEdited: {} };
+    const currentMemorizationTimestamps = freshMemorizationTimestamps ? JSON.parse(freshMemorizationTimestamps) : memorizationTimestamps || { created: {}, lastEdited: {} };
+    const currentReadingTimestamps = freshReadingTimestamps ? JSON.parse(freshReadingTimestamps) : readingTimestamps || { created: {}, lastEdited: {} };
+    
     let lastPage: number | null = null;
     let lastTime = 0;
     let lastType: 'bookmark' | 'memorization' | 'reading' = 'bookmark';
 
     // Check all bookmark types for the most recent
     safeBookmarks.forEach(page => {
-      const time = bookmarkTimestamps?.lastEdited?.[page] || bookmarkTimestamps?.created?.[page] || 0;
+      const time = currentBookmarkTimestamps?.lastEdited?.[page] || currentBookmarkTimestamps?.created?.[page] || 0;
       if (time > lastTime) {
         lastTime = time;
         lastPage = page;
@@ -190,7 +209,7 @@ export default function BookmarksView({
     });
 
     safeMemorizationBookmarks.forEach(page => {
-      const time = memorizationTimestamps?.lastEdited?.[page] || memorizationTimestamps?.created?.[page] || 0;
+      const time = currentMemorizationTimestamps?.lastEdited?.[page] || currentMemorizationTimestamps?.created?.[page] || 0;
       if (time > lastTime) {
         lastTime = time;
         lastPage = page;
@@ -199,7 +218,7 @@ export default function BookmarksView({
     });
 
     safeReadingBookmarks.forEach(page => {
-      const time = readingTimestamps?.lastEdited?.[page] || readingTimestamps?.created?.[page] || 0;
+      const time = currentReadingTimestamps?.lastEdited?.[page] || currentReadingTimestamps?.created?.[page] || 0;
       if (time > lastTime) {
         lastTime = time;
         lastPage = page;
@@ -847,6 +866,7 @@ export default function BookmarksView({
                   </div>
                   <button
                     onClick={() => {
+                      onTouchBookmark(page, type);
                       onNavigate(page, safeBookmarkPageSurahIds[page], safeBookmarkPageAyahs[page]);
                     }}
                     className={cn(
@@ -886,6 +906,7 @@ export default function BookmarksView({
                     <div className="flex-1 border border-amber-200 dark:border-amber-800/40 bg-gradient-to-r from-amber-50 to-white dark:from-amber-950/20 dark:to-emerald-950/30 rounded-lg shadow-sm overflow-hidden">
                       <button
                         onClick={() => {
+                          onTouchBookmark(page, 'bookmark');
                           onNavigate(page, safeBookmarkPageSurahIds[page], safeBookmarkPageAyahs[page]);
                         }}
                         className={cn("flex items-center gap-1.5 sm:gap-2 w-full py-2 sm:py-2.5 px-3 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors", isRTL ? 'text-right' : 'text-left')}
@@ -925,6 +946,7 @@ export default function BookmarksView({
                     <div className="flex-1 border border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-900/30 dark:to-emerald-950/30 rounded-lg shadow-sm overflow-hidden">
                       <button
                         onClick={() => {
+                          onTouchBookmark(page, 'memorization');
                           onNavigate(page, safeBookmarkPageSurahIds[page], safeBookmarkPageAyahs[page]);
                         }}
                         className={cn("flex items-center gap-1.5 sm:gap-2 w-full py-2 sm:py-2.5 px-3 hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 transition-colors", isRTL ? 'text-right' : 'text-left')}
@@ -964,6 +986,7 @@ export default function BookmarksView({
                     <div className="flex-1 border border-blue-200 dark:border-blue-800/40 bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-emerald-950/30 rounded-lg shadow-sm overflow-hidden">
                       <button
                         onClick={() => {
+                          onTouchBookmark(page, 'reading');
                           onNavigate(page, safeBookmarkPageSurahIds[page], safeBookmarkPageAyahs[page]);
                         }}
                         className={cn("flex items-center gap-1.5 sm:gap-2 w-full py-2 sm:py-2.5 px-3 hover:bg-blue-100/50 dark:hover:bg-blue-900/20 transition-colors", isRTL ? 'text-right' : 'text-left')}

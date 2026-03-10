@@ -177,6 +177,7 @@ export default function ConfigOverlay({
     removeReadingBookmark,
     addBookmarkByType,
     updateBookmark,
+    touchBookmark,
     getTotalBookmarks,
   } = useBookmarks(language);
   
@@ -279,6 +280,7 @@ export default function ConfigOverlay({
             onRemoveReadingBookmark={removeReadingBookmark}
             onAddBookmarkByType={addBookmarkByType}
             onUpdateBookmark={updateBookmark}
+            onTouchBookmark={touchBookmark}
             initialCategory={initialBookmarkCategory}
           />
         );

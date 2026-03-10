@@ -51,6 +51,7 @@ export default function Configuration() {
     removeReadingBookmark,
     addBookmarkByType,
     updateBookmark,
+    touchBookmark,
     getTotalBookmarks,
   } = useBookmarks(language);
   
@@ -173,6 +174,7 @@ export default function Configuration() {
             onRemoveReadingBookmark={removeReadingBookmark}
             onAddBookmarkByType={addBookmarkByType}
             onUpdateBookmark={updateBookmark}
+            onTouchBookmark={touchBookmark}
           />
         );
       case 'navigation':
