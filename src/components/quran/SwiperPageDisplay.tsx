@@ -199,17 +199,27 @@ export function SwiperPageDisplay({
     }
   }, [initialPage]);
   
-  // Expose navigation method via callback
-  useEffect(() => {
-    if (swiperRef.current && onSwiperReady) {
+  // Track if we've already called onSwiperReady to prevent infinite loop
+  const hasCalledSwiperReadyRef = useRef(false);
+  
+  // Handle swiper initialization
+  const handleSwiperInit = useCallback((swiper: SwiperType) => {
+    swiperRef.current = swiper;
+    
+    // Call onSwiperReady once and only once
+    if (onSwiperReady && !hasCalledSwiperReadyRef.current) {
       const navigateToPage = (pageNum: number) => {
         if (swiperRef.current) {
           swiperRef.current.slideTo(pageNum - 1, 400);
         }
       };
       onSwiperReady(navigateToPage);
+      hasCalledSwiperReadyRef.current = true;
     }
-  }, [onSwiperReady]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Note: onSwiperReady is intentionally excluded to prevent infinite loop
+    // This callback should only set up the swiper ref and call onSwiperReady once
+  }, []);
   
   // Render bookmark icons for a page
   const renderBookmarkIcons = useCallback((pageNum: number, position: 'left' | 'right') => {
@@ -325,9 +335,7 @@ export function SwiperPageDisplay({
     <main className="flex-1 flex items-center justify-center overflow-hidden min-h-0 bg-[#FBF9F4]">
       <Swiper
         modules={[Navigation, Virtual, Keyboard, A11y]}
-        onSwiper={(swiper) => {
-          swiperRef.current = swiper;
-        }}
+        onSwiper={handleSwiperInit}
         onSlideChange={handleSlideChange}
         onTransitionEnd={handleTransitionEnd}
         initialSlide={initialPage - 1} // Swiper is 0-indexed
