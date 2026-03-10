@@ -143,8 +143,15 @@ export const isFontCached = async (
   }
 };
 
+// Track which fonts are currently being loaded (prevent duplicate loads)
+const loadingFonts = new Set<string>();
+
+// Track which fonts have been injected into CSS (persistent across pages)
+const injectedFonts = new Set<string>();
+
 /**
- * Load font into document with caching
+ * Load font into document with caching (Optimized for Android performance)
+ * Uses CSS @font-face injection instead of FontFace API to avoid blocking
  * Returns the font family name to use in CSS
  * Throws error if font is not cached and offline
  */
@@ -155,93 +162,137 @@ export const loadCachedFont = async (
 ): Promise<string> => {
   const fontName = `p${pageNumber}-${mushafType}`;
   
-  // Check if font is already loaded in document.fonts
-  const existingFont = Array.from(document.fonts).find(
-    (font: any) => font.family === fontName
-  );
-  
-  if (existingFont && existingFont.status === 'loaded') {
-    console.log(`Font ${fontName} already loaded in document`);
+  // If font is already injected, return immediately (FAST PATH)
+  if (injectedFonts.has(fontName)) {
+    console.log(`✅ Font ${fontName} already injected (cached in CSS)`);
     return fontName;
   }
-
-  // Try to get from cache first
-  let fontUrl: string;
-  let needsCleanup = false;
   
-  if (isNativePlatform()) {
-    // On native, try to get file URI first (much faster)
-    const fileUri = await getCachedFontUri(pageNumber, mushafType);
-    if (fileUri) {
-      fontUrl = Capacitor.convertFileSrc(fileUri);
-      console.log(`Using cached font URI: ${fontName}`);
-    } else {
-      // Not cached - check if online before downloading
-      if (!navigator.onLine) {
-        console.error(`[FontCache] 🔴 OFFLINE and font not cached: p${pageNumber} (${mushafType})`);
-        throw new Error('FONT_NOT_CACHED_OFFLINE');
-      }
-      
-      // Online - download and cache it
-      console.log(`Font not cached, downloading: ${fontName}`);
-      await cacheFont(pageNumber, mushafType, signal);
-      
-      // Get the URI after caching
-      const newFileUri = await getCachedFontUri(pageNumber, mushafType);
-      if (newFileUri) {
-        fontUrl = Capacitor.convertFileSrc(newFileUri);
-      } else {
-        // Fallback to network URL
-        fontUrl = getFontUrl(pageNumber, mushafType);
-      }
-    }
-  } else {
-    // On web, try to get blob from cache
-    const cachedBlob = await getCachedFont(pageNumber, mushafType);
+  // If font is currently being loaded, wait for it
+  if (loadingFonts.has(fontName)) {
+    console.log(`⏳ Font ${fontName} is being loaded, waiting...`);
+    // Wait for the ongoing load to complete
+    return new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        if (injectedFonts.has(fontName)) {
+          clearInterval(checkInterval);
+          resolve(fontName);
+        }
+      }, 50);
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        resolve(fontName);
+      }, 5000);
+    });
+  }
+  
+  // Mark font as loading
+  loadingFonts.add(fontName);
+  
+  try {
+    // Get font URL (from cache or download)
+    let fontUrl: string;
+    let needsCleanup = false;
     
-    if (cachedBlob) {
-      fontUrl = URL.createObjectURL(cachedBlob);
-      needsCleanup = true;
-      console.log(`Using cached font blob: ${fontName}`);
-    } else {
-      // Not cached - check if online before downloading
-      if (!navigator.onLine) {
-        console.error(`[FontCache] 🔴 OFFLINE and font not cached: p${pageNumber} (${mushafType})`);
-        throw new Error('FONT_NOT_CACHED_OFFLINE');
-      }
-      
-      // Online - download, cache, and use it
-      console.log(`Font not cached, downloading: ${fontName}`);
-      await cacheFont(pageNumber, mushafType, signal);
-      
-      // Get the blob after caching
-      const newBlob = await getCachedFont(pageNumber, mushafType);
-      if (newBlob) {
-        fontUrl = URL.createObjectURL(newBlob);
-        needsCleanup = true;
+    if (isNativePlatform()) {
+      // On native, try to get file URI first (much faster - direct disk access)
+      const fileUri = await getCachedFontUri(pageNumber, mushafType);
+      if (fileUri) {
+        fontUrl = Capacitor.convertFileSrc(fileUri);
+        console.log(`✅ Using cached font URI: ${fontName}`);
       } else {
-        // Fallback to network URL
-        fontUrl = getFontUrl(pageNumber, mushafType);
+        // Not cached - check if online before downloading
+        if (!navigator.onLine) {
+          console.error(`[FontCache] 🔴 OFFLINE and font not cached: p${pageNumber} (${mushafType})`);
+          throw new Error('FONT_NOT_CACHED_OFFLINE');
+        }
+        
+        // Online - download and cache it
+        console.log(`📥 Font not cached, downloading: ${fontName}`);
+        await cacheFont(pageNumber, mushafType, signal);
+        
+        // Get the URI after caching
+        const newFileUri = await getCachedFontUri(pageNumber, mushafType);
+        if (newFileUri) {
+          fontUrl = Capacitor.convertFileSrc(newFileUri);
+        } else {
+          // Fallback to network URL
+          fontUrl = getFontUrl(pageNumber, mushafType);
+        }
+      }
+    } else {
+      // On web, try to get blob from cache
+      const cachedBlob = await getCachedFont(pageNumber, mushafType);
+      
+      if (cachedBlob) {
+        fontUrl = URL.createObjectURL(cachedBlob);
+        needsCleanup = true;
+        console.log(`✅ Using cached font blob: ${fontName}`);
+      } else {
+        // Not cached - check if online before downloading
+        if (!navigator.onLine) {
+          console.error(`[FontCache] 🔴 OFFLINE and font not cached: p${pageNumber} (${mushafType})`);
+          throw new Error('FONT_NOT_CACHED_OFFLINE');
+        }
+        
+        // Online - download, cache, and use it
+        console.log(`📥 Font not cached, downloading: ${fontName}`);
+        await cacheFont(pageNumber, mushafType, signal);
+        
+        // Get the blob after caching
+        const newBlob = await getCachedFont(pageNumber, mushafType);
+        if (newBlob) {
+          fontUrl = URL.createObjectURL(newBlob);
+          needsCleanup = true;
+        } else {
+          // Fallback to network URL
+          fontUrl = getFontUrl(pageNumber, mushafType);
+        }
       }
     }
-  }
 
-  // Load font into document
-  const font = new FontFace(fontName, `url(${fontUrl})`);
-  await font.load();
-  document.fonts.add(font);
-  
-  // Wait for fonts to be fully ready
-  await document.fonts.ready;
-  
-  // Cleanup blob URL if we created one
-  if (needsCleanup) {
-    // Delay cleanup to ensure font is loaded
-    setTimeout(() => URL.revokeObjectURL(fontUrl), 1000);
+    // Inject font using CSS @font-face (non-blocking, persistent)
+    // This is MUCH faster than FontFace API because it doesn't block rendering
+    const styleId = `font-${fontName}`;
+    let styleElement = document.getElementById(styleId) as HTMLStyleElement;
+    
+    if (!styleElement) {
+      styleElement = document.createElement('style');
+      styleElement.id = styleId;
+      styleElement.textContent = `
+        @font-face {
+          font-family: '${fontName}';
+          src: url('${fontUrl}') format('woff');
+          font-display: swap;
+        }
+      `;
+      document.head.appendChild(styleElement);
+      console.log(`✅ Font ${fontName} injected into CSS (non-blocking)`);
+    }
+    
+    // Mark font as injected
+    injectedFonts.add(fontName);
+    
+    // Optionally preload the font asynchronously (doesn't block rendering)
+    // This helps ensure the font is available quickly but doesn't block the UI
+    if ('fonts' in document) {
+      document.fonts.load(`16px ${fontName}`).catch(() => {
+        // Ignore errors - font will load when needed
+      });
+    }
+    
+    // Schedule cleanup for blob URLs (web only)
+    if (needsCleanup) {
+      // Delay cleanup to ensure font is loaded (5 seconds should be enough)
+      setTimeout(() => URL.revokeObjectURL(fontUrl), 5000);
+    }
+    
+    return fontName;
+  } finally {
+    // Remove from loading set
+    loadingFonts.delete(fontName);
   }
-  
-  console.log(`Font ${fontName} loaded and ready`);
-  return fontName;
 };
 
 /**
@@ -256,6 +307,17 @@ export const removeCachedFont = async (
     
     const key = getFontCacheKey(pageNumber, mushafType);
     await fontStorage.removeItem(key);
+    
+    // Remove from injected fonts tracking
+    const fontName = `p${pageNumber}-${mushafType}`;
+    injectedFonts.delete(fontName);
+    
+    // Remove CSS style element
+    const styleId = `font-${fontName}`;
+    const styleElement = document.getElementById(styleId);
+    if (styleElement) {
+      styleElement.remove();
+    }
     
     console.log(`✅ [${getPlatform()}] Removed cached font: p${pageNumber} (${mushafType})`);
     return true;
@@ -272,12 +334,71 @@ export const clearAllFonts = async (): Promise<boolean> => {
   try {
     await fontStorage.init();
     await fontStorage.clear();
-    console.log(`✅ [${getPlatform()}] Cleared all font cache`);
+    
+    // Remove all CSS style elements for fonts
+    injectedFonts.forEach(fontName => {
+      const styleId = `font-${fontName}`;
+      const styleElement = document.getElementById(styleId);
+      if (styleElement) {
+        styleElement.remove();
+      }
+    });
+    
+    // Clear tracking sets
+    injectedFonts.clear();
+    loadingFonts.clear();
+    
+    console.log(`✅ [${getPlatform()}] Cleared all font cache and CSS`);
     return true;
   } catch (error) {
     console.error('Error clearing font cache:', error);
     return false;
   }
+};
+
+/**
+ * Preload fonts for adjacent pages (performance optimization)
+ * Call this after loading the current page to prepare nearby pages
+ */
+export const preloadAdjacentFonts = async (
+  currentPage: number,
+  mushafType: 'tarteel' | 'tajweed',
+  range: number = 2
+): Promise<void> => {
+  const pagesToPreload: number[] = [];
+  
+  // Preload previous and next pages within range
+  for (let i = 1; i <= range; i++) {
+    const prevPage = currentPage - i;
+    const nextPage = currentPage + i;
+    
+    if (prevPage >= 1) pagesToPreload.push(prevPage);
+    if (nextPage <= 604) pagesToPreload.push(nextPage);
+  }
+  
+  // Preload fonts in parallel (non-blocking)
+  const preloadPromises = pagesToPreload.map(async (pageNum) => {
+    try {
+      // Check if already cached or injected
+      const fontName = `p${pageNum}-${mushafType}`;
+      if (injectedFonts.has(fontName)) {
+        return; // Already loaded
+      }
+      
+      // Check if cached in storage
+      const isCached = await isFontCached(pageNum, mushafType);
+      if (!isCached && navigator.onLine) {
+        // Download and cache if online
+        await cacheFont(pageNum, mushafType);
+        console.log(`📦 Preloaded font for page ${pageNum}`);
+      }
+    } catch (error) {
+      // Silently fail - preloading is optional
+      console.log(`⚠️ Failed to preload font for page ${pageNum}`);
+    }
+  });
+  
+  await Promise.allSettled(preloadPromises);
 };
 
 /**

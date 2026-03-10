@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, memo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { surahs } from '@/data/surahs';
-import { loadCachedFont } from '@/lib/font-cache';
+import { loadCachedFont, preloadAdjacentFonts } from '@/lib/font-cache';
 
 interface Word {
   word_id: number;
@@ -41,9 +41,50 @@ interface TartelPageProps {
   mushafType?: 'tarteel' | 'tajweed';
 }
 
+// Cache for the complete Quran pages data (loaded once, used for all pages)
+let cachedQuranData: QuranData | null = null;
+let dataLoadingPromise: Promise<QuranData> | null = null;
+
+// Function to load and cache the Quran pages data
+const loadQuranPagesData = async (): Promise<QuranData> => {
+  // If already cached, return immediately
+  if (cachedQuranData) {
+    console.log('[TartelPage] ✅ Using cached Quran page data (instant access)');
+    return cachedQuranData;
+  }
+  
+  // If already loading, wait for the existing promise
+  if (dataLoadingPromise) {
+    console.log('[TartelPage] ⏳ Waiting for in-progress data load');
+    return dataLoadingPromise;
+  }
+  
+  // Start loading
+  console.log('[TartelPage] 📥 Loading quran_pages_lines.json (first time)');
+  dataLoadingPromise = (async () => {
+    try {
+      const response = await fetch('/assets/quran_pages_lines.json');
+      if (!response.ok) {
+        throw new Error(`Failed to load page data: ${response.status}`);
+      }
+      const data: QuranData = await response.json();
+      cachedQuranData = data;  // Cache the data
+      console.log('[TartelPage] ✅ Quran page data cached successfully');
+      return data;
+    } catch (error) {
+      dataLoadingPromise = null;  // Reset on error so it can be retried
+      console.error('[TartelPage] ❌ Failed to load page data:', error);
+      throw error;
+    }
+  })();
+  
+  return dataLoadingPromise;
+};
+
 const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel' }: TartelPageProps) => {
   const { language, t, isRTL } = useLanguage();
   const [pageData, setPageData] = useState<PageData | null>(null);
+  // Start with fontLoaded = false - wait for actual font to be ready
   const [fontLoaded, setFontLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [hoveredAyah, setHoveredAyah] = useState<string | null>(null);
@@ -65,17 +106,14 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   // Detect if device has touch capability
   const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-  // Load page data
+  // Load page data (using cached data for instant access)
   useEffect(() => {
     let mounted = true;
 
     const loadPageData = async () => {
       try {
-        const response = await fetch('/assets/quran_pages_lines.json');
-        if (!response.ok) {
-          throw new Error(`Failed to load page data: ${response.status}`);
-        }
-        const data: QuranData = await response.json();
+        // Load from cache (instant if already loaded)
+        const data = await loadQuranPagesData();
         
         if (mounted && pageNumber >= 1 && pageNumber <= 604) {
           setPageData(data.pages[pageNumber - 1]);
@@ -92,7 +130,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     };
   }, [pageNumber]);
 
-  // Load page-specific font from cache/network
+  // Load page-specific font from cache/network (non-blocking)
   useEffect(() => {
     let mounted = true;
     let abortController = new AbortController();
@@ -100,15 +138,33 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     const loadFont = async () => {
       try {
         // Load font with caching (downloads if not cached)
+        // This injects CSS @font-face rule
         const fontName = await loadCachedFont(pageNumber, mushafType, abortController.signal);
         
+        if (!mounted) return;
+        
+        // Wait for the font to actually be loaded and ready to render
+        // This prevents FOUC (Flash of Unstyled Content)
+        try {
+          await document.fonts.load(`1em ${fontName}`);
+          console.log(`✅ Font ${fontName} loaded and ready for rendering`);
+        } catch (fontLoadError) {
+          // Font Loading API failed, but CSS is injected - proceed anyway
+          console.warn(`⚠️ Font Loading API failed for ${fontName}, proceeding with CSS fallback`);
+        }
+        
         if (mounted) {
-          console.log(`Font ${fontName} loaded successfully`);
           setFontLoaded(true);
           setLoadError(false);
+          
+          // Preload adjacent pages' fonts in the background (non-blocking)
+          // This makes swiping to nearby pages instant
+          preloadAdjacentFonts(pageNumber, mushafType, 2).catch(() => {
+            // Silently fail - preloading is optional
+          });
         }
       } catch (error: any) {
-        console.error(`Error loading font for page ${pageNumber}:`, error);
+        console.error(`❌ Error loading font for page ${pageNumber}:`, error);
         if (mounted) {
           // If font is not cached and we're offline, show error
           if (error.message === 'FONT_NOT_CACHED_OFFLINE') {
@@ -123,6 +179,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       }
     };
 
+    // Reset fontLoaded to false when page changes
     setFontLoaded(false);
     setLoadError(false);
     loadFont();
@@ -323,7 +380,8 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     );
   }
 
-  // Show loading state
+  // Show loading state until both page data AND font are loaded
+  // This prevents FOUC (Flash of Unstyled Content)
   if (!pageData || !fontLoaded) {
     return (
       <div className={`flex items-center justify-center bg-[#FBF9F4] ${className}`}>
@@ -504,9 +562,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         .surah-icon-wrapper {
           position: relative;
-          width: 120%;
-          margin-left: -1%;
-          margin-right: -1%;
+          width: 100%;
           display: flex;
           justify-content: center;
           align-items: center;
