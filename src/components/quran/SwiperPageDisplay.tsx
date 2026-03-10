@@ -191,6 +191,14 @@ export function SwiperPageDisplay({
     setIsTransitioning(false);
   }, []);
   
+  // Sync Swiper position when initialPage changes (e.g., on app reopen)
+  useEffect(() => {
+    if (swiperRef.current && swiperRef.current.realIndex !== initialPage - 1) {
+      // Navigate to the correct page without animation (0ms) to avoid flashing
+      swiperRef.current.slideTo(initialPage - 1, 0);
+    }
+  }, [initialPage]);
+  
   // Expose navigation method via callback
   useEffect(() => {
     if (swiperRef.current && onSwiperReady) {

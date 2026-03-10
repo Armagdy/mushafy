@@ -29,7 +29,6 @@ import { useQuranData } from '@/hooks/useQuranData';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { getPageImageFilename, getPageSurahInfo, getPageJuzNumber, getJuzFirstPage, getSurahFirstPage, getAyahPage } from '@/lib/quran-mapping';
 import { cn } from '@/lib/utils';
-import { isNativePlatform } from '@/lib/native-storage';
 
 const Surah = () => {
   const { page } = useParams<{ page: string }>();
@@ -572,9 +571,6 @@ const Surah = () => {
       className="w-full h-screen max-h-screen bg-[#FBF9F4] dark:bg-gray-900 flex flex-col overflow-hidden" 
       style={{ height: '100dvh', maxHeight: '100dvh' }}
       onClick={(e) => {
-        // Only toggle fullscreen on native platforms (Android/iOS)
-        if (!isNativePlatform()) return;
-        
         // Don't toggle if clicking on interactive elements
         const target = e.target as HTMLElement;
         const isInteractive = target.closest('button, a, input, select, textarea, [role="button"], [onClick]') !== null;
@@ -699,11 +695,8 @@ const Surah = () => {
           readingBookmarks={readingBookmarks}
           isFullscreen={isFullscreen}
           onImageClick={() => {
-            // Only toggle fullscreen on native platforms (Android/iOS)
-            if (isNativePlatform()) {
-              setIsFullscreen(!isFullscreen);
-              setShowBookmarkTypeSelector(false);
-            }
+            setIsFullscreen(!isFullscreen);
+            setShowBookmarkTypeSelector(false);
           }}
           audioSource={audioSource}
           hasAyahTimings={hasAyahTimings}
@@ -733,11 +726,8 @@ const Surah = () => {
           onScroll={handleScroll}
           isFullscreen={isFullscreen}
           onImageClick={() => {
-            // Only toggle fullscreen on native platforms (Android/iOS)
-            if (isNativePlatform()) {
-              setIsFullscreen(!isFullscreen);
-              setShowBookmarkTypeSelector(false);
-            }
+            setIsFullscreen(!isFullscreen);
+            setShowBookmarkTypeSelector(false);
           }}
           onAyahSelect={(surah: number, ayah: number) => {
             console.log('Ayah selected in TartelPage:', surah, ayah);
