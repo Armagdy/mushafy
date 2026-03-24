@@ -338,6 +338,24 @@ export const getAyahPage = async (surahId: number, ayahNumber: number): Promise<
       }
     }
     
+    // If we didn't find the surah directly, it might be on a shared page
+    // (e.g., Surahs 113 and 114 share page 604 which starts with Surah 112)
+    // Find the page where the surah would be located
+    if (firstPageOfSurah === null) {
+      console.log(`📍 Surah ${surahId} doesn't start on any page directly, looking for shared page...`);
+      
+      // Find the last page that starts with a surah BEFORE the target surah
+      for (let i = quranData.pages.length - 1; i >= 0; i--) {
+        const [pageSurahId] = quranData.pages[i];
+        if (pageSurahId < surahId) {
+          // This page starts with a surah before our target, so our surah must be on this page
+          // (since there's no page that starts with our surah or any surah between)
+          console.log(`✅ Found! Surah ${surahId} Ayah ${ayahNumber} is on page ${i + 1} (shared page starting with surah ${pageSurahId})`);
+          return i + 1;
+        }
+      }
+    }
+    
     console.error('❌ No page found for surah', surahId, 'ayah', ayahNumber);
     return 1;
   } catch (error) {
