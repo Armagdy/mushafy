@@ -367,12 +367,6 @@
   color: #059669 !important; /* emerald-600 */
 }
 
-/* Highlighted ayah in dark mode - softer green highlight */
-.tartel-dark-mode .char-word.ayah-highlighted {
-  background-color: rgba(5, 150, 105, 0.25) !important; /* emerald-600 highlight */
-  border-radius: 2px;
-}
-
 /* Bismillah in dark mode */
 .tartel-dark-mode .bismillah-line {
   color: #F2E3BB !important;

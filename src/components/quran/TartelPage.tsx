@@ -93,6 +93,11 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   const containerRef = useRef<HTMLDivElement>(null);
   const [dynamicLineHeight, setDynamicLineHeight] = useState<number | null>(null);
   
+  // Highlight rectangles for the currently highlighted ayah
+  const [highlightRects, setHighlightRects] = useState<{top: number, left: number, width: number, height: number}[]>([]);
+  // Trigger to force recalculation of highlight positions
+  const [highlightRecalcTrigger, setHighlightRecalcTrigger] = useState(0);
+  
   // Function to remove Arabic diacritics (tashkil)
   const removeTashkil = (text: string): string => {
     // Remove all Arabic diacritical marks (U+064B to U+065F, U+0670, U+06D6 to U+06ED)
@@ -257,6 +262,86 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       window.removeEventListener('resize', calculateLineHeight);
     };
   }, [isFullscreen, pageData, fontLoaded]);
+
+  // Calculate highlight rectangles for the currently highlighted ayah
+  useEffect(() => {
+    // Determine which ayah is highlighted
+    const highlightedVerseKey = hoveredAyah || 
+      (currentPlayingAyah ? `${currentPlayingAyah.surah}:${currentPlayingAyah.ayah}` : null);
+    
+    if (!highlightedVerseKey || !containerRef.current) {
+      setHighlightRects([]);
+      return;
+    }
+    
+    // Use a small delay to ensure layout has settled after fullscreen toggle
+    const calculateRects = () => {
+      if (!containerRef.current) return;
+      
+      // Find all word elements for this ayah
+      const wordElements = containerRef.current.querySelectorAll(`[data-ayah="${highlightedVerseKey}"]`);
+      if (wordElements.length === 0) {
+        setHighlightRects([]);
+        return;
+      }
+      
+      const containerRect = containerRef.current.getBoundingClientRect();
+      
+      // Group words by line (similar top position)
+      const lineGroups: Map<number, Element[]> = new Map();
+      wordElements.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        // Round top to group words on same line (within 5px tolerance)
+        const lineTop = Math.round(rect.top / 5) * 5;
+        if (!lineGroups.has(lineTop)) {
+          lineGroups.set(lineTop, []);
+        }
+        lineGroups.get(lineTop)!.push(el);
+      });
+      
+      // Calculate bounding rect for each line group
+      const rects: {top: number, left: number, width: number, height: number}[] = [];
+      lineGroups.forEach((elements) => {
+        let minLeft = Infinity;
+        let maxRight = -Infinity;
+        let minTop = Infinity;
+        let maxBottom = -Infinity;
+        
+        elements.forEach(el => {
+          const rect = el.getBoundingClientRect();
+          minLeft = Math.min(minLeft, rect.left);
+          maxRight = Math.max(maxRight, rect.right);
+          minTop = Math.min(minTop, rect.top);
+          maxBottom = Math.max(maxBottom, rect.bottom);
+        });
+        
+        // Convert to container-relative coordinates
+        rects.push({
+          top: minTop - containerRect.top,
+          left: minLeft - containerRect.left,
+          width: maxRight - minLeft,
+          height: maxBottom - minTop
+        });
+      });
+      
+      setHighlightRects(rects);
+    };
+    
+    // Small delay to allow layout to settle after fullscreen toggle
+    const timeoutId = setTimeout(calculateRects, 50);
+    return () => clearTimeout(timeoutId);
+  }, [hoveredAyah, currentPlayingAyah, fontLoaded, pageData, isFullscreen, dynamicLineHeight, highlightRecalcTrigger]);
+
+  // Recalculate highlight positions after layout changes (resize)
+  useEffect(() => {
+    const recalculateHighlights = () => {
+      // Trigger recalculation by incrementing the trigger
+      setHighlightRecalcTrigger(prev => prev + 1);
+    };
+    
+    window.addEventListener('resize', recalculateHighlights);
+    return () => window.removeEventListener('resize', recalculateHighlights);
+  }, []);
 
   const handleWordHover = (verseKey: string) => {
     // Only allow hover on non-touch devices (desktop)
@@ -466,24 +551,39 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         direction: 'rtl',
         maxHeight: '100%',
         height: isFullscreen ? '100%' : 'auto',
+        position: 'relative',
       }}
     >
-      <div className={`w-full flex flex-col ${isFullscreen ? 'justify-between flex-1' : 'justify-center'} px-2 sm:px-4 md:px-6 ${isFullscreen ? 'py-0' : 'py-2 sm:py-3 md:py-4'}`} style={{ maxHeight: '100%' }}>
+      {/* Highlight overlay rectangles */}
+      {highlightRects.map((rect, idx) => (
+        <div
+          key={idx}
+          className="ayah-highlight-overlay"
+          style={{
+            position: 'absolute',
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+            backgroundColor: isFullscreenDarkMode ? 'rgba(5, 150, 105, 0.25)' : 'rgba(9, 176, 0, 0.15)',
+            borderRadius: '3px',
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+      ))}
+      <div className={`w-full flex flex-col ${isFullscreen ? 'justify-between flex-1' : 'justify-center'} px-2 sm:px-4 md:px-6 ${isFullscreen ? 'py-0' : 'py-2 sm:py-3 md:py-4'}`} style={{ maxHeight: '100%', position: 'relative', zIndex: 1 }}>
         {pageData.lines.map((line, idx) => (
           <div key={idx} className={`line-container ${isFullscreen ? 'mb-0' : 'mb-0.5 sm:mb-1'}`}>
             {line.line_type === 'ayah' && line.words ? (
               <div className={`line-content ${line.is_centered ? 'text-center' : 'text-center'}`}>
                 {line.words.map((word, widx) => {
                   const isLastWord = word.position === ayahLastWords.get(word.verse_key);
-                  // Highlight if locally hovered OR if it matches the currently selected ayah from parent
-                  const isCurrentlySelected = currentPlayingAyah && 
-                    word.verse_key === `${currentPlayingAyah.surah}:${currentPlayingAyah.ayah}`;
-                  const isHighlighted = hoveredAyah === word.verse_key || isCurrentlySelected;
                   
                   return (
                     <span
                       key={widx}
-                      className={`char-word ${isLastWord ? 'char-end' : ''} ${isHighlighted ? 'ayah-highlighted' : ''}`}
+                      className={`char-word ${isLastWord ? 'char-end' : ''}`}
                       data-ayah={word.verse_key}
                       data-surah={word.surah}
                       data-ayah-num={word.ayah}
@@ -585,13 +685,6 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         .char-word.char-end {
           color: #0a8500;
           font-weight: bold;
-        }
-
-        /* Highlight on hover/touch - keeps inline display for connected background */
-        .char-word.ayah-highlighted {
-          background-color: rgba(9, 176, 0, 0.15);
-          box-decoration-break: clone;
-          -webkit-box-decoration-break: clone;
         }
 
         .surah-header-container {
