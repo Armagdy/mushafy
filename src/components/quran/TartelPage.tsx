@@ -485,7 +485,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         }
 
         .line-content {
-          font-size: min(max(2.5vw, 1.75rem), 2.5rem);
+          font-size: ${mushafType === 'tajweed' ? 'min(max(2.3vw, 1.6rem), 2.3rem)' : 'min(max(2.5vw, 1.75rem), 2.5rem)'};
           line-height: 1.75;
           padding: 0;
           margin: 0;
@@ -498,7 +498,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         @media (min-width: 640px) {
           .line-content {
-            font-size: min(max(2.2vw, 2rem), 2.5rem);
+            font-size: ${mushafType === 'tajweed' ? 'min(max(2vw, 1.85rem), 2.3rem)' : 'min(max(2.2vw, 2rem), 2.5rem)'};
             line-height: 1.85;
           }
         }
@@ -509,7 +509,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           padding: 0;
           transition: none;
           letter-spacing: 0;
-          font-weight: 500;
+          font-weight: ${mushafType === 'tajweed' ? '600' : '500'};
           user-select: none;
           -webkit-user-select: none;
           -moz-user-select: none;
@@ -585,7 +585,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         .surah-name-v4-icon {
           font-family: surah-name-v4;
-          font-size: min(max(7.1vw, 2.47rem), 4.18rem);
+          font-size: min(max(8vw, 2.8rem), 4.5rem);
           color: #065f46;
           line-height: 1;
         }
@@ -598,7 +598,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
             font-size: min(max(12.5vw, 5rem), 7.5rem);
           }
           .surah-name-v4-icon {
-            font-size: min(max(8.75vw, 3.1rem), 5.25rem);
+            font-size: min(max(9.5vw, 3.4rem), 5.6rem);
           }
         }
 
@@ -607,7 +607,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
             font-size: min(max(15vw, 6.25rem), 8.75rem);
           }
           .surah-name-v4-icon {
-            font-size: min(max(10vw, 3.5rem), 6rem);
+            font-size: min(max(11vw, 4rem), 6.5rem);
           }
           
           .surah-header-container {
@@ -629,38 +629,9 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           -ms-user-select: none;
         }
 
-        /* Tajweed mushaf - same font sizes as tarteel for consistent line breaks */
-        ${mushafType === 'tajweed' ? `
-          .quran-icon-surah-header {
-            font-size: min(max(8.75vw, 3.1rem), 5rem);
-          }
-
-          .surah-name-v4-icon {
-            font-size: min(max(6.9vw, 2.25rem), 3.75rem);
-          }
-
-          @media (min-width: 640px) {
-            .quran-icon-surah-header {
-              font-size: min(max(10vw, 3.75rem), 6.25rem);
-            }
-            .surah-name-v4-icon {
-              font-size: min(max(7.5vw, 2.6rem), 4.5rem);
-            }
-          }
-
-          @media (min-width: 768px) {
-            .quran-icon-surah-header {
-              font-size: min(max(12.5vw, 5rem), 7.5rem);
-            }
-            .surah-name-v4-icon {
-              font-size: min(max(8.75vw, 3rem), 5.25rem);
-            }
-          }
-        ` : ''}
-
         @media (min-width: 768px) {
           .line-content {
-            font-size: 2.5rem;
+            font-size: ${mushafType === 'tajweed' ? '2.3rem' : '2.5rem'};
             line-height: 2;
           }
           
@@ -675,13 +646,6 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
             margin: 0;
             line-height: 2;
           }
-
-          /* Tajweed header sizes for larger screens */
-          ${mushafType === 'tajweed' ? `
-            .surah-name-v4-icon {
-              font-size: 4rem;
-            }
-          ` : ''}
         }
       `}</style>
     </div>
