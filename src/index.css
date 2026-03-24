@@ -381,3 +381,18 @@
 .tartel-dark-mode .surah-name-v4-icon {
   color: #F2E3BB !important; /* Same cream color as text */
 }
+
+/* ========================================
+   Tajweed Font Dark Mode (Colored Glyphs)
+   ======================================== */
+/* Tajweed fonts have colored glyphs that CSS color can't override.
+   Use filters to make them visible on dark backgrounds. */
+.tartel-dark-mode.mushaf-tajweed .line-content {
+  filter: invert(0.85) hue-rotate(180deg);
+}
+
+/* Reset filter for surah header and bismillah (they use separate fonts that work with CSS color) */
+.tartel-dark-mode.mushaf-tajweed .surah-header-container,
+.tartel-dark-mode.mushaf-tajweed .bismillah-line {
+  filter: none;
+}

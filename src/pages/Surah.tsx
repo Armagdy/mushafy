@@ -37,7 +37,18 @@ const Surah = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, isRTL, language, setLanguage } = useLanguage();
   const { getMushafPath, mushafType, setMushafType } = useMushaf();
-  const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { isDarkMode, setIsDarkMode, toggleDarkMode } = useDarkMode();
+  
+  // Disable dark mode when using Tajweed mushaf (colored glyphs don't work with dark mode)
+  const isTajweedMushaf = mushafType === 'tajweed';
+  
+  // Auto-disable dark mode when switching to Tajweed mushaf
+  useEffect(() => {
+    if (isTajweedMushaf && isDarkMode) {
+      setIsDarkMode(false);
+    }
+  }, [isTajweedMushaf, isDarkMode, setIsDarkMode]);
+  
   const { toast } = useToast();
   
   // Custom hooks for bookmark and data management
@@ -1017,22 +1028,27 @@ const Surah = () => {
               <BookText className="w-8 h-8" />
             </button>
 
-            {/* Dark/Light Mode Toggle */}
+            {/* Dark/Light Mode Toggle - disabled for Tajweed (colored glyphs) */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setShowBookmarkTypeSelector(false);
-                toggleDarkMode();
+                if (!isTajweedMushaf) {
+                  toggleDarkMode();
+                }
               }}
+              disabled={isTajweedMushaf}
               className={cn(
                 "flex flex-col items-center gap-1",
-                isDarkMode 
-                  ? "text-[#F2E3BB] hover:text-[#FBF9F4]" 
-                  : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
+                isTajweedMushaf
+                  ? "text-gray-400 cursor-not-allowed opacity-50"
+                  : isDarkMode 
+                    ? "text-[#F2E3BB] hover:text-[#FBF9F4]" 
+                    : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
               )}
-              title={isDarkMode ? t('lightMode') : t('darkMode')}
+              title={isTajweedMushaf ? t('darkModeNotAvailableTajweed') : (isDarkMode ? t('lightMode') : t('darkMode'))}
             >
-              {isDarkMode ? (
+              {isDarkMode && !isTajweedMushaf ? (
                 <Sun className="w-8 h-8" />
               ) : (
                 <Moon className="w-8 h-8" />

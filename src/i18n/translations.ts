@@ -272,6 +272,7 @@ export const translations = {
     ayahSelectionNotAvailableForMushaf: 'الرجاء تحديد الآية من منتقي الآيات لهذا المصحف',
     darkMode: 'الوضع الداكن',
     lightMode: 'الوضع الفاتح',
+    darkModeNotAvailableTajweed: 'الوضع الداكن غير متاح مع مصحف التجويد',
   },
   en: {
     appName: 'Mushafy',
@@ -545,6 +546,7 @@ export const translations = {
     ayahSelectionNotAvailableForMushaf: 'Please select ayah from ayah picker for this mushaf',
     darkMode: 'Dark Mode',
     lightMode: 'Light Mode',
+    darkModeNotAvailableTajweed: 'Dark mode not available with Tajweed mushaf',
   },
 };
 
