@@ -2,10 +2,16 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { preloadQuranData } from "./lib/quran-data-service";
+import { loadAllIconFonts } from "./lib/font-cache";
 
 // Preload static Quran data early for better performance
 preloadQuranData().catch(err => {
   console.error('Failed to preload Quran data:', err);
+});
+
+// Load icon fonts (quran-icon, surah-name-v4) - downloads from CDN and caches
+loadAllIconFonts().catch(err => {
+  console.error('Failed to load icon fonts:', err);
 });
 
 // Helper function to pre-cache critical assets after SW is active

@@ -413,7 +413,6 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         maxHeight: '100%',
         height: 'auto',
       }}
-      onClick={onClick}
     >
       <div className="w-full flex flex-col justify-center px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4" style={{ maxHeight: '100%' }}>
         {pageData.lines.map((line, idx) => (
@@ -490,9 +489,10 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           line-height: 1.75;
           padding: 0;
           margin: 0;
-          text-align: center;
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
           letter-spacing: 0;
-          white-space: nowrap;
           overflow: visible;
         }
 
@@ -505,11 +505,11 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         .char-word {
           display: inline;
-          margin: 0 1px;
+          margin: 0;
           padding: 0;
-          cursor: pointer;
           transition: none;
           letter-spacing: 0;
+          font-weight: 500;
           user-select: none;
           -webkit-user-select: none;
           -moz-user-select: none;
@@ -533,36 +533,42 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           font-weight: bold;
         }
 
-        /* Highlight on hover/touch */
+        /* Highlight on hover/touch - keeps inline display for connected background */
         .char-word.ayah-highlighted {
           background-color: rgba(9, 176, 0, 0.15);
-          margin: 0;
-          padding: 0 1px;
-          display: inline-block;
-          vertical-align: baseline;
+          box-decoration-break: clone;
+          -webkit-box-decoration-break: clone;
         }
 
         .surah-header-container {
           padding: 0;
-          margin: 0;
-          line-height: 1.75;
+          margin: 0 auto;
+          line-height: 1.65;
           height: auto;
           display: flex;
           justify-content: center;
           align-items: center;
           width: 100%;
+          max-width: 100%;
+          overflow: hidden;
+          pointer-events: none;
+          user-select: none;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
         }
 
         .quran-icon-surah-header {
           position: relative;
           font-family: quran-icon;
-          font-size: min(max(8vw, 3rem), 5rem);
+          font-size: min(max(9.5vw, 3.56rem), 5.94rem);
           color: #065f46;
           line-height: 1;
           display: flex;
           justify-content: center;
           align-items: center;
-          width: 100%;
+          width: auto;
+          max-width: 100%;
         }
 
         .surah-icon-overlay {
@@ -579,26 +585,29 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         .surah-name-v4-icon {
           font-family: surah-name-v4;
-          font-size: min(max(6vw, 2.1rem), 3.5rem);
+          font-size: min(max(7.1vw, 2.47rem), 4.18rem);
           color: #065f46;
           line-height: 1;
         }
 
         @media (min-width: 640px) {
+          .surah-header-container {
+            line-height: 1.75;
+          }
           .quran-icon-surah-header {
-            font-size: min(max(10vw, 4rem), 6rem);
+            font-size: min(max(12.5vw, 5rem), 7.5rem);
           }
           .surah-name-v4-icon {
-            font-size: min(max(7vw, 2.5rem), 4.2rem);
+            font-size: min(max(8.75vw, 3.1rem), 5.25rem);
           }
         }
 
         @media (min-width: 768px) {
           .quran-icon-surah-header {
-            font-size: min(max(12vw, 5rem), 7rem);
+            font-size: min(max(15vw, 6.25rem), 8.75rem);
           }
           .surah-name-v4-icon {
-            font-size: min(max(8vw, 2.8rem), 4.8rem);
+            font-size: min(max(10vw, 3.5rem), 6rem);
           }
           
           .surah-header-container {
@@ -613,48 +622,39 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           padding: 0;
           margin: 0;
           line-height: 1.75;
+          pointer-events: none;
+          user-select: none;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
         }
 
-        /* Slightly smaller font sizes for tajweed mushaf */
+        /* Tajweed mushaf - same font sizes as tarteel for consistent line breaks */
         ${mushafType === 'tajweed' ? `
-          .line-content {
-            font-size: min(max(2.2vw, 1.55rem), 2.2rem);
-          }
-
-          @media (min-width: 640px) {
-            .line-content {
-              font-size: min(max(2vw, 1.75rem), 2.2rem);
-            }
-          }
-
           .quran-icon-surah-header {
-            font-size: min(max(7vw, 2.5rem), 4rem);
+            font-size: min(max(8.75vw, 3.1rem), 5rem);
           }
 
           .surah-name-v4-icon {
-            font-size: min(max(5.5vw, 1.8rem), 3rem);
+            font-size: min(max(6.9vw, 2.25rem), 3.75rem);
           }
 
           @media (min-width: 640px) {
             .quran-icon-surah-header {
-              font-size: min(max(8vw, 3rem), 5rem);
+              font-size: min(max(10vw, 3.75rem), 6.25rem);
             }
             .surah-name-v4-icon {
-              font-size: min(max(6vw, 2.1rem), 3.6rem);
+              font-size: min(max(7.5vw, 2.6rem), 4.5rem);
             }
           }
 
           @media (min-width: 768px) {
             .quran-icon-surah-header {
-              font-size: min(max(10vw, 4rem), 6rem);
+              font-size: min(max(12.5vw, 5rem), 7.5rem);
             }
             .surah-name-v4-icon {
-              font-size: min(max(7vw, 2.4rem), 4.2rem);
+              font-size: min(max(8.75vw, 3rem), 5.25rem);
             }
-          }
-
-          .bismillah-line {
-            font-size: min(max(1.6vw, 1.25rem), 1.8rem);
           }
         ` : ''}
 
@@ -676,18 +676,10 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
             line-height: 2;
           }
 
-          /* Smaller sizes for tajweed at larger screens */
+          /* Tajweed header sizes for larger screens */
           ${mushafType === 'tajweed' ? `
-            .line-content {
-              font-size: 2.2rem;
-            }
-            
             .surah-name-v4-icon {
-              font-size: 3.2rem;
-            }
-            
-            .bismillah-line {
-              font-size: 1.8rem;
+              font-size: 4rem;
             }
           ` : ''}
         }
