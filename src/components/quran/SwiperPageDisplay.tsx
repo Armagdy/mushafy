@@ -262,6 +262,11 @@ export function SwiperPageDisplay({
     
     const isOddPage = pageNum % 2 !== 0;
     
+    // Dynamic max-height based on fullscreen mode
+    const imageMaxHeight = isFullscreen 
+      ? 'max-h-[calc(100dvh-80px)]'  // More space in fullscreen (only header/footer overlays)
+      : 'max-h-[calc(100dvh-170px)]'; // Normal mode with bars visible
+    
     if (mushafType === 'tarteel' || mushafType === 'tajweed') {
       return (
         <div className="relative">
@@ -276,7 +281,11 @@ export function SwiperPageDisplay({
             onAyahSelect={onAyahSelect}
             currentPlayingAyah={isTransitioning ? null : currentPlayingAyah}
             mushafType={mushafType as 'tarteel' | 'tajweed'}
-            className="max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto mx-auto cursor-pointer"
+            isFullscreen={isFullscreen}
+            className={cn(
+              "max-w-full w-auto h-auto mx-auto cursor-pointer transition-all duration-300 ease-out",
+              imageMaxHeight
+            )}
           />
         </div>
       );
@@ -295,7 +304,10 @@ export function SwiperPageDisplay({
           <CachedImage
             src={`${getMushafPath()}/${getPageImageFilename(pageNum)}`}
             alt={`${t('page')} ${pageNum}`}
-            className="max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain mx-auto cursor-pointer"
+            className={cn(
+              "max-w-full w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300 ease-out",
+              imageMaxHeight
+            )}
             loading="lazy"
             cacheCategory={cacheCategory}
             onClick={(e) => {
@@ -318,6 +330,7 @@ export function SwiperPageDisplay({
     onAyahSelect,
     currentPlayingAyah,
     isTransitioning,
+    isFullscreen,
     handleTouchStart,
     handleTouchMove,
     handleTouchEnd,

@@ -39,6 +39,7 @@ interface TartelPageProps {
   onAyahSelect?: (surah: number, ayah: number) => void;
   currentPlayingAyah?: { surah: number; ayah: number } | null;
   mushafType?: 'tarteel' | 'tajweed';
+  isFullscreen?: boolean;
 }
 
 // Cache for the complete Quran pages data (loaded once, used for all pages)
@@ -81,7 +82,7 @@ const loadQuranPagesData = async (): Promise<QuranData> => {
   return dataLoadingPromise;
 };
 
-const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel' }: TartelPageProps) => {
+const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel', isFullscreen = false }: TartelPageProps) => {
   const { language, t, isRTL } = useLanguage();
   const [pageData, setPageData] = useState<PageData | null>(null);
   // Start with fontLoaded = false - wait for actual font to be ready
@@ -89,6 +90,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   const [loadError, setLoadError] = useState(false);
   const [hoveredAyah, setHoveredAyah] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [dynamicLineHeight, setDynamicLineHeight] = useState<number | null>(null);
   
   // Function to remove Arabic diacritics (tashkil)
   const removeTashkil = (text: string): string => {
@@ -203,6 +205,57 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
   }, [loadError]);
+
+  // Calculate dynamic line-height for fullscreen mode
+  useEffect(() => {
+    // Wait until fontLoaded is true - that's when the content renders and containerRef is populated
+    if (!isFullscreen || !pageData || !fontLoaded || !containerRef.current) {
+      setDynamicLineHeight(null);
+      return;
+    }
+
+    const calculateLineHeight = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      // Get available height, accounting for fullscreen header (~80px) and footer (~100px) overlays
+      const headerHeight = 80;
+      const footerHeight = 100;
+      const availableHeight = window.innerHeight - headerHeight - footerHeight;
+      
+      // Count total lines on this page
+      const totalLines = pageData.lines.length;
+      if (totalLines === 0) return;
+
+      // Get actual computed font size from the first line-content element
+      const lineContentEl = container.querySelector('.line-content');
+      let actualFontSize = 28; // fallback
+      if (lineContentEl) {
+        const computed = window.getComputedStyle(lineContentEl);
+        actualFontSize = parseFloat(computed.fontSize) || 28;
+      }
+      
+      // Calculate line-height needed to fill available space
+      // Total height = totalLines * fontSize * lineHeight
+      // So: lineHeight = availableHeight / (totalLines * fontSize)
+      const calculatedLineHeight = availableHeight / (totalLines * actualFontSize);
+      
+      // Clamp between 1.8 and 6.0 for readability
+      const clampedLineHeight = Math.max(1.8, Math.min(6.0, calculatedLineHeight));
+      
+      setDynamicLineHeight(clampedLineHeight);
+    };
+
+    // Small delay to ensure font is rendered before measuring
+    const timeoutId = setTimeout(calculateLineHeight, 50);
+    
+    // Recalculate on resize
+    window.addEventListener('resize', calculateLineHeight);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', calculateLineHeight);
+    };
+  }, [isFullscreen, pageData, fontLoaded]);
 
   const handleWordHover = (verseKey: string) => {
     // Only allow hover on non-touch devices (desktop)
@@ -406,17 +459,17 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   return (
     <div
       ref={containerRef}
-      className={`tartel-page flex flex-col items-center justify-center bg-transparent ${className}`}
+      className={`tartel-page flex flex-col items-center ${isFullscreen ? 'justify-between' : 'justify-center'} bg-transparent ${className}`}
       style={{ 
         fontFamily: `'p${pageNumber}-${mushafType}', 'Amiri', serif`,
         direction: 'rtl',
         maxHeight: '100%',
-        height: 'auto',
+        height: isFullscreen ? '100%' : 'auto',
       }}
     >
-      <div className="w-full flex flex-col justify-center px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4" style={{ maxHeight: '100%' }}>
+      <div className={`w-full flex flex-col ${isFullscreen ? 'justify-between flex-1' : 'justify-center'} px-2 sm:px-4 md:px-6 ${isFullscreen ? 'py-0' : 'py-2 sm:py-3 md:py-4'}`} style={{ maxHeight: '100%' }}>
         {pageData.lines.map((line, idx) => (
-          <div key={idx} className="line-container mb-0.5 sm:mb-1">
+          <div key={idx} className={`line-container ${isFullscreen ? 'mb-0' : 'mb-0.5 sm:mb-1'}`}>
             {line.line_type === 'ayah' && line.words ? (
               <div className={`line-content ${line.is_centered ? 'text-center' : 'text-center'}`}>
                 {line.words.map((word, widx) => {
@@ -486,7 +539,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         .line-content {
           font-size: ${mushafType === 'tajweed' ? 'min(max(2.3vw, 1.6rem), 2.3rem)' : 'min(max(2.5vw, 1.75rem), 2.5rem)'};
-          line-height: 1.75;
+          line-height: ${dynamicLineHeight || 1.75};
           padding: 0;
           margin: 0;
           display: flex;
@@ -499,7 +552,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         @media (min-width: 640px) {
           .line-content {
             font-size: ${mushafType === 'tajweed' ? 'min(max(2vw, 1.85rem), 2.3rem)' : 'min(max(2.2vw, 2rem), 2.5rem)'};
-            line-height: 1.85;
+            line-height: ${dynamicLineHeight || 1.85};
           }
         }
 
@@ -543,7 +596,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         .surah-header-container {
           padding: 0;
           margin: 0 auto;
-          line-height: 1.65;
+          line-height: ${dynamicLineHeight || 1.65};
           height: auto;
           display: flex;
           justify-content: center;
@@ -592,7 +645,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         @media (min-width: 640px) {
           .surah-header-container {
-            line-height: 1.75;
+            line-height: ${dynamicLineHeight || 1.75};
           }
           .quran-icon-surah-header {
             font-size: min(max(12.5vw, 5rem), 7.5rem);
@@ -621,7 +674,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           font-weight: 600;
           padding: 0;
           margin: 0;
-          line-height: 1.75;
+          line-height: ${dynamicLineHeight || 1.75};
           pointer-events: none;
           user-select: none;
           -webkit-user-select: none;
@@ -632,19 +685,19 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         @media (min-width: 768px) {
           .line-content {
             font-size: ${mushafType === 'tajweed' ? '2.3rem' : '2.5rem'};
-            line-height: 2;
+            line-height: ${dynamicLineHeight || 2};
           }
           
           .surah-header-container {
             padding: 0.75rem 0;
-            line-height: 2;
+            line-height: ${dynamicLineHeight || 2};
           }
           
           .bismillah-line {
             font-size: 2rem;
             padding: 0;
             margin: 0;
-            line-height: 2;
+            line-height: ${dynamicLineHeight || 2};
           }
         }
       `}</style>

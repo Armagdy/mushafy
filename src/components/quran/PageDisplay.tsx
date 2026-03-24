@@ -152,6 +152,11 @@ export function PageDisplay({
     touchStartPosRef.current = null;
   };
 
+  // Dynamic max-height based on fullscreen mode
+  const imageMaxHeight = isFullscreen 
+    ? 'max-h-[calc(100dvh-80px)]'  // More space in fullscreen (only header/footer overlays)
+    : 'max-h-[calc(100dvh-170px)]'; // Normal mode with bars visible
+
   // Helper to render the appropriate page component based on mushaf type
   const renderPage = (pageNum: number) => {
     if (mushafType === 'tarteel' || mushafType === 'tajweed') {
@@ -162,7 +167,8 @@ export function PageDisplay({
           onAyahSelect={onAyahSelect}
           currentPlayingAyah={currentPlayingAyah}
           mushafType={mushafType as 'tarteel' | 'tajweed'}
-          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto mx-auto cursor-pointer"
+          isFullscreen={isFullscreen}
+          className={`relative max-w-full w-auto h-auto mx-auto cursor-pointer transition-all duration-300 ease-out ${imageMaxHeight}`}
         />
       );
     }
@@ -178,7 +184,7 @@ export function PageDisplay({
         <CachedImage
           src={`${getMushafPath()}/${getPageImageFilename(pageNum)}`}
           alt={`${t('page')} ${pageNum}`}
-          className="relative max-w-full max-h-[calc(100dvh-170px)] w-auto h-auto object-contain mx-auto cursor-pointer"
+          className={`relative max-w-full w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300 ease-out ${imageMaxHeight}`}
           loading="lazy"
           cacheCategory={cacheCategory}
           onClick={(e) => {

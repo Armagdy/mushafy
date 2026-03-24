@@ -629,143 +629,191 @@ const Surah = () => {
       />
       </motion.div>
 
-      {/* Main Content Area */}
-      {isFullscreen ? (
-        /* Fullscreen Mode - Absolute positioning to cover full screen */
-        <div className="absolute inset-0 flex flex-col justify-between bg-[#FBF9F4] dark:bg-gray-900 z-[60]">
-          {/* Fullscreen Header - Juz, Surah, Page (fixed to top) */}
-          <div className="flex items-center justify-between pt-12 pb-3 px-6 bg-gradient-to-b from-[#FBF9F4] via-[#FBF9F4]/80 to-transparent dark:from-gray-900 dark:via-gray-900/80 dark:to-transparent">
-            {/* Juz */}
-            <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
-              {t('juz')} {formatNumber(currentJuz)}
-            </div>
-            
-            {/* Ornament separator */}
-            <div className="flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent"></div>
-            
-            {/* Surah Name */}
-            <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
-              {language === 'ar' ? currentSurah.name : currentSurah.englishName}
-            </div>
-            
-            {/* Ornament separator */}
-            <div className="flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent"></div>
-            
-            {/* Page */}
-            <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
-              {t('page')} {formatNumber(currentPageNum)}
-            </div>
-          </div>
+      {/* Main Content Area - Single instance with animated container for smooth fullscreen transition */}
+      
+      {/* Fullscreen Overlay Header - animated in/out */}
+      <motion.div
+        initial={false}
+        animate={{
+          opacity: isFullscreen ? 1 : 0,
+          y: isFullscreen ? 0 : -20,
+        }}
+        transition={{
+          type: 'spring',
+          stiffness: 300,
+          damping: 30,
+        }}
+        className={cn(
+          "absolute top-0 left-0 right-0 z-[65] flex items-center justify-between pt-12 pb-3 px-6 bg-gradient-to-b from-[#FBF9F4] via-[#FBF9F4]/80 to-transparent dark:from-gray-900 dark:via-gray-900/80 dark:to-transparent",
+          !isFullscreen && "pointer-events-none"
+        )}
+      >
+        {/* Juz */}
+        <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
+          {t('juz')} {formatNumber(currentJuz)}
+        </div>
+        
+        {/* Ornament separator */}
+        <div className="flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent"></div>
+        
+        {/* Surah Name */}
+        <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
+          {language === 'ar' ? currentSurah.name : currentSurah.englishName}
+        </div>
+        
+        {/* Ornament separator */}
+        <div className="flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent"></div>
+        
+        {/* Page */}
+        <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
+          {t('page')} {formatNumber(currentPageNum)}
+        </div>
+      </motion.div>
 
-          {/* Fullscreen Content - Surah Image (takes full height between header and footer) */}
-          <div className="flex-1 flex items-center justify-center overflow-hidden">
-            {useSwiperMode ? (
-              <SwiperPageDisplay
-                initialPage={currentPageNum}
-                viewMode={viewMode}
-                isMobile={isMobile}
-                onPageChange={useCallback((pageNum: number) => {
-                  navigate(`/page/${pageNum}`, { replace: true });
-                }, [navigate])}
-                onAyahSelect={(surah: number, ayah: number) => {
-                  console.log('Ayah selected in TartelPage:', surah, ayah);
-                  
-                  // Check if MP3Quran reciter without ayah timing is selected
-                  if (audioSource === 'mp3quran' && !hasAyahTimings) {
-                    toast({
-                      title: t('cannotSelectAyahWithReciter'),
-                      description: t('pleaseChooseAnotherReciter'),
-                      variant: 'destructive',
-                    });
-                    return;
-                  }
-                  
-                  setCurrentSurahId(surah);
-                  setCurrentPageAyah(ayah);
-                  setCurrentPlayingAyah({ surah, ayah });
-                  
-                  // If audio is currently playing, start playing the newly selected ayah
-                  if (isPlaying) {
-                    console.log('Audio is playing - starting newly selected ayah:', surah, ayah);
-                    playAyah(surah, ayah);
-                  }
-                }}
-                currentPlayingAyah={currentPlayingAyah}
-                bookmarks={bookmarks}
-                memorizationBookmarks={memorizationBookmarks}
-                readingBookmarks={readingBookmarks}
-                isFullscreen={isFullscreen}
-                onImageClick={() => {
-                  setIsFullscreen(!isFullscreen);
-                  setShowBookmarkTypeSelector(false);
-                }}
-                audioSource={audioSource}
-                hasAyahTimings={hasAyahTimings}
-                onLongPressNotification={() => {
-                  setFlashAyahPickerIcon(true);
-                  setTimeout(() => setFlashAyahPickerIcon(false), 3000);
-                }}
-                onSwiperReady={useCallback((navFunc: (page: number) => void) => {
-                  setNavigateToPage(() => navFunc);
-                }, [])}
-              />
-            ) : (
-              <PageDisplay
-                currentPageNum={currentPageNum}
-                secondPageNum={secondPageNum}
-                leftPageNum={leftPageNum}
-                rightPageNum={rightPageNum}
-                viewMode={viewMode}
-                isMobile={isMobile}
-                bookmarks={bookmarks}
-                memorizationBookmarks={memorizationBookmarks}
-                readingBookmarks={readingBookmarks}
-                pagesToLoad={pagesToLoad}
-                scrollContainerRef={scrollContainerRef}
-                onPreviousPage={handlePreviousPage}
-                onNextPage={handleNextPage}
-                onScroll={handleScroll}
-                isFullscreen={isFullscreen}
-                onImageClick={() => {
-                  setIsFullscreen(!isFullscreen);
-                  setShowBookmarkTypeSelector(false);
-                }}
-                onAyahSelect={(surah: number, ayah: number) => {
-                  console.log('Ayah selected in TartelPage:', surah, ayah);
-                  
-                  // Check if MP3Quran reciter without ayah timing is selected
-                  if (audioSource === 'mp3quran' && !hasAyahTimings) {
-                    toast({
-                      title: t('cannotSelectAyahWithReciter'),
-                      description: t('pleaseChooseAnotherReciter'),
-                      variant: 'destructive',
-                    });
-                    return;
-                  }
-                  
-                  setCurrentSurahId(surah);
-                  setCurrentPageAyah(ayah);
-                  setCurrentPlayingAyah({ surah, ayah });
-                  
-                  // If audio is currently playing, start playing the newly selected ayah
-                  if (isPlaying) {
-                    console.log('Audio is playing - starting newly selected ayah:', surah, ayah);
-                    playAyah(surah, ayah);
-                  }
-                }}
-                currentPlayingAyah={currentPlayingAyah}
-                onLongPressNotification={() => {
-                  setFlashAyahPickerIcon(true);
-                  setTimeout(() => setFlashAyahPickerIcon(false), 3000);
-                }}
-                audioSource={audioSource}
-                hasAyahTimings={hasAyahTimings}
-              />
-            )}
-          </div>
+      {/* Page Display Container - Always rendered, animates between normal and fullscreen */}
+      <motion.div
+        initial={false}
+        animate={{
+          position: isFullscreen ? 'absolute' : 'relative',
+          inset: isFullscreen ? 0 : 'auto',
+          zIndex: isFullscreen ? 60 : 'auto',
+        }}
+        transition={{
+          type: 'spring',
+          stiffness: 300,
+          damping: 30,
+        }}
+        className={cn(
+          "flex-1 flex items-center justify-center overflow-hidden bg-[#FBF9F4] dark:bg-gray-900",
+          isFullscreen && "absolute inset-0 z-[60]"
+        )}
+        style={{
+          // Smooth transition for layout properties that can't be animated with framer-motion
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        {useSwiperMode ? (
+          <SwiperPageDisplay
+            initialPage={currentPageNum}
+            viewMode={viewMode}
+            isMobile={isMobile}
+            onPageChange={useCallback((pageNum: number) => {
+              navigate(`/page/${pageNum}`, { replace: true });
+            }, [navigate])}
+            onAyahSelect={(surah: number, ayah: number) => {
+              console.log('Ayah selected in TartelPage:', surah, ayah);
+              
+              // Check if MP3Quran reciter without ayah timing is selected
+              if (audioSource === 'mp3quran' && !hasAyahTimings) {
+                toast({
+                  title: t('cannotSelectAyahWithReciter'),
+                  description: t('pleaseChooseAnotherReciter'),
+                  variant: 'destructive',
+                });
+                return;
+              }
+              
+              setCurrentSurahId(surah);
+              setCurrentPageAyah(ayah);
+              setCurrentPlayingAyah({ surah, ayah });
+              
+              // If audio is currently playing, start playing the newly selected ayah
+              if (isPlaying) {
+                console.log('Audio is playing - starting newly selected ayah:', surah, ayah);
+                playAyah(surah, ayah);
+              }
+            }}
+            currentPlayingAyah={currentPlayingAyah}
+            bookmarks={bookmarks}
+            memorizationBookmarks={memorizationBookmarks}
+            readingBookmarks={readingBookmarks}
+            isFullscreen={isFullscreen}
+            onImageClick={() => {
+              setIsFullscreen(!isFullscreen);
+              setShowBookmarkTypeSelector(false);
+            }}
+            audioSource={audioSource}
+            hasAyahTimings={hasAyahTimings}
+            onLongPressNotification={() => {
+              setFlashAyahPickerIcon(true);
+              setTimeout(() => setFlashAyahPickerIcon(false), 3000);
+            }}
+            onSwiperReady={useCallback((navFunc: (page: number) => void) => {
+              setNavigateToPage(() => navFunc);
+            }, [])}
+          />
+        ) : (
+          <PageDisplay
+            currentPageNum={currentPageNum}
+            secondPageNum={secondPageNum}
+            leftPageNum={leftPageNum}
+            rightPageNum={rightPageNum}
+            viewMode={viewMode}
+            isMobile={isMobile}
+            bookmarks={bookmarks}
+            memorizationBookmarks={memorizationBookmarks}
+            readingBookmarks={readingBookmarks}
+            pagesToLoad={pagesToLoad}
+            scrollContainerRef={scrollContainerRef}
+            onPreviousPage={handlePreviousPage}
+            onNextPage={handleNextPage}
+            onScroll={handleScroll}
+            isFullscreen={isFullscreen}
+            onImageClick={() => {
+              setIsFullscreen(!isFullscreen);
+              setShowBookmarkTypeSelector(false);
+            }}
+            onAyahSelect={(surah: number, ayah: number) => {
+              console.log('Ayah selected in TartelPage:', surah, ayah);
+              
+              // Check if MP3Quran reciter without ayah timing is selected
+              if (audioSource === 'mp3quran' && !hasAyahTimings) {
+                toast({
+                  title: t('cannotSelectAyahWithReciter'),
+                  description: t('pleaseChooseAnotherReciter'),
+                  variant: 'destructive',
+                });
+                return;
+              }
+              
+              setCurrentSurahId(surah);
+              setCurrentPageAyah(ayah);
+              setCurrentPlayingAyah({ surah, ayah });
+              
+              // If audio is currently playing, start playing the newly selected ayah
+              if (isPlaying) {
+                console.log('Audio is playing - starting newly selected ayah:', surah, ayah);
+                playAyah(surah, ayah);
+              }
+            }}
+            currentPlayingAyah={currentPlayingAyah}
+            onLongPressNotification={() => {
+              setFlashAyahPickerIcon(true);
+              setTimeout(() => setFlashAyahPickerIcon(false), 3000);
+            }}
+            audioSource={audioSource}
+            hasAyahTimings={hasAyahTimings}
+          />
+        )}
+      </motion.div>
 
-          {/* Fullscreen Footer - Quick Action Buttons (fixed to bottom) */}
-          <div className="relative z-[65] flex items-center justify-center gap-8 py-4 px-6 pb-16 bg-gradient-to-t from-[#FBF9F4] via-[#FBF9F4]/80 to-transparent dark:from-gray-900 dark:via-gray-900/80 dark:to-transparent">
+      {/* Fullscreen Footer - Quick Action Buttons (animated in/out) */}
+      <motion.div
+        initial={false}
+        animate={{
+          opacity: isFullscreen ? 1 : 0,
+          y: isFullscreen ? 0 : 20,
+        }}
+        transition={{
+          type: 'spring',
+          stiffness: 300,
+          damping: 30,
+        }}
+        className={cn(
+          "absolute bottom-0 left-0 right-0 z-[65] flex items-center justify-center gap-8 py-4 px-6 pb-16 bg-gradient-to-t from-[#FBF9F4] via-[#FBF9F4]/80 to-transparent dark:from-gray-900 dark:via-gray-900/80 dark:to-transparent",
+          !isFullscreen && "pointer-events-none"
+        )}
+      >
             {/* Bookmark Button */}
             <div className="relative">
               <button
@@ -935,113 +983,7 @@ const Surah = () => {
             >
               <BookText className="w-8 h-8" />
             </button>
-          </div>
-        </div>
-      ) : (
-        /* Normal Mode - Original Page Display */
-        useSwiperMode ? (
-        <SwiperPageDisplay
-          initialPage={currentPageNum}
-          viewMode={viewMode}
-          isMobile={isMobile}
-          onPageChange={useCallback((pageNum: number) => {
-            navigate(`/page/${pageNum}`, { replace: true });
-          }, [navigate])}
-          onAyahSelect={(surah: number, ayah: number) => {
-            console.log('Ayah selected in TartelPage:', surah, ayah);
-            
-            // Check if MP3Quran reciter without ayah timing is selected
-            if (audioSource === 'mp3quran' && !hasAyahTimings) {
-              toast({
-                title: t('cannotSelectAyahWithReciter'),
-                description: t('pleaseChooseAnotherReciter'),
-                variant: 'destructive',
-              });
-              return;
-            }
-            
-            setCurrentSurahId(surah);
-            setCurrentPageAyah(ayah);
-            setCurrentPlayingAyah({ surah, ayah });
-            
-            // If audio is currently playing, start playing the newly selected ayah
-            if (isPlaying) {
-              console.log('Audio is playing - starting newly selected ayah:', surah, ayah);
-              playAyah(surah, ayah);
-            }
-          }}
-          currentPlayingAyah={currentPlayingAyah}
-          bookmarks={bookmarks}
-          memorizationBookmarks={memorizationBookmarks}
-          readingBookmarks={readingBookmarks}
-          isFullscreen={isFullscreen}
-          onImageClick={() => {
-            setIsFullscreen(!isFullscreen);
-            setShowBookmarkTypeSelector(false);
-          }}
-          audioSource={audioSource}
-          hasAyahTimings={hasAyahTimings}
-          onLongPressNotification={() => {
-            setFlashAyahPickerIcon(true);
-            setTimeout(() => setFlashAyahPickerIcon(false), 3000);
-          }}
-          onSwiperReady={useCallback((navFunc: (page: number) => void) => {
-            setNavigateToPage(() => navFunc);
-          }, [])}
-        />
-      ) : (
-        <PageDisplay
-          currentPageNum={currentPageNum}
-          secondPageNum={secondPageNum}
-          leftPageNum={leftPageNum}
-          rightPageNum={rightPageNum}
-          viewMode={viewMode}
-          isMobile={isMobile}
-          bookmarks={bookmarks}
-          memorizationBookmarks={memorizationBookmarks}
-          readingBookmarks={readingBookmarks}
-          pagesToLoad={pagesToLoad}
-          scrollContainerRef={scrollContainerRef}
-          onPreviousPage={handlePreviousPage}
-          onNextPage={handleNextPage}
-          onScroll={handleScroll}
-          isFullscreen={isFullscreen}
-          onImageClick={() => {
-            setIsFullscreen(!isFullscreen);
-            setShowBookmarkTypeSelector(false);
-          }}
-          onAyahSelect={(surah: number, ayah: number) => {
-            console.log('Ayah selected in TartelPage:', surah, ayah);
-            
-            // Check if MP3Quran reciter without ayah timing is selected
-            if (audioSource === 'mp3quran' && !hasAyahTimings) {
-              toast({
-                title: t('cannotSelectAyahWithReciter'),
-                description: t('pleaseChooseAnotherReciter'),
-                variant: 'destructive',
-              });
-              return;
-            }
-            
-            setCurrentSurahId(surah);
-            setCurrentPageAyah(ayah);
-            setCurrentPlayingAyah({ surah, ayah });
-            
-            // If audio is currently playing, start playing the newly selected ayah
-            if (isPlaying) {
-              console.log('Audio is playing - starting newly selected ayah:', surah, ayah);
-              playAyah(surah, ayah);
-            }
-          }}
-          currentPlayingAyah={currentPlayingAyah}
-          onLongPressNotification={() => {
-            setFlashAyahPickerIcon(true);
-            setTimeout(() => setFlashAyahPickerIcon(false), 3000);
-          }}
-          audioSource={audioSource}
-          hasAyahTimings={hasAyahTimings}
-        />
-      ))}
+          </motion.div>
 
       {/* Preloading indicator overlay */}
       {isPreloadingAyahs && (
