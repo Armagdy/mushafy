@@ -1,0 +1,103 @@
+# Font Resources for Mushafy Quran App
+
+## Google Fonts (CDN)
+All loaded via Google Fonts API in index.css
+
+### Arabic Fonts
+- **Amiri** (400, 700) - Primary Arabic text font
+  https://fonts.google.com/specimen/Amiri
+
+- **Noto Naskh Arabic** (400, 500, 600, 700) - Secondary Arabic font
+  https://fonts.google.com/specimen/Noto+Naskh+Arabic
+
+- **Aref Ruqaa** (400, 700) - Decorative Arabic font
+  https://fonts.google.com/specimen/Aref+Ruqaa
+
+- **Scheherazade New** (400, 500, 600, 700) - Traditional Arabic script
+  https://fonts.google.com/specimen/Scheherazade+New
+
+### Latin Fonts
+- **Playfair Display** (400, 500, 600, 700) - Display/heading font
+  https://fonts.google.com/specimen/Playfair+Display
+
+- **Inter** (300, 400, 500, 600) - Body text font
+  https://fonts.google.com/specimen/Inter
+
+---
+
+## Local Fonts
+
+### Khat e Sulas
+- Location: /alfont_com_ArbFONTS-Khat-e-Sulas-Shipped.ttf
+- Source: https://www.arabicfonts.net/
+- Usage: Decorative Arabic calligraphy
+
+### Quran Icon Font (quran-icon)
+- Location: /assets/fonts/quran-icon/quran-common.woff2
+- Original Source: https://static-cdn.tarteel.ai/qul/fonts/common/quran-common.woff2
+- Provider: Tarteel AI (https://tarteel.ai)
+- Usage: Icon font for surah header decorative frame
+- Ligature: "header" renders decorative surah header frame
+
+### Surah Name Font (surah-name-v4)
+- Location: /assets/fonts/surah-name-v4/surah-name-v4.woff2
+- Also available: surah-name-v2.woff2
+- Original Source: https://static-cdn.tarteel.ai/qul/fonts/surah-names/
+- Provider: Tarteel AI (https://tarteel.ai)
+- Usage: Icon font for Arabic surah names
+- Ligature: "surah001" to "surah114" renders respective surah name icons
+
+### Surah Header Font
+- Location: /assets/fonts/surah-header/surah-header.woff2
+- Source: Tarteel AI
+- Usage: Alternative surah header decorations
+
+### QPC V2 Font (Quran Page Fonts)
+- Location: /assets/fonts/qpc_v2_font/
+- Files: p1.woff to p604.woff (604 files, one per Quran page)
+- Source: https://quran.com / Quran.com API
+- Usage: Page-specific Quran text fonts for Uthmani script rendering
+- Each page has its own font file optimized for that page's glyphs
+
+### QPC V4 Font (Quran Page Fonts Version 4)
+- Location: /assets/fonts/qpc_v4_font/
+- Files: p1.woff to p604.woff (604 files, one per Quran page)
+- Source: https://quran.com / Quran.com API
+- Usage: Updated version of page-specific Quran fonts
+- Improvements: Better glyph rendering and Tajweed color support
+
+---
+
+## Font Usage in Application
+
+| Font Family      | CSS Variable        | Primary Use                    |
+|------------------|---------------------|--------------------------------|
+| Amiri            | --font-arabic       | Quran text, Arabic UI          |
+| Noto Naskh Arabic| --font-arabic       | Fallback Arabic font           |
+| Playfair Display | --font-display      | Headings, titles               |
+| Inter            | --font-body         | Body text, UI elements         |
+| quran-icon       | quran-icon          | Surah header decorations       |
+| surah-name-v4    | surah-name-v4       | Surah name icons               |
+| QPC fonts        | Dynamic per page    | Quran page rendering           |
+
+---
+
+## Attribution & Licenses
+
+- **Google Fonts**: Open Font License (OFL) - Free for commercial use
+- **Tarteel AI fonts**: Used with permission for Quran applications
+- **QPC fonts**: Provided by Quran.com for Quran rendering
+- **Arabic Fonts**: Various licenses - check individual font sources
+
+---
+
+## CDN/Download Links
+
+### Tarteel CDN
+- Base URL: https://static-cdn.tarteel.ai/qul/fonts/
+- quran-common: /common/quran-common.woff2
+- surah-names: /surah-names/surah-name-v4.woff2
+
+### Quran.com CDN
+- Page fonts: https://api.quran.com/v4/fonts/
+- Documentation: https://api-docs.quran.com/

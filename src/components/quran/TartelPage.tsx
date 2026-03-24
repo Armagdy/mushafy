@@ -447,22 +447,15 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
                 })}
               </div>
             ) : line.line_type === 'surah_name' ? (
-              // Surah name decorative header with icon and text overlay
+              // Surah name decorative header with icon fonts
               <div className="surah-header-container text-center">
-                <div className="surah-icon-wrapper">
-                  <img 
-                    src="/surahicon.png" 
-                    alt={line.surah_number && surahs[line.surah_number - 1] 
-                      ? `سُورَةُ ${surahs[line.surah_number - 1].name}`
-                      : 'Surah Header'}
-                    className="surah-icon"
-                    loading="lazy"
-                  />
-                  <span className="surah-name-overlay">
-                    {line.surah_number && surahs[line.surah_number - 1] 
-                      ? removeTashkil(`سورة ${surahs[line.surah_number - 1].name}`)
-                      : ''}
-                  </span>
+                <div className="quran-icon-surah-header">
+                  header
+                  <div className="surah-icon-overlay">
+                    <span className="surah-name-v4-icon">
+                      {`surah${String(line.surah_number || 1).padStart(3, '0')}`}
+                    </span>
+                  </div>
                 </div>
               </div>
             ) : line.line_type === 'basmallah' ? (
@@ -560,45 +553,52 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           width: 100%;
         }
 
-        .surah-icon-wrapper {
+        .quran-icon-surah-header {
           position: relative;
-          width: 100%;
+          font-family: quran-icon;
+          font-size: min(max(8vw, 3rem), 5rem);
+          color: #065f46;
+          line-height: 1;
           display: flex;
           justify-content: center;
           align-items: center;
-        }
-
-        .surah-icon {
           width: 100%;
-          height: auto;
-          display: block;
         }
 
-        .surah-name-overlay {
+        .surah-icon-overlay {
           position: absolute;
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
-          font-family: 'Scheherazade New', 'Amiri Quran', 'Amiri', 'Traditional Arabic', 'Noto Naskh Arabic', serif;
-          font-size: min(max(2vw, 1.4rem), 2rem);
-          font-weight: 700;
-          color: #065f46;
-          white-space: nowrap;
-          text-shadow: 0 0 4px rgba(255, 255, 255, 0.9), 0 1px 2px rgba(255, 255, 255, 0.7);
+          display: flex;
+          align-items: center;
+          justify-content: center;
           pointer-events: none;
           z-index: 1;
-          letter-spacing: 0.02em;
+        }
+
+        .surah-name-v4-icon {
+          font-family: surah-name-v4;
+          font-size: min(max(6vw, 2.1rem), 3.5rem);
+          color: #065f46;
+          line-height: 1;
         }
 
         @media (min-width: 640px) {
-          .surah-name-overlay {
-            font-size: min(max(2.2vw, 1.6rem), 2.2rem);
+          .quran-icon-surah-header {
+            font-size: min(max(10vw, 4rem), 6rem);
+          }
+          .surah-name-v4-icon {
+            font-size: min(max(7vw, 2.5rem), 4.2rem);
           }
         }
 
         @media (min-width: 768px) {
-          .surah-name-overlay {
-            font-size: min(max(2.5vw, 1.8rem), 2.5rem);
+          .quran-icon-surah-header {
+            font-size: min(max(12vw, 5rem), 7rem);
+          }
+          .surah-name-v4-icon {
+            font-size: min(max(8vw, 2.8rem), 4.8rem);
           }
           
           .surah-header-container {
@@ -627,19 +627,29 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
             }
           }
 
-          .surah-name-overlay {
-            font-size: min(max(1.8vw, 1.25rem), 1.8rem);
+          .quran-icon-surah-header {
+            font-size: min(max(7vw, 2.5rem), 4rem);
+          }
+
+          .surah-name-v4-icon {
+            font-size: min(max(5.5vw, 1.8rem), 3rem);
           }
 
           @media (min-width: 640px) {
-            .surah-name-overlay {
-              font-size: min(max(2vw, 1.45rem), 2rem);
+            .quran-icon-surah-header {
+              font-size: min(max(8vw, 3rem), 5rem);
+            }
+            .surah-name-v4-icon {
+              font-size: min(max(6vw, 2.1rem), 3.6rem);
             }
           }
 
           @media (min-width: 768px) {
-            .surah-name-overlay {
-              font-size: min(max(2.2vw, 1.6rem), 2.2rem);
+            .quran-icon-surah-header {
+              font-size: min(max(10vw, 4rem), 6rem);
+            }
+            .surah-name-v4-icon {
+              font-size: min(max(7vw, 2.4rem), 4.2rem);
             }
           }
 
@@ -672,8 +682,8 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
               font-size: 2.2rem;
             }
             
-            .surah-name-overlay {
-              font-size: 2.2rem;
+            .surah-name-v4-icon {
+              font-size: 3.2rem;
             }
             
             .bismillah-line {
