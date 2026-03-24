@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, BookText, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, BookText, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat, Sun, Moon } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { surahs } from '@/data/surahs';
@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useMushaf, type MushafType } from '@/contexts/MushafContext';
+import { useDarkMode } from '@/contexts/DarkModeContext';
 import { useToast } from '@/hooks/use-toast';
 import { useBookmarks } from '@/hooks/useBookmarks';
 import { useQuranData } from '@/hooks/useQuranData';
@@ -36,6 +37,7 @@ const Surah = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, isRTL, language, setLanguage } = useLanguage();
   const { getMushafPath, mushafType, setMushafType } = useMushaf();
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const { toast } = useToast();
   
   // Custom hooks for bookmark and data management
@@ -645,27 +647,43 @@ const Surah = () => {
         }}
         className={cn(
           "absolute top-0 left-0 right-0 z-[65] flex items-center justify-between pt-12 pb-3 px-6 bg-gradient-to-b from-[#FBF9F4] via-[#FBF9F4]/80 to-transparent dark:from-gray-900 dark:via-gray-900/80 dark:to-transparent",
-          !isFullscreen && "pointer-events-none"
+          !isFullscreen && "pointer-events-none",
+          isDarkMode && "from-black via-black/80 to-transparent"
         )}
       >
         {/* Juz */}
-        <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
+        <div className={cn(
+          "text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold",
+          isDarkMode && "text-[#F2E3BB]"
+        )}>
           {t('juz')} {formatNumber(currentJuz)}
         </div>
         
         {/* Ornament separator */}
-        <div className="flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent"></div>
+        <div className={cn(
+          "flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent",
+          isDarkMode && "via-[#F2E3BB]/50"
+        )}></div>
         
         {/* Surah Name */}
-        <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
+        <div className={cn(
+          "text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold",
+          isDarkMode && "text-[#F2E3BB]"
+        )}>
           {language === 'ar' ? currentSurah.name : currentSurah.englishName}
         </div>
         
         {/* Ornament separator */}
-        <div className="flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent"></div>
+        <div className={cn(
+          "flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent",
+          isDarkMode && "via-[#F2E3BB]/50"
+        )}></div>
         
         {/* Page */}
-        <div className="text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold">
+        <div className={cn(
+          "text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold",
+          isDarkMode && "text-[#F2E3BB]"
+        )}>
           {t('page')} {formatNumber(currentPageNum)}
         </div>
       </motion.div>
@@ -685,11 +703,12 @@ const Surah = () => {
         }}
         className={cn(
           "flex-1 flex items-center justify-center overflow-hidden bg-[#FBF9F4] dark:bg-gray-900",
-          isFullscreen && "absolute inset-0 z-[60]"
+          isFullscreen && "absolute inset-0 z-[60]",
+          isDarkMode && "bg-black"
         )}
         style={{
-          // Smooth transition for layout properties that can't be animated with framer-motion
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          // Smooth transition for layout properties only, NOT background-color
+          transition: 'position 0.3s cubic-bezier(0.4, 0, 0.2, 1), inset 0.3s cubic-bezier(0.4, 0, 0.2, 1), z-index 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         {useSwiperMode ? (
@@ -728,6 +747,7 @@ const Surah = () => {
             memorizationBookmarks={memorizationBookmarks}
             readingBookmarks={readingBookmarks}
             isFullscreen={isFullscreen}
+            isFullscreenDarkMode={isDarkMode}
             onImageClick={() => {
               setIsFullscreen(!isFullscreen);
               setShowBookmarkTypeSelector(false);
@@ -810,7 +830,10 @@ const Surah = () => {
           damping: 30,
         }}
         className={cn(
-          "absolute bottom-0 left-0 right-0 z-[65] flex items-center justify-center gap-8 py-4 px-6 pb-16 bg-gradient-to-t from-[#FBF9F4] via-[#FBF9F4]/80 to-transparent dark:from-gray-900 dark:via-gray-900/80 dark:to-transparent",
+          "absolute bottom-0 left-0 right-0 z-[65] flex items-center justify-center gap-8 py-4 px-6 pb-16",
+          isDarkMode 
+            ? "bg-gradient-to-t from-black via-black/80 to-transparent" 
+            : "bg-gradient-to-t from-[#FBF9F4] via-[#FBF9F4]/80 to-transparent dark:from-gray-900 dark:via-gray-900/80 dark:to-transparent",
           !isFullscreen && "pointer-events-none"
         )}
       >
@@ -821,7 +844,12 @@ const Surah = () => {
                   e.stopPropagation();
                   setShowBookmarkTypeSelector(!showBookmarkTypeSelector);
                 }}
-                className="flex flex-col items-center gap-1 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors"
+                className={cn(
+                  "flex flex-col items-center gap-1",
+                  isDarkMode 
+                    ? "text-[#F2E3BB] hover:text-[#FBF9F4]" 
+                    : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
+                )}
               >
                 <Bookmark className="w-8 h-8" />
               </button>
@@ -979,9 +1007,36 @@ const Surah = () => {
                 }
                 setConfigOverlayType('tafseer');
               }}
-              className="flex flex-col items-center gap-1 text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors"
+              className={cn(
+                "flex flex-col items-center gap-1",
+                isDarkMode 
+                  ? "text-[#F2E3BB] hover:text-[#FBF9F4]" 
+                  : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
+              )}
             >
               <BookText className="w-8 h-8" />
+            </button>
+
+            {/* Dark/Light Mode Toggle */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowBookmarkTypeSelector(false);
+                toggleDarkMode();
+              }}
+              className={cn(
+                "flex flex-col items-center gap-1",
+                isDarkMode 
+                  ? "text-[#F2E3BB] hover:text-[#FBF9F4]" 
+                  : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
+              )}
+              title={isDarkMode ? t('lightMode') : t('darkMode')}
+            >
+              {isDarkMode ? (
+                <Sun className="w-8 h-8" />
+              ) : (
+                <Moon className="w-8 h-8" />
+              )}
             </button>
           </motion.div>
 

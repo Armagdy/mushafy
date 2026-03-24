@@ -339,3 +339,51 @@
   opacity: 0;
   pointer-events: none;
 }
+
+/* Swiper fullscreen dark mode */
+.swiper-fullscreen-dark,
+.swiper-fullscreen-dark .swiper-wrapper,
+.swiper-fullscreen-dark .swiper-slide,
+.swiper-fullscreen-dark .swiper-slide > div {
+  background-color: #000000 !important;
+}
+
+/* ========================================
+   Fullscreen Dark Mode Styles
+   ======================================== */
+
+/* Dark mode for TartelPage (text-based Quran display) */
+.tartel-dark-mode {
+  color: #F2E3BB !important; /* Cream/beige text */
+  background-color: #000000 !important; /* Black background */
+}
+
+.tartel-dark-mode .char-word {
+  color: #F2E3BB !important; /* Cream/beige for all words */
+}
+
+/* Verse end marker (last word of ayah) in dark mode - emerald-600 */
+.tartel-dark-mode .char-word.char-end {
+  color: #059669 !important; /* emerald-600 */
+}
+
+/* Highlighted ayah in dark mode - softer green highlight */
+.tartel-dark-mode .char-word.ayah-highlighted {
+  background-color: rgba(5, 150, 105, 0.25) !important; /* emerald-600 highlight */
+  border-radius: 2px;
+}
+
+/* Bismillah in dark mode */
+.tartel-dark-mode .bismillah-line {
+  color: #F2E3BB !important;
+}
+
+/* Surah header decoration in dark mode - emerald-600 */
+.tartel-dark-mode .quran-icon-surah-header {
+  color: #059669 !important; /* emerald-600 */
+}
+
+/* Surah name in dark mode - same as text */
+.tartel-dark-mode .surah-name-v4-icon {
+  color: #F2E3BB !important; /* Same cream color as text */
+}

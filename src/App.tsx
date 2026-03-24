@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { MushafProvider } from "@/contexts/MushafContext";
 import { DialogTextSizeProvider } from "@/contexts/DialogTextSizeContext";
 import { DownloadProvider } from "@/contexts/DownloadContext";
+import { DarkModeProvider } from "@/contexts/DarkModeContext";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { useAppKeepAwake } from "@/hooks/useAppKeepAwake";
 import Index from "./pages/Index";
@@ -46,9 +47,11 @@ const App = () => (
     <LanguageProvider>
       <MushafProvider>
         <DialogTextSizeProvider>
-          <DownloadProvider>
-            <AppContent />
-          </DownloadProvider>
+          <DarkModeProvider>
+            <DownloadProvider>
+              <AppContent />
+            </DownloadProvider>
+          </DarkModeProvider>
         </DialogTextSizeProvider>
       </MushafProvider>
     </LanguageProvider>

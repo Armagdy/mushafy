@@ -40,6 +40,7 @@ interface TartelPageProps {
   currentPlayingAyah?: { surah: number; ayah: number } | null;
   mushafType?: 'tarteel' | 'tajweed';
   isFullscreen?: boolean;
+  isFullscreenDarkMode?: boolean;
 }
 
 // Cache for the complete Quran pages data (loaded once, used for all pages)
@@ -82,7 +83,7 @@ const loadQuranPagesData = async (): Promise<QuranData> => {
   return dataLoadingPromise;
 };
 
-const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel', isFullscreen = false }: TartelPageProps) => {
+const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel', isFullscreen = false, isFullscreenDarkMode = false }: TartelPageProps) => {
   const { language, t, isRTL } = useLanguage();
   const [pageData, setPageData] = useState<PageData | null>(null);
   // Start with fontLoaded = false - wait for actual font to be ready
@@ -459,7 +460,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   return (
     <div
       ref={containerRef}
-      className={`tartel-page flex flex-col items-center ${isFullscreen ? 'justify-between' : 'justify-center'} bg-transparent ${className}`}
+      className={`tartel-page flex flex-col items-center ${isFullscreen ? 'justify-between' : 'justify-center'} bg-transparent ${isFullscreenDarkMode ? 'tartel-dark-mode' : ''} ${className}`}
       style={{ 
         fontFamily: `'p${pageNumber}-${mushafType}', 'Amiri', serif`,
         direction: 'rtl',

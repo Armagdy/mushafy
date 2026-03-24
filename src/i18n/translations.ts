@@ -268,6 +268,8 @@ export const translations = {
     back: 'رجوع',
     navigation: 'التنقل',
     ayahSelectionNotAvailableForMushaf: 'الرجاء تحديد الآية من منتقي الآيات لهذا المصحف',
+    darkMode: 'الوضع الداكن',
+    lightMode: 'الوضع الفاتح',
   },
   en: {
     appName: 'Mushafy',
@@ -537,6 +539,8 @@ export const translations = {
     back: 'Back',
     navigation: 'Navigation',
     ayahSelectionNotAvailableForMushaf: 'Please select ayah from ayah picker for this mushaf',
+    darkMode: 'Dark Mode',
+    lightMode: 'Light Mode',
   },
 };
 

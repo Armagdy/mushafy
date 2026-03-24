@@ -26,6 +26,7 @@ interface SwiperPageDisplayProps {
   memorizationBookmarks: number[];
   readingBookmarks: number[];
   isFullscreen: boolean;
+  isFullscreenDarkMode?: boolean;
   onImageClick: () => void;
   audioSource?: 'everyayah' | 'mp3quran';
   hasAyahTimings?: boolean;
@@ -44,6 +45,7 @@ export function SwiperPageDisplay({
   memorizationBookmarks,
   readingBookmarks,
   isFullscreen,
+  isFullscreenDarkMode = false,
   onImageClick,
   audioSource = 'everyayah',
   hasAyahTimings = true,
@@ -282,6 +284,7 @@ export function SwiperPageDisplay({
             currentPlayingAyah={isTransitioning ? null : currentPlayingAyah}
             mushafType={mushafType as 'tarteel' | 'tajweed'}
             isFullscreen={isFullscreen}
+            isFullscreenDarkMode={isFullscreenDarkMode}
             className={cn(
               "max-w-full w-auto h-auto mx-auto cursor-pointer transition-all duration-300 ease-out",
               imageMaxHeight
@@ -306,7 +309,8 @@ export function SwiperPageDisplay({
             alt={`${t('page')} ${pageNum}`}
             className={cn(
               "max-w-full w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300 ease-out",
-              imageMaxHeight
+              imageMaxHeight,
+              isFullscreenDarkMode && "invert sepia-[0.2] brightness-[0.85]"
             )}
             loading="lazy"
             cacheCategory={cacheCategory}
@@ -331,6 +335,7 @@ export function SwiperPageDisplay({
     currentPlayingAyah,
     isTransitioning,
     isFullscreen,
+    isFullscreenDarkMode,
     handleTouchStart,
     handleTouchMove,
     handleTouchEnd,
@@ -372,7 +377,8 @@ export function SwiperPageDisplay({
         watchSlidesProgress={true}
         className={cn(
           'w-full h-full max-w-7xl',
-          isFullscreen && 'swiper-fullscreen'
+          isFullscreen && 'swiper-fullscreen',
+          isFullscreenDarkMode && 'swiper-fullscreen-dark'
         )}
         style={{
           '--swiper-navigation-size': '28px',

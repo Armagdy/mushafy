@@ -1,8 +1,9 @@
 import React from "react";
 import { Switch } from "@/components/ui/switch";
-import { Book, Menu } from "lucide-react";
+import { Book, Menu, Moon } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
+import { useDarkMode } from "@/contexts/DarkModeContext";
 import { cn } from "@/lib/utils";
 
 interface StyleSettingsProps {
@@ -22,6 +23,7 @@ export function StyleSettings({
 }: StyleSettingsProps) {
   const { t, isRTL } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
+  const { isDarkMode, setIsDarkMode } = useDarkMode();
   
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
 
@@ -62,6 +64,22 @@ export function StyleSettings({
               onShowBottomBarTextChange(checked);
               localStorage.setItem('quran-show-bottom-bar-text', String(checked));
             }}
+          />
+        </div>
+      </div>
+
+      {/* Dark Mode Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Moon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
+            {t('darkMode')}
+          </span>
+        </div>
+        <div dir="ltr">
+          <Switch
+            checked={isDarkMode}
+            onCheckedChange={setIsDarkMode}
           />
         </div>
       </div>
