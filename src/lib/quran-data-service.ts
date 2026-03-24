@@ -278,6 +278,42 @@ export const getFaviconUrl = async (): Promise<string> => {
 };
 
 /**
+ * Get ayah text from local cached data
+ * Returns Arabic and English text for a specific ayah
+ */
+export const getAyahText = async (surahNumber: number, ayahNumber: number): Promise<{ ar: string; en: string } | null> => {
+  try {
+    const ayahData = await getAyahMetaData();
+    if (!ayahData || !Array.isArray(ayahData)) {
+      console.warn('Ayah metadata not available');
+      return null;
+    }
+
+    // Find the surah (array is 0-indexed, surah numbers are 1-indexed)
+    const surah = ayahData.find((s: any) => s.number === surahNumber);
+    if (!surah || !surah.verses) {
+      console.warn(`Surah ${surahNumber} not found in ayah metadata`);
+      return null;
+    }
+
+    // Find the ayah (verse numbers are 1-indexed)
+    const verse = surah.verses.find((v: any) => v.number === ayahNumber);
+    if (!verse || !verse.text) {
+      console.warn(`Ayah ${ayahNumber} not found in surah ${surahNumber}`);
+      return null;
+    }
+
+    return {
+      ar: verse.text.ar || '',
+      en: verse.text.en || ''
+    };
+  } catch (error) {
+    console.error('Failed to get ayah text:', error);
+    return null;
+  }
+};
+
+/**
  * Clear all cached data and in-flight promises
  * Useful for testing or force reload scenarios
  */

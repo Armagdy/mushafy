@@ -7,6 +7,7 @@ import { useTafseer } from "@/hooks/useTafseer";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { surahs } from "@/data/surahs";
+import { getAyahText } from "@/lib/quran-data-service";
 
 /**
  * Tafseer View Component
@@ -97,7 +98,7 @@ export default function TafseerView() {
     setShowAyahPicker(false);
   };
 
-  // Fetch ayah text from Quran.com API - defer to avoid blocking render
+  // Fetch ayah text from local cached data
   useEffect(() => {
     if (currentSurahNumber && currentAyahNumber) {
       // Defer fetch to next tick to allow view to render first
@@ -105,25 +106,19 @@ export default function TafseerView() {
         setIsLoadingAyah(true);
         setAyahText(""); // Reset ayah text
         
-        // Use Quran.com API to get verse text
-        fetch(`https://api.quran.com/api/v4/verses/by_key/${currentSurahNumber}:${currentAyahNumber}?fields=text_uthmani`)
-          .then(res => {
-            if (!res.ok) {
-              throw new Error(`HTTP error! status: ${res.status}`);
-            }
-            return res.json();
-          })
+        // Use local cached ayah data
+        getAyahText(currentSurahNumber, currentAyahNumber)
           .then(data => {
-            if (data && data.verse && data.verse.text_uthmani) {
-              console.log('Ayah text loaded from Quran.com API:', data.verse.text_uthmani);
-              setAyahText(data.verse.text_uthmani);
+            if (data && data.ar) {
+              console.log('Ayah text loaded from local cache');
+              setAyahText(data.ar);
             } else {
-              console.warn('Verse text not found in response');
+              console.warn('Verse text not found in local data');
             }
             setIsLoadingAyah(false);
           })
           .catch(err => {
-            console.error('Failed to load ayah text from Quran.com API:', err);
+            console.error('Failed to load ayah text from local cache:', err);
             setIsLoadingAyah(false);
           });
       }, 0);

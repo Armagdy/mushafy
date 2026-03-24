@@ -5,11 +5,13 @@ import { getPageImageFilename } from '@/lib/quran-mapping';
 import { getSurahAudioUrl } from '@/lib/mp3quran-service';
 import { IMAGES_BASE_URL } from '@/config/assets';
 import { cacheFont, isFontCached } from '@/lib/font-cache';
+import { fetchAndCacheTafseer, isTafseerCached } from '@/lib/tafseer-cache';
+import { surahs } from '@/data/surahs';
 import type { Mp3QuranMoshaf } from '@/lib/mp3quran-service';
 
 export interface DownloadJob {
   id: string;
-  type: 'pages' | 'everyayah' | 'mp3quran';
+  type: 'pages' | 'everyayah' | 'mp3quran' | 'tafseer';
   status: 'idle' | 'downloading' | 'completed' | 'cancelled' | 'error';
   progress: {
     current: number;
@@ -31,6 +33,9 @@ export interface DownloadJob {
     moshaf?: Mp3QuranMoshaf;
     fromSurah?: number;
     toSurah?: number;
+    // Tafseer params
+    tafseerId?: number;
+    tafseerName?: string;
   };
   error?: string;
   startedAt?: Date;
@@ -134,6 +139,10 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
         });
       } else if (job.type === 'mp3quran') {
         await downloadMp3Quran(job, signal, (progress) => {
+          setActiveDownload(prev => prev ? { ...prev, progress } : null);
+        });
+      } else if (job.type === 'tafseer') {
+        await downloadTafseer(job, signal, (progress) => {
           setActiveDownload(prev => prev ? { ...prev, progress } : null);
         });
       }
@@ -377,6 +386,66 @@ async function downloadMp3Quran(
     signal,
     (current, totalCount) => onProgress({ current: current + cachedCount, total: total }),
     5 // 5 concurrent downloads (increased from 3)
+  );
+}
+
+async function downloadTafseer(
+  job: DownloadJob,
+  signal: AbortSignal,
+  onProgress: (progress: { current: number; total: number }) => void
+) {
+  const { tafseerId, tafseerName, fromSurah, toSurah } = job.params;
+  if (!tafseerId || !tafseerName || fromSurah === undefined || toSurah === undefined) {
+    throw new Error('Invalid Tafseer download parameters');
+  }
+
+  // Build list of all ayahs to download
+  interface AyahToDownload {
+    surahNum: number;
+    ayahNum: number;
+  }
+  
+  const ayahsToDownload: AyahToDownload[] = [];
+  for (let surahNum = fromSurah; surahNum <= toSurah; surahNum++) {
+    const surah = surahs.find(s => s.id === surahNum);
+    if (surah) {
+      for (let ayahNum = 1; ayahNum <= surah.numberOfAyahs; ayahNum++) {
+        ayahsToDownload.push({ surahNum, ayahNum });
+      }
+    }
+  }
+
+  const total = ayahsToDownload.length;
+  onProgress({ current: 0, total });
+
+  console.log(`[Download] Starting tafseer download for ${total} ayahs (surahs ${fromSurah}-${toSurah})`);
+
+  // Pre-filter: Check which ayahs are already cached (in parallel batches)
+  console.log(`[Download] Checking ${total} ayahs for existing tafseer cache...`);
+  const cacheChecks = await Promise.all(
+    ayahsToDownload.map(async (ayah) => {
+      const cached = await isTafseerCached(tafseerId, ayah.surahNum, ayah.ayahNum);
+      return { ...ayah, cached };
+    })
+  );
+
+  const uncachedAyahs = cacheChecks.filter(a => !a.cached);
+  const cachedCount = total - uncachedAyahs.length;
+
+  if (cachedCount > 0) {
+    console.log(`[Download] ✓ ${cachedCount} ayahs already cached, downloading ${uncachedAyahs.length} tafseer entries`);
+  }
+
+  // Download only uncached tafseer in parallel (8 at a time - API rate limiting consideration)
+  await downloadInParallel(
+    uncachedAyahs,
+    async (item, sig) => {
+      await fetchAndCacheTafseer(tafseerId, tafseerName, item.surahNum, item.ayahNum, sig);
+      return true;
+    },
+    signal,
+    (current, totalCount) => onProgress({ current: current + cachedCount, total: total }),
+    8 // 8 concurrent downloads
   );
 }
 

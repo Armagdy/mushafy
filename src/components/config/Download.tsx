@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { HardDriveDownload, Search, WifiOff, StopCircle, CheckCircle2, XCircle, Pencil } from "lucide-react";
+import { HardDriveDownload, Search, WifiOff, StopCircle, CheckCircle2, XCircle, Pencil, BookOpen } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { MushafType } from "@/contexts/MushafContext";
@@ -11,6 +11,7 @@ import { getMp3QuranReciters, type Mp3QuranReciter, type Mp3QuranMoshaf } from "
 import { useNetwork } from "@/hooks/useNetwork";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { useTafseer, type TafseerInfo } from "@/hooks/useTafseer";
 
 interface Reciter {
   folder: string;
@@ -45,11 +46,12 @@ export function Download() {
   const { toast } = useToast();
   const { dialogTextSize } = useDialogTextSize();
   const { activeDownload, startDownload, cancelDownload, clearDownload } = useDownload();
+  const { tafseers } = useTafseer();
   
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   
   // Download state
-  const [downloadType, setDownloadType] = useState<'pages' | 'everyayah' | 'mp3quran'>('pages');
+  const [downloadType, setDownloadType] = useState<'pages' | 'everyayah' | 'mp3quran' | 'tafseer'>('pages');
   const [downloadMushafType, setDownloadMushafType] = useState<MushafType>('mwdoa');
   const [downloadFromPage, setDownloadFromPage] = useState(1);
   const [downloadToPage, setDownloadToPage] = useState(604);
@@ -68,6 +70,13 @@ export function Download() {
   const [mp3QuranRecitersAr, setMp3QuranRecitersAr] = useState<Mp3QuranReciter[]>([]);
   const [selectedMp3QuranReciter, setSelectedMp3QuranReciter] = useState<number | null>(null);
   const [selectedMoshaf, setSelectedMoshaf] = useState<Mp3QuranMoshaf | null>(null);
+  
+  // Tafseer state for downloads
+  const [selectedDownloadTafseer, setSelectedDownloadTafseer] = useState<TafseerInfo | null>(null);
+  const [showTafseerScroll, setShowTafseerScroll] = useState(true);
+  const [tafseerSearch, setTafseerSearch] = useState('');
+  const tafseerSearchInputRef = useRef<HTMLInputElement>(null);
+  const selectedTafseerRef = useRef<HTMLButtonElement>(null);
   
   // Unified reciter selection
   const [selectedUnifiedReciter, setSelectedUnifiedReciter] = useState<UnifiedReciter | null>(null);
@@ -107,6 +116,27 @@ export function Download() {
     
     return () => clearInterval(intervalId);
   }, [reciterSearch]);
+  
+  // 50ms polling for tafseer search input (fixes Android Arabic keyboard IME issues)
+  useEffect(() => {
+    const checkTafseerSearchInput = () => {
+      const inputEl = tafseerSearchInputRef.current;
+      if (!inputEl) return;
+      
+      const currentValue = inputEl.value;
+      if (currentValue !== tafseerSearch) {
+        setTafseerSearch(currentValue);
+      }
+    };
+    
+    // Check immediately
+    checkTafseerSearchInput();
+    
+    // Poll every 50ms
+    const intervalId = setInterval(checkTafseerSearchInput, 50);
+    
+    return () => clearInterval(intervalId);
+  }, [tafseerSearch]);
   
   // Normalize Arabic text for search
   const normalizeArabic = (text: string): string => {
@@ -222,6 +252,9 @@ export function Download() {
     } else if (downloadType === 'mp3quran') {
       // Need unified reciter selected and it must be MP3Quran source
       return selectedUnifiedReciter !== null && selectedUnifiedReciter.source === 'mp3quran' && selectedMoshaf !== null;
+    } else if (downloadType === 'tafseer') {
+      // Need tafseer selected
+      return selectedDownloadTafseer !== null;
     }
     return false;
   })();
@@ -388,6 +421,18 @@ export function Download() {
           toSurah: downloadToSurah,
         },
       });
+    } else if (downloadType === 'tafseer') {
+      if (!selectedDownloadTafseer) return;
+      
+      await startDownload({
+        type: 'tafseer',
+        params: {
+          tafseerId: selectedDownloadTafseer.id,
+          tafseerName: selectedDownloadTafseer.name,
+          fromSurah: downloadFromSurah,
+          toSurah: downloadToSurah,
+        },
+      });
     }
   };
 
@@ -466,6 +511,21 @@ export function Download() {
                 {t('downloadMp3QuranAudio')}
               </span>
             </button>
+            <button
+              onClick={() => {
+                setDownloadType('tafseer');
+                setShowDownloadTypeScroll(false);
+              }}
+              className={cn(
+                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-right",
+                downloadType === 'tafseer' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                textSizeClasses.text
+              )}
+            >
+              <span className="text-emerald-800 dark:text-emerald-200">
+                {t('downloadTafseer')}
+              </span>
+            </button>
           </div>
         ) : (
           <button
@@ -479,6 +539,7 @@ export function Download() {
               {downloadType === 'pages' && t('downloadMushafPages')}
               {downloadType === 'everyayah' && t('downloadEveryAyahAudio')}
               {downloadType === 'mp3quran' && t('downloadMp3QuranAudio')}
+              {downloadType === 'tafseer' && t('downloadTafseer')}
             </span>
             <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
           </button>
@@ -1061,6 +1122,180 @@ export function Download() {
                         onClick={() => {
                           setDownloadFromSurah(surah.id);
                           // Auto-adjust toSurah if it's now less than fromSurah
+                          if (downloadToSurah < surah.id) {
+                            setDownloadToSurah(surah.id);
+                          }
+                        }}
+                        className={cn(
+                          "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
+                          downloadFromSurah === surah.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                          textSizeClasses.text
+                        )}
+                      >
+                        <span className="text-emerald-800 dark:text-emerald-200">
+                          {surah.id}. {isRTL ? surah.name : surah.englishName}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* To Surah Column */}
+                  <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    {surahs.filter(surah => surah.id >= downloadFromSurah).map((surah) => (
+                      <button
+                        key={surah.id}
+                        onClick={() => setDownloadToSurah(surah.id)}
+                        className={cn(
+                          "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
+                          downloadToSurah === surah.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                          textSizeClasses.text
+                        )}
+                      >
+                        <span className="text-emerald-800 dark:text-emerald-200">
+                          {surah.id}. {isRTL ? surah.name : surah.englishName}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ) : null}
+        </div>
+      )}
+      
+      {/* Tafseer Download Options */}
+      {downloadType === 'tafseer' && (
+        <div className="flex flex-col gap-3">
+          {showTafseerScroll ? (
+            /* Tafseer Selection Phase */
+            <>
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('tafseer')}</label>
+              </div>
+              {/* Search input */}
+              <div className="relative">
+                <Search className={cn(
+                  'absolute top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 dark:text-emerald-400',
+                  isRTL ? 'right-3' : 'left-3'
+                )} />
+                <input
+                  ref={tafseerSearchInputRef}
+                  type="text"
+                  placeholder={t('searchTafseer')}
+                  className={cn(
+                    'w-full h-9 rounded-md border border-emerald-300 bg-transparent px-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
+                    isRTL ? 'pr-9 text-right' : 'pl-9 text-left',
+                    textSizeClasses.text
+                  )}
+                />
+              </div>
+
+              {/* Tafseer scrollable list */}
+              <div className="overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-48" style={{ WebkitOverflowScrolling: 'touch' }}>
+                {tafseers
+                  .filter(tafseer => {
+                    if (!tafseerSearch) return true;
+                    const searchLower = tafseerSearch.toLowerCase();
+                    return (
+                      tafseer.name.toLowerCase().includes(searchLower) ||
+                      tafseer.author.toLowerCase().includes(searchLower) ||
+                      tafseer.book_name.toLowerCase().includes(searchLower)
+                    );
+                  })
+                  .map((tafseer, index) => (
+                    <button
+                      key={tafseer.id}
+                      ref={selectedDownloadTafseer?.id === tafseer.id ? selectedTafseerRef : null}
+                      onClick={() => {
+                        setSelectedDownloadTafseer(tafseer);
+                        setShowTafseerScroll(false);
+                      }}
+                      className={cn(
+                        'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
+                        'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
+                        selectedDownloadTafseer?.id === tafseer.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+                        textSizeClasses.text,
+                        isRTL ? 'text-right' : 'text-left'
+                      )}
+                    >
+                      <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+                        <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
+                        <span className="flex-1 text-emerald-800 dark:text-emerald-200">
+                          {tafseer.name}
+                        </span>
+                        <span className={cn(
+                          'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+                          tafseer.language === 'ar'
+                            ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                            : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+                        )}>
+                          {tafseer.language === 'ar' ? 'عربي' : 'EN'}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            </>
+          ) : selectedDownloadTafseer ? (
+            /* Tafseer Selected - Show selected item and surah range */
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col gap-3"
+            >
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('tafseer')}</label>
+              </div>
+              <button
+                onClick={() => setShowTafseerScroll(true)}
+                title={t('searchTafseer')}
+                className={cn(
+                  'w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-500/20 dark:bg-emerald-500/20 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
+                  isRTL ? 'flex-row-reverse' : 'flex-row'
+                )}
+              >
+                <span className="flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-right">
+                  {selectedDownloadTafseer.name}
+                </span>
+                <span className={cn(
+                  'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+                  selectedDownloadTafseer.language === 'ar'
+                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                    : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+                )}>
+                  {selectedDownloadTafseer.language === 'ar' ? 'عربي' : 'EN'}
+                </span>
+                <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              </button>
+              
+              {/* From/To Surah - Side by Side Scrollable Columns */}
+              <div className="flex flex-col">
+                {/* Column Headers */}
+                <div className="flex gap-2 mb-2">
+                  <div className="flex-1 text-center">
+                    <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+                      {t('fromSurah')}
+                    </h3>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+                      {t('toSurah')}
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Scrollable Columns */}
+                <div className="flex gap-2 max-h-40">
+                  {/* From Surah Column */}
+                  <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    {surahs.map((surah) => (
+                      <button
+                        key={surah.id}
+                        onClick={() => {
+                          setDownloadFromSurah(surah.id);
                           if (downloadToSurah < surah.id) {
                             setDownloadToSurah(surah.id);
                           }

@@ -183,3 +183,107 @@ export const clearTafseerCache = async (): Promise<void> => {
     console.error('Error clearing tafseer cache:', error);
   }
 };
+
+/**
+ * Check if tafseer is cached for a specific ayah
+ */
+export const isTafseerCached = async (
+  tafseerId: number,
+  surahNumber: number,
+  ayahNumber: number
+): Promise<boolean> => {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    
+    const key = getCacheKey(tafseerId, surahNumber, ayahNumber);
+    const request = store.get(key);
+    
+    const result = await new Promise<CachedTafseer | undefined>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    
+    db.close();
+    return result !== undefined;
+  } catch (error) {
+    console.error('Error checking tafseer cache:', error);
+    return false;
+  }
+};
+
+// Quran.com API base URL
+const QURAN_COM_API_BASE = 'https://api.quran.com/api/v4';
+
+/**
+ * Fetch and cache tafseer for a specific ayah from API
+ */
+export const fetchAndCacheTafseer = async (
+  tafseerId: number,
+  tafseerName: string,
+  surahNumber: number,
+  ayahNumber: number,
+  signal?: AbortSignal
+): Promise<boolean> => {
+  try {
+    // Check if already cached
+    const cached = await isTafseerCached(tafseerId, surahNumber, ayahNumber);
+    if (cached) {
+      return true; // Already cached, skip
+    }
+    
+    // Fetch from Quran.com API
+    const response = await fetch(
+      `${QURAN_COM_API_BASE}/tafsirs/${tafseerId}/by_ayah/${surahNumber}:${ayahNumber}`,
+      { signal }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Strip HTML tags from the text
+    const cleanText = data.tafsir?.text?.replace(/<[^>]*>/g, '') || '';
+    
+    if (cleanText) {
+      await cacheTafseer(tafseerId, tafseerName, surahNumber, ayahNumber, cleanText);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error; // Re-throw abort errors
+    }
+    console.error(`Error fetching tafseer for ${surahNumber}:${ayahNumber}:`, error);
+    return false;
+  }
+};
+
+/**
+ * Get count of cached tafseer entries for a specific tafseer
+ */
+export const getCachedTafseerCount = async (tafseerId: number): Promise<number> => {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const index = store.index('tafseer_id');
+    
+    const countRequest = index.count(IDBKeyRange.only(tafseerId));
+    
+    const count = await new Promise<number>((resolve, reject) => {
+      countRequest.onsuccess = () => resolve(countRequest.result);
+      countRequest.onerror = () => reject(countRequest.error);
+    });
+    
+    db.close();
+    return count;
+  } catch (error) {
+    console.error('Error getting cached tafseer count:', error);
+    return 0;
+  }
+};
