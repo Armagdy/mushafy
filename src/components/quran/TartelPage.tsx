@@ -93,10 +93,31 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   const containerRef = useRef<HTMLDivElement>(null);
   const [dynamicLineHeight, setDynamicLineHeight] = useState<number | null>(null);
   
+  // Track fullscreen state changes for smooth transitions
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const prevFullscreenRef = useRef(isFullscreen);
+  
   // Highlight rectangles for the currently highlighted ayah
   const [highlightRects, setHighlightRects] = useState<{top: number, left: number, width: number, height: number}[]>([]);
   // Trigger to force recalculation of highlight positions
   const [highlightRecalcTrigger, setHighlightRecalcTrigger] = useState(0);
+  
+  // Handle fullscreen transition timing
+  useEffect(() => {
+    if (prevFullscreenRef.current !== isFullscreen) {
+      setIsTransitioning(true);
+      prevFullscreenRef.current = isFullscreen;
+      
+      // Clear transitioning state after animation completes
+      const timer = setTimeout(() => {
+        setIsTransitioning(false);
+        // Trigger highlight recalculation after transition
+        setHighlightRecalcTrigger(prev => prev + 1);
+      }, 350); // Match the CSS transition duration
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isFullscreen]);
   
   // Function to remove Arabic diacritics (tashkil)
   const removeTashkil = (text: string): string => {
@@ -545,13 +566,14 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   return (
     <div
       ref={containerRef}
-      className={`tartel-page flex flex-col items-center ${isFullscreen ? 'justify-between' : 'justify-center'} bg-transparent ${isFullscreenDarkMode ? 'tartel-dark-mode' : ''} ${className}`}
+      className={`tartel-page tartel-page-transition flex flex-col items-center bg-transparent ${isFullscreenDarkMode ? 'tartel-dark-mode' : ''} ${isTransitioning ? 'tartel-transitioning' : ''} ${className}`}
       style={{ 
         fontFamily: `'p${pageNumber}-${mushafType}', 'Amiri', serif`,
         direction: 'rtl',
         maxHeight: '100%',
         height: isFullscreen ? '100%' : 'auto',
         position: 'relative',
+        justifyContent: isFullscreen ? 'space-between' : 'center',
       }}
     >
       {/* Highlight overlay rectangles */}
@@ -572,9 +594,20 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           }}
         />
       ))}
-      <div className={`w-full flex flex-col ${isFullscreen ? 'justify-between flex-1' : 'justify-center'} px-2 sm:px-4 md:px-6 ${isFullscreen ? 'py-0' : 'py-2 sm:py-3 md:py-4'}`} style={{ maxHeight: '100%', position: 'relative', zIndex: 1 }}>
+      <div 
+        className={`tartel-content-wrapper w-full flex flex-col px-2 sm:px-4 md:px-6`} 
+        style={{ 
+          maxHeight: '100%', 
+          position: 'relative', 
+          zIndex: 1,
+          flex: isFullscreen ? '1' : 'none',
+          justifyContent: isFullscreen ? 'space-between' : 'center',
+          paddingTop: isFullscreen ? '0' : undefined,
+          paddingBottom: isFullscreen ? '0' : undefined,
+        }}
+      >
         {pageData.lines.map((line, idx) => (
-          <div key={idx} className={`line-container ${isFullscreen ? 'mb-0' : 'mb-0.5 sm:mb-1'}`}>
+          <div key={idx} className="line-container">
             {line.line_type === 'ayah' && line.words ? (
               <div className={`line-content ${line.is_centered ? 'text-center' : 'text-center'}`}>
                 {line.words.map((word, widx) => {
@@ -629,6 +662,27 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           -webkit-font-kerning: none;
           font-feature-settings: normal;
           -webkit-font-feature-settings: normal;
+        }
+        
+        /* Smooth fullscreen transition styles */
+        .tartel-page-transition {
+          transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                      justify-content 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+          will-change: height, justify-content;
+        }
+        
+        .tartel-content-wrapper {
+          transition: flex 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                      justify-content 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                      padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+          will-change: flex, justify-content, padding;
+        }
+        
+        /* While transitioning, ensure smooth line-height changes */
+        .tartel-transitioning .line-content,
+        .tartel-transitioning .surah-header-container,
+        .tartel-transitioning .bismillah-line {
+          transition: line-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .line-container {

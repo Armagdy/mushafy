@@ -156,6 +156,10 @@
     background-color: #ffffff;
   }
 
+  html.dark, html.dark body {
+    background-color: #000000;
+  }
+
   body {
     background-color: #ffffff;
     @apply text-foreground;
@@ -340,7 +344,15 @@
   pointer-events: none;
 }
 
-/* Swiper fullscreen dark mode */
+/* Swiper fullscreen light mode - explicit backgrounds */
+.swiper-fullscreen,
+.swiper-fullscreen .swiper-wrapper,
+.swiper-fullscreen .swiper-slide,
+.swiper-fullscreen .swiper-slide > div {
+  background-color: #FBF9F4 !important;
+}
+
+/* Swiper fullscreen dark mode - overrides light mode */
 .swiper-fullscreen-dark,
 .swiper-fullscreen-dark .swiper-wrapper,
 .swiper-fullscreen-dark .swiper-slide,

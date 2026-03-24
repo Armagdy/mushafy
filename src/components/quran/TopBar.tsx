@@ -1,4 +1,6 @@
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useDarkMode } from '@/contexts/DarkModeContext';
+import { cn } from '@/lib/utils';
 
 interface TopBarProps {
   currentSurah: {
@@ -28,14 +30,22 @@ export function TopBar({
   onJuzClick,
 }: TopBarProps) {
   const { t, isRTL, language } = useLanguage();
+  const { isDarkMode } = useDarkMode();
 
   return (
-    <div className="w-full flex justify-center bg-gradient-to-b from-emerald-800 to-emerald-600 pt-8">
+    <div className={cn(
+      "w-full flex justify-center pt-8",
+      isDarkMode 
+        ? "bg-emerald-950" 
+        : "bg-gradient-to-b from-emerald-800 to-emerald-600"
+    )}>
       <header className="w-full max-w-[1600px]">
         {/* Main Header */}
         <div className="relative">
-          {/* Subtle background gradient */}
-          <div className="absolute inset-0 bg-gradient-to-b from-emerald-700/20 to-transparent pointer-events-none" />
+          {/* Subtle background gradient - only in light mode */}
+          {!isDarkMode && (
+            <div className="absolute inset-0 bg-gradient-to-b from-emerald-700/20 to-transparent pointer-events-none" />
+          )}
           
           {/* Content */}
           <div className="relative px-4 md:px-8 pt-2.5 pb-1.5 md:pt-3 md:pb-2 flex items-center justify-between gap-2" style={{ direction: 'ltr' }}>

@@ -1,4 +1,5 @@
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useDarkMode } from "@/contexts/DarkModeContext";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -159,6 +160,7 @@ export default function ConfigOverlay({
   onSeekToAyahPosition,
 }: ConfigOverlayProps) {
   const { t, language, isRTL } = useLanguage();
+  const { isDarkMode } = useDarkMode();
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Get bookmarks data
@@ -381,11 +383,16 @@ export default function ConfigOverlay({
     <>
       {/* Content (header + main view) */}
       <div
-        className="fixed inset-0 z-[100] flex flex-col bg-[#FBF9F4] dark:bg-emerald-950"
+        className="fixed inset-0 z-[100] flex flex-col bg-[#FBF9F4] dark:bg-black"
       >
         {/* Header with close button */}
         <div 
-          className="sticky top-0 z-10 bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-lg pt-6"
+          className={cn(
+            "sticky top-0 z-10 shadow-lg pt-6",
+            isDarkMode 
+              ? "bg-emerald-950" 
+              : "bg-gradient-to-b from-emerald-800 to-emerald-600"
+          )}
         >
           <div className="flex items-center justify-between px-4 py-3">
             <Button
@@ -418,7 +425,12 @@ export default function ConfigOverlay({
       </div>
 
       {/* Bottom Navigation Bar - Fixed, doesn't slide */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-emerald-800 to-emerald-600 z-[101] pt-2">
+      <div className={cn(
+        "fixed bottom-0 left-0 right-0 z-[101] pt-2",
+        isDarkMode 
+          ? "bg-emerald-950" 
+          : "bg-gradient-to-t from-emerald-800 to-emerald-600"
+      )}>
         <BottomBar
           showBottomBarText={showBottomBarText}
           totalBookmarks={getTotalBookmarks()}

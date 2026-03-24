@@ -261,7 +261,7 @@ export default function SettingsView() {
   };
   
   return (
-    <div className="h-full overflow-hidden bg-[#FBF9F4]">
+    <div className="h-full overflow-hidden bg-[#FBF9F4] dark:bg-black">
       {activeCategory === null ? (
         /* Show categories list */
         <div className="h-full overflow-y-auto">
@@ -271,7 +271,7 @@ export default function SettingsView() {
         /* Show category content with back button */
         <div className="h-full overflow-y-auto">
           {/* Back button header */}
-          <div className="sticky top-0 z-10 bg-[#FBF9F4] border-b border-emerald-200 dark:border-emerald-800">
+          <div className="sticky top-0 z-10 bg-[#FBF9F4] dark:bg-black border-b border-emerald-200 dark:border-emerald-800">
             <button
               onClick={() => setSearchParams({})}
               className={cn(

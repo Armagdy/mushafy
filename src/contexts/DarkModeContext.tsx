@@ -16,6 +16,13 @@ export const DarkModeProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     localStorage.setItem('quran-dark-mode', isDarkMode.toString());
+    
+    // Apply dark class to document element for Tailwind dark mode and global CSS
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [isDarkMode]);
 
   const toggleDarkMode = () => {

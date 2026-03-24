@@ -350,8 +350,12 @@ export function SwiperPageDisplay({
   const slidesPerGroup = viewMode === 'double' && !isMobile ? 2 : 1;
   
   return (
-    <main className="flex-1 flex items-center justify-center overflow-hidden min-h-0 bg-[#FBF9F4]">
+    <main className={cn(
+      "flex-1 flex items-center justify-center overflow-hidden min-h-0",
+      isFullscreenDarkMode ? "bg-black" : "bg-[#FBF9F4]"
+    )}>
       <Swiper
+        key={`swiper-${isFullscreenDarkMode}`}
         modules={[Navigation, Virtual, Keyboard, A11y]}
         onSwiper={handleSwiperInit}
         onSlideChange={handleSlideChange}
@@ -386,7 +390,10 @@ export function SwiperPageDisplay({
       >
         {slides.map((pageNum) => (
           <SwiperSlide key={pageNum} virtualIndex={pageNum - 1}>
-            <div className="flex items-center justify-center h-full w-full py-1">
+            <div className={cn(
+              "flex items-center justify-center h-full w-full py-1",
+              isFullscreenDarkMode ? "bg-black" : "bg-[#FBF9F4]"
+            )}>
               {renderPage(pageNum)}
             </div>
           </SwiperSlide>

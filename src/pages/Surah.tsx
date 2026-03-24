@@ -581,7 +581,7 @@ const Surah = () => {
 
   return (
     <div 
-      className="w-full h-screen max-h-screen bg-[#FBF9F4] dark:bg-gray-900 flex flex-col overflow-hidden" 
+      className={cn("w-full h-screen max-h-screen flex flex-col overflow-hidden", isDarkMode ? "bg-black" : "bg-[#FBF9F4]")} 
       style={{ height: '100dvh', maxHeight: '100dvh' }}
       onClick={(e) => {
         // Don't toggle if clicking on interactive elements
@@ -597,16 +597,19 @@ const Surah = () => {
         }
       }}
     >
-      {/* Enhanced Islamic Top Header */}
+      {/* Enhanced Islamic Top Header - smooth slide transition */}
       <motion.div
         initial={false}
         animate={{
           y: isFullscreen ? '-100%' : '0%',
+          opacity: isFullscreen ? 0 : 1,
         }}
         transition={{
           type: 'spring',
-          stiffness: 300,
-          damping: 30,
+          stiffness: 280,
+          damping: 28,
+          mass: 0.8,
+          opacity: { duration: 0.2, ease: 'easeOut' },
         }}
         className={cn("z-50", isFullscreen && "pointer-events-none")}
       >
@@ -644,56 +647,69 @@ const Surah = () => {
 
       {/* Main Content Area - Single instance with animated container for smooth fullscreen transition */}
       
-      {/* Fullscreen Overlay Header - animated in/out */}
+      {/* Fullscreen Overlay Header - animated in/out with smooth fade and slide */}
       <motion.div
         initial={false}
         animate={{
           opacity: isFullscreen ? 1 : 0,
-          y: isFullscreen ? 0 : -20,
+          y: isFullscreen ? 0 : -30,
+          scale: isFullscreen ? 1 : 0.95,
         }}
         transition={{
           type: 'spring',
-          stiffness: 300,
-          damping: 30,
+          stiffness: 260,
+          damping: 25,
+          mass: 0.8,
+          opacity: { duration: 0.25, ease: 'easeOut' },
         }}
         className={cn(
-          "absolute top-0 left-0 right-0 z-[65] flex items-center justify-between pt-12 pb-3 px-6 bg-gradient-to-b from-[#FBF9F4] via-[#FBF9F4]/80 to-transparent dark:from-gray-900 dark:via-gray-900/80 dark:to-transparent",
-          !isFullscreen && "pointer-events-none",
-          isDarkMode && "from-black via-black/80 to-transparent"
+          "absolute top-0 left-0 right-0 z-[65] flex items-center justify-between pt-12 pb-3 px-6",
+          isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
+          !isFullscreen && "pointer-events-none"
         )}
       >
         {/* Juz */}
         <div className={cn(
-          "text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold",
-          isDarkMode && "text-[#F2E3BB]"
+          "text-lg md:text-2xl font-bold",
+          isDarkMode 
+            ? "text-[#F2E3BB]" 
+            : "text-emerald-800 dark:text-emerald-200"
         )}>
           {t('juz')} {formatNumber(currentJuz)}
         </div>
         
         {/* Ornament separator */}
         <div className={cn(
-          "flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent",
-          isDarkMode && "via-[#F2E3BB]/50"
+          "flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent to-transparent",
+          isDarkMode 
+            ? "via-[#F2E3BB]/50" 
+            : "via-emerald-700 dark:via-emerald-500"
         )}></div>
         
         {/* Surah Name */}
         <div className={cn(
-          "text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold",
-          isDarkMode && "text-[#F2E3BB]"
+          "text-lg md:text-2xl font-bold",
+          isDarkMode 
+            ? "text-[#F2E3BB]" 
+            : "text-emerald-800 dark:text-emerald-200"
         )}>
           {language === 'ar' ? currentSurah.name : currentSurah.englishName}
         </div>
         
         {/* Ornament separator */}
         <div className={cn(
-          "flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent via-emerald-700 to-transparent dark:from-transparent dark:via-emerald-500 dark:to-transparent",
-          isDarkMode && "via-[#F2E3BB]/50"
+          "flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent to-transparent",
+          isDarkMode 
+            ? "via-[#F2E3BB]/50" 
+            : "via-emerald-700 dark:via-emerald-500"
         )}></div>
         
         {/* Page */}
         <div className={cn(
-          "text-emerald-800 dark:text-emerald-200 text-lg md:text-2xl font-bold",
-          isDarkMode && "text-[#F2E3BB]"
+          "text-lg md:text-2xl font-bold",
+          isDarkMode 
+            ? "text-[#F2E3BB]" 
+            : "text-emerald-800 dark:text-emerald-200"
         )}>
           {t('page')} {formatNumber(currentPageNum)}
         </div>
@@ -703,23 +719,27 @@ const Surah = () => {
       <motion.div
         initial={false}
         animate={{
-          position: isFullscreen ? 'absolute' : 'relative',
-          inset: isFullscreen ? 0 : 'auto',
-          zIndex: isFullscreen ? 60 : 'auto',
+          scale: 1,
+          opacity: 1,
         }}
         transition={{
           type: 'spring',
-          stiffness: 300,
-          damping: 30,
+          stiffness: 280,
+          damping: 28,
+          mass: 0.8,
         }}
         className={cn(
-          "flex-1 flex items-center justify-center overflow-hidden bg-[#FBF9F4] dark:bg-gray-900",
-          isFullscreen && "absolute inset-0 z-[60]",
-          isDarkMode && "bg-black"
+          "flex-1 flex items-center justify-center overflow-hidden",
+          isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
+          "fullscreen-container-transition",
+          isFullscreen && "absolute inset-0 z-[60]"
         )}
         style={{
-          // Smooth transition for layout properties only, NOT background-color
-          transition: 'position 0.3s cubic-bezier(0.4, 0, 0.2, 1), inset 0.3s cubic-bezier(0.4, 0, 0.2, 1), z-index 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          // Smooth CSS transition for layout properties
+          transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          position: isFullscreen ? 'absolute' : 'relative',
+          inset: isFullscreen ? 0 : 'auto',
+          zIndex: isFullscreen ? 60 : 'auto',
         }}
       >
         {useSwiperMode ? (
@@ -842,9 +862,7 @@ const Surah = () => {
         }}
         className={cn(
           "absolute bottom-0 left-0 right-0 z-[65] flex items-center justify-center gap-8 py-4 px-6 pb-16",
-          isDarkMode 
-            ? "bg-gradient-to-t from-black via-black/80 to-transparent" 
-            : "bg-gradient-to-t from-[#FBF9F4] via-[#FBF9F4]/80 to-transparent dark:from-gray-900 dark:via-gray-900/80 dark:to-transparent",
+          isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
           !isFullscreen && "pointer-events-none"
         )}
       >
@@ -1082,8 +1100,10 @@ const Surah = () => {
         }}
         transition={{
           type: 'spring',
-          stiffness: 300,
-          damping: 30,
+          stiffness: 280,
+          damping: 28,
+          mass: 0.8,
+          opacity: { duration: 0.2, ease: 'easeOut' },
         }}
         className={cn("z-[100]", (isFullscreen || !currentPlayingAyah) && "pointer-events-none")}
       >
@@ -1163,18 +1183,27 @@ const Surah = () => {
         </motion.div>
       )}
 
-      {/* Combined Audio & Navigation Bar */}
+      {/* Combined Audio & Navigation Bar - smooth slide transition */}
       <motion.div
         initial={false}
         animate={{
           y: isFullscreen ? '100%' : '0%',
+          opacity: isFullscreen ? 0 : 1,
         }}
         transition={{
           type: 'spring',
-          stiffness: 300,
-          damping: 30,
+          stiffness: 280,
+          damping: 28,
+          mass: 0.8,
+          opacity: { duration: 0.2, ease: 'easeOut' },
         }}
-        className={cn("w-full bg-gradient-to-t from-emerald-800 to-emerald-600 z-50", isFullscreen && "pointer-events-none")}
+        className={cn(
+          "w-full z-50",
+          isDarkMode 
+            ? "bg-emerald-950" 
+            : "bg-gradient-to-t from-emerald-800 to-emerald-600",
+          isFullscreen && "pointer-events-none"
+        )}
       >
         <div className="w-full max-w-[1600px] mx-auto rounded-t-2xl">
         {/* Audio Player Bottom Bar */}
