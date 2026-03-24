@@ -13,7 +13,7 @@ export const translations = {
     medinan: 'مدنية',
     juz: 'الجزء',
     page: 'ص',
-    bismillah: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+    bismillah: '﷽',
     readMore: 'اقرأ المزيد',
     install: 'تثبيت التطبيق',
     installDescription: 'قم بتثبيت التطبيق للوصول السريع والقراءة بدون اتصال',

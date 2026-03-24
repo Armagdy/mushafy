@@ -50,7 +50,7 @@ const Hero = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+            ﷽
           </motion.p>
 
           {/* Main Title */}

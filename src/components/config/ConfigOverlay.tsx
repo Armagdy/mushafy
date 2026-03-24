@@ -381,7 +381,7 @@ export default function ConfigOverlay({
     <>
       {/* Content (header + main view) */}
       <div
-        className="fixed inset-0 z-50 flex flex-col bg-[#FBF9F4] dark:bg-emerald-950"
+        className="fixed inset-0 z-[100] flex flex-col bg-[#FBF9F4] dark:bg-emerald-950"
       >
         {/* Header with close button */}
         <div 
@@ -418,7 +418,7 @@ export default function ConfigOverlay({
       </div>
 
       {/* Bottom Navigation Bar - Fixed, doesn't slide */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-emerald-800 to-emerald-600 z-[60] pt-2">
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-emerald-800 to-emerald-600 z-[101] pt-2">
         <BottomBar
           showBottomBarText={showBottomBarText}
           totalBookmarks={getTotalBookmarks()}

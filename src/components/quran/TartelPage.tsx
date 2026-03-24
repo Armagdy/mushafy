@@ -467,7 +467,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
               </div>
             ) : line.line_type === 'basmallah' ? (
               <div className="bismillah-line text-center">
-                بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ
+                ﷽
               </div>
             ) : null}
           </div>
