@@ -351,7 +351,8 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
       const value = inputEl.value.trim();
       
       if (!value) {
-        setIsPageButtonEnabled(false);
+        // Empty input is allowed - button enabled based on selectedPage
+        setIsPageButtonEnabled(selectedPage >= 1 && selectedPage <= 604);
         setPageValidationError('');
         return;
       }
@@ -528,9 +529,16 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
     // Read from input DOM directly (consistent with polling approach)
     const inputValue = pageInputRef.current?.value || '';
     
-    // Convert Arabic numerals to English for parsing
-    const normalizedPage = parseArabicNumber(inputValue);
-    const pageNum = parseInt(normalizedPage);
+    let pageNum: number;
+    
+    if (inputValue.trim()) {
+      // Convert Arabic numerals to English for parsing
+      const normalizedPage = parseArabicNumber(inputValue);
+      pageNum = parseInt(normalizedPage);
+    } else {
+      // If input is empty, use the selected page from the list
+      pageNum = selectedPage;
+    }
     
     if (pageNum > 0 && pageNum <= 604) {
       if (onNavigate) {
@@ -880,8 +888,9 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
                       key={juzNum}
                       onClick={() => {
                         setSearchJuz(juzNum.toString());
-                        // Clear Hizb when selecting a new Juz
-                        setSearchJuzHezb('');
+                        // Set Hizb to first Hizb of the selected Juz
+                        const firstHezb = (juzNum - 1) * 2 + 1;
+                        setSearchJuzHezb(firstHezb.toString());
                       }}
                       className={cn(
                         "w-full px-3 py-3 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
@@ -908,21 +917,23 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
               </div>
               
               {/* Hizb List - Only shown when Juz is selected */}
-              {searchJuz && searchJuz !== '' && (
-                <motion.div
-                  initial={{ opacity: 0, x: isRTL ? -20 : 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className={cn(
-                    "overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent",
-                    searchJuzHezb && searchJuzHezb !== '' ? "flex-1" : "flex-1"
-                  )}
-                >
-                  {(() => {
-                    const juzNum = parseInt(searchJuz);
-                    const firstHezb = (juzNum - 1) * 2 + 1;
-                    const secondHezb = firstHezb + 1;
-                    
-                    return [firstHezb, secondHezb].map((hezbNum) => {
+              {searchJuz && searchJuz !== '' && (() => {
+                const juzNum = parseInt(searchJuz);
+                const firstHezb = (juzNum - 1) * 2 + 1;
+                const secondHezb = firstHezb + 1;
+                const hezbList = [firstHezb, secondHezb];
+                
+                return (
+                  <motion.div
+                    key={`hizb-${searchJuz}`}
+                    initial={{ opacity: 0, x: isRTL ? -20 : 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className={cn(
+                      "overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent",
+                      searchJuzHezb && searchJuzHezb !== '' ? "flex-1" : "flex-1"
+                    )}
+                  >
+                    {hezbList.map((hezbNum) => {
                       const isSelected = searchJuzHezb === hezbNum.toString();
                       
                       return (
@@ -943,10 +954,10 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
                             : `Hizb ${hezbNum}`}
                         </button>
                       );
-                    });
-                  })()}
-                </motion.div>
-              )}
+                    })}
+                  </motion.div>
+                );
+              })()}
             </div>
             
             {/* Navigation Button - Fixed at Bottom Always Visible */}

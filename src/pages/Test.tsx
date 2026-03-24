@@ -774,8 +774,7 @@ export default function Test() {
 
   return (
     <div className={cn(
-      "min-h-screen bg-[#FBF9F4]",
-      "dark:from-gray-900 dark:via-gray-800 dark:to-gray-900",
+      "min-h-screen bg-[#FBF9F4] dark:bg-black",
       isRTL ? "rtl" : "ltr"
     )}>
       <div className="container mx-auto px-4 py-8 max-w-4xl">
