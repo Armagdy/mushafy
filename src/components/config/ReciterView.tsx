@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Search, ChevronLeft, ChevronRight, Loader2, CheckCircle2, XCircle, Pencil } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Loader2, CheckCircle2, XCircle, Pencil, Star } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -88,6 +88,18 @@ const getMoshafStyle = (moshafName: string): string => {
   return 'murattal';
 };
 
+const FAVORITE_RECITERS_KEY = 'quran-favorite-reciters';
+
+const loadFavoriteReciterIds = (): string[] => {
+  try {
+    const raw = localStorage.getItem(FAVORITE_RECITERS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((id: unknown) => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
 export default function ReciterView({
   audioSource,
   onAudioSourceChange,
@@ -129,6 +141,21 @@ export default function ReciterView({
   const [selectedSurahForPlayback, setSelectedSurahForPlayback] = useState(currentSurahId);
   const [selectedAyahForPlayback, setSelectedAyahForPlayback] = useState(currentPlayingAyah?.ayah || 1);
 
+  // Favorite reciters (persisted in localStorage)
+  const [favoriteIds, setFavoriteIds] = useState<string[]>(loadFavoriteReciterIds);
+
+  const toggleFavorite = (reciterId: string) => {
+    setFavoriteIds(prev => {
+      const next = prev.includes(reciterId)
+        ? prev.filter(id => id !== reciterId)
+        : [...prev, reciterId];
+      try {
+        localStorage.setItem(FAVORITE_RECITERS_KEY, JSON.stringify(next));
+      } catch { /* storage full/unavailable */ }
+      return next;
+    });
+  };
+
   // MP3Quran reading/style selection (derived from moshaf names)
   const [selectedMp3Reading, setSelectedMp3Reading] = useState('');
   const [selectedMp3Style, setSelectedMp3Style] = useState('');
@@ -144,7 +171,7 @@ export default function ReciterView({
   const [surahError, setSurahError] = useState<'network' | 'not-found' | null>(null);
 
   // Scroll-to refs
-  const selectedReciterRef = useRef<HTMLButtonElement>(null);
+  const selectedReciterRef = useRef<HTMLDivElement>(null);
   const selectedReadingRef = useRef<HTMLButtonElement>(null);
   const selectedStyleRef = useRef<HTMLButtonElement>(null);
   const selectedSurahRef = useRef<HTMLButtonElement>(null);
@@ -401,13 +428,17 @@ export default function ReciterView({
     }
   };
 
-  // Filtered + sorted reciter list (memoized)
+  // Filtered + sorted reciter list, favorites first (memoized)
   const filteredAndSortedReciters = useMemo(() => unifiedReciters
     .filter(r => {
       const name = language === 'ar' ? r.nameAr : r.name;
       return matchesSearch(name, search);
     })
     .sort((a, b) => {
+      // Favorites always first
+      const aFav = favoriteIds.includes(a.id) ? 0 : 1;
+      const bFav = favoriteIds.includes(b.id) ? 0 : 1;
+      if (aFav !== bFav) return aFav - bFav;
       // MP3Quran always before EveryAyah
       if (a.source !== b.source) {
         return a.source === 'mp3quran' ? -1 : 1;
@@ -415,7 +446,12 @@ export default function ReciterView({
       const nameA = language === 'ar' ? a.nameAr : a.name;
       const nameB = language === 'ar' ? b.nameAr : b.name;
       return nameA.localeCompare(nameB, language);
-    }), [unifiedReciters, search, language]);
+    }), [unifiedReciters, search, language, favoriteIds]);
+
+  const { favoriteReciters, otherReciters } = useMemo(() => ({
+    favoriteReciters: filteredAndSortedReciters.filter(r => favoriteIds.includes(r.id)),
+    otherReciters: filteredAndSortedReciters.filter(r => !favoriteIds.includes(r.id)),
+  }), [filteredAndSortedReciters, favoriteIds]);
 
   // ── Column 1: reading type data ───────────────────────────────────────────────
   const mp3Readings = useMemo(() => {
@@ -496,6 +532,66 @@ export default function ReciterView({
     textSizeClasses.text
   );
 
+  // Reciter row renderer (shared by favorites & all-reciters sections)
+  const renderReciterRow = (reciter: UnifiedReciter, index: number) => {
+    const isFavorite = favoriteIds.includes(reciter.id);
+    const favoriteLabel = isFavorite ? t('removeFromFavorites') : t('addToFavorites');
+    return (
+      <div
+        key={reciter.id}
+        ref={selectedUnifiedReciter?.id === reciter.id ? selectedReciterRef : undefined}
+        role="button"
+        tabIndex={0}
+        aria-pressed={selectedUnifiedReciter?.id === reciter.id}
+        onClick={() => handleReciterSelect(reciter)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleReciterSelect(reciter);
+          }
+        }}
+        className={cn(
+          'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors cursor-pointer',
+          'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
+          selectedUnifiedReciter?.id === reciter.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
+          textSizeClasses.text,
+          isRTL ? 'text-right' : 'text-left'
+        )}
+      >
+        <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
+          <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
+          <span className="flex-1 text-emerald-800 dark:text-emerald-200">
+            {language === 'ar' ? reciter.nameAr : reciter.name}
+          </span>
+          <span className={cn(
+            'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+            reciter.source === 'everyayah'
+              ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+              : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+          )}>
+            {reciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); toggleFavorite(reciter.id); }}
+            onKeyDown={(e) => e.stopPropagation()}
+            title={favoriteLabel}
+            aria-label={favoriteLabel}
+            aria-pressed={isFavorite}
+            className="shrink-0 p-1 rounded-full hover:bg-emerald-500/15 dark:hover:bg-emerald-400/15 transition-colors"
+          >
+            <Star className={cn(
+              'w-4 h-4 transition-colors',
+              isFavorite
+                ? 'fill-emerald-700 text-emerald-700 dark:fill-emerald-400 dark:text-emerald-400'
+                : 'text-emerald-300 dark:text-emerald-700'
+            )} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       className={cn('flex flex-col flex-1 min-h-0 overflow-hidden px-4 pt-3 pb-[5.5rem]', isRTL ? 'rtl' : 'ltr')}
@@ -535,35 +631,23 @@ export default function ReciterView({
 
           {/* Reciter scroll — takes all remaining height */}
           <div className="overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-[calc(100vh-30rem)] md:max-h-[calc(100vh-26rem)]">
-            {filteredAndSortedReciters.map((reciter, index) => (
-              <button
-                key={reciter.id}
-                ref={selectedUnifiedReciter?.id === reciter.id ? selectedReciterRef : null}
-                onClick={() => handleReciterSelect(reciter)}
-                className={cn(
-                  'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
-                  'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
-                  selectedUnifiedReciter?.id === reciter.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
-                  textSizeClasses.text,
-                  isRTL ? 'text-right' : 'text-left'
-                )}
-              >
-                <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
-                  <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
-                  <span className="flex-1 text-emerald-800 dark:text-emerald-200">
-                    {language === 'ar' ? reciter.nameAr : reciter.name}
-                  </span>
-                  <span className={cn(
-                    'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
-                    reciter.source === 'everyayah'
-                      ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                      : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
-                  )}>
-                    {reciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
-                  </span>
+            {/* Favorites on top */}
+            {favoriteReciters.length > 0 && (
+              <>
+                {favoriteReciters.map((reciter, index) => renderReciterRow(reciter, index))}
+                {/* Separator between favorites and the rest */}
+                <div
+                  role="separator"
+                  className="flex items-center gap-2 my-1 px-3"
+                >
+                  <div className="flex-1 border-t-2 border-emerald-700 dark:border-emerald-600 rounded" />
+                  <Star className="w-3 h-3 shrink-0 fill-emerald-700 text-emerald-700 dark:fill-emerald-500 dark:text-emerald-500" />
+                  <div className="flex-1 border-t-2 border-emerald-700 dark:border-emerald-600 rounded" />
                 </div>
-              </button>
-            ))}
+              </>
+            )}
+            {/* Rest of reciters */}
+            {otherReciters.map((reciter, index) => renderReciterRow(reciter, favoriteReciters.length + index))}
           </div>
         </>
       ) : selectedUnifiedReciter ? (
