@@ -273,6 +273,14 @@ export function SwiperPageDisplay({
       return (
         <div className="relative">
           {renderBookmarkIcons(pageNum, isOddPage ? 'right' : 'left')}
+          <div
+            aria-hidden="true"
+            className={cn(
+              'absolute top-0 z-[5] w-3 h-8 md:w-5 md:h-10 bg-emerald-800 shadow-sm',
+              isOddPage ? 'left-0' : 'right-0'
+            )}
+            style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 75%, 0 100%)' }}
+          />
           <TartelPage
             pageNumber={pageNum}
             onClick={() => {
@@ -298,6 +306,14 @@ export function SwiperPageDisplay({
     return (
       <div className="relative">
         {renderBookmarkIcons(pageNum, isOddPage ? 'right' : 'left')}
+        <div
+          aria-hidden="true"
+          className={cn(
+            'absolute top-0 z-[5] w-3 h-8 md:w-5 md:h-10 bg-emerald-800 shadow-sm',
+            isOddPage ? 'left-0' : 'right-0'
+          )}
+          style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 75%, 0 100%)' }}
+        />
         <div
           onTouchStart={(e) => handleTouchStart(e, pageNum)}
           onTouchMove={handleTouchMove}
