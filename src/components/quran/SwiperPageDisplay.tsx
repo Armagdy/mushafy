@@ -264,8 +264,12 @@ export function SwiperPageDisplay({
     
     const isOddPage = pageNum % 2 !== 0;
     
+    // Text mushafs (tarteel/tajweed) are always enlarged, regardless of fullscreen chrome state
+    const isTextMushaf = mushafType === 'tarteel' || mushafType === 'tajweed';
+    const pageEnlarged = isFullscreen || isTextMushaf;
+    
     // Dynamic max-height based on fullscreen mode
-    const imageMaxHeight = isFullscreen 
+    const imageMaxHeight = pageEnlarged 
       ? 'max-h-[calc(100dvh-80px)]'  // More space in fullscreen (only header/footer overlays)
       : 'max-h-[calc(100dvh-170px)]'; // Normal mode with bars visible
     
@@ -291,7 +295,7 @@ export function SwiperPageDisplay({
             onAyahSelect={onAyahSelect}
             currentPlayingAyah={isTransitioning ? null : currentPlayingAyah}
             mushafType={mushafType as 'tarteel' | 'tajweed'}
-            isFullscreen={isFullscreen}
+            isFullscreen={pageEnlarged}
             isFullscreenDarkMode={isFullscreenDarkMode}
             className={cn(
               "max-w-full w-auto h-auto mx-auto cursor-pointer transition-all duration-300 ease-out",
