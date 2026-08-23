@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
-import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Type, ChevronLeft, ChevronRight } from "lucide-react";
+import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Type, ChevronLeft, ChevronRight, Sunrise } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMushaf, MushafType } from "@/contexts/MushafContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
@@ -53,6 +53,7 @@ export default function SettingsView() {
   
   const settingsCategories = [
     { id: 'mushaf', icon: BookOpen, label: isRTL ? 'المصحف' : 'Mushaf' },
+    { id: 'azkar', icon: Sunrise, label: isRTL ? 'الأذكار' : 'Azkar' },
     { id: 'style', icon: Palette, label: isRTL ? 'العرض' : 'Style' },
     { id: 'download', icon: HardDriveDownload, label: t('download') },
     { id: 'test', icon: GraduationCap, label: isRTL ? 'اختبار' : 'Test' },
@@ -71,6 +72,8 @@ export default function SettingsView() {
               onClick={() => {
                 if (category.id === 'test') {
                   navigate('/test');
+                } else if (category.id === 'azkar') {
+                  navigate('/azkar');
                 } else {
                   setSearchParams({ category: category.id });
                 }
