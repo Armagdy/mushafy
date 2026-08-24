@@ -136,6 +136,11 @@ const Surah = () => {
     const saved = localStorage.getItem('quran-show-bottom-bar-text');
     return saved !== null ? saved === 'true' : true;
   });
+  // Header/footer chrome theme: 'green' (classic emerald gradient) | 'glass' (frosted translucent)
+  const [chromeTheme, setChromeTheme] = useState<'green' | 'glass'>(() => {
+    const saved = localStorage.getItem('quran-chrome-theme');
+    return saved === 'glass' ? 'glass' : 'green';
+  });
   const [flashAyahPickerIcon, setFlashAyahPickerIcon] = useState(false);
   
   // Swiper mode is now the default page display
@@ -271,6 +276,8 @@ const Surah = () => {
         setShowBottomBarText(event.detail.value === 'true');
       } else if (event.detail.key === 'quran-pages-to-load') {
         setPagesToLoad(parseInt(event.detail.value));
+      } else if (event.detail.key === 'quran-chrome-theme') {
+        setChromeTheme(event.detail.value === 'glass' ? 'glass' : 'green');
       }
     };
     
@@ -579,6 +586,18 @@ const Surah = () => {
   // Minimum swipe distance (in px)
   const minSwipeDistance = 50;
 
+  // Fullscreen chrome glass card styling, per chrome theme
+  const chromeCardClass = cn(
+    "relative isolate rounded-2xl",
+    chromeTheme === 'glass'
+      ? isDarkMode
+        ? "bg-[#9CA3AF]/15 border border-gray-300/15 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_rgba(0,0,0,0.4)]"
+        : "bg-[#E7E6E2]/30 border border-[#8A8578]/25 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6),0_2px_12px_rgba(87,70,36,0.12)]"
+      : isDarkMode
+        ? "bg-emerald-400/10 border border-emerald-200/20 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_2px_12px_rgba(0,0,0,0.35)]"
+        : "bg-emerald-600/10 border border-emerald-800/15 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7),0_2px_12px_rgba(6,78,59,0.10)]"
+  );
+
   return (
     <div 
       className={cn("w-full h-screen max-h-screen flex flex-col overflow-hidden", isDarkMode ? "bg-black" : "bg-[#FBF9F4]")} 
@@ -614,6 +633,7 @@ const Surah = () => {
         className={cn("z-50", isFullscreen && "pointer-events-none")}
       >
       <TopBar
+        theme={chromeTheme}
         currentSurah={currentSurah}
         currentPageNum={currentPageNum}
         currentJuz={currentJuz}
@@ -668,11 +688,9 @@ const Surah = () => {
           !isFullscreen && "pointer-events-none"
         )}
       >
-        <div className={cn(
-          "relative isolate flex items-center justify-between w-full px-5 md:px-8 py-1.5 md:py-2 rounded-2xl",
-          isDarkMode
-            ? "bg-[#9CA3AF]/15 border border-gray-300/15 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_rgba(0,0,0,0.4)]"
-            : "bg-[#E7E6E2]/30 border border-[#8A8578]/25 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6),0_2px_12px_rgba(87,70,36,0.12)]"
+        <div         className={cn(
+          chromeCardClass,
+          "flex items-center justify-between w-full px-5 md:px-8 py-1.5 md:py-2"
         )}>
           <div className="liquid-glass-backdrop -z-10" />
           {/* Juz */}
@@ -874,11 +892,9 @@ const Surah = () => {
           !isFullscreen && "pointer-events-none"
         )}
       >
-        <div className={cn(
-          "relative isolate flex items-center justify-center gap-6 md:gap-10 px-4 md:px-8 py-1.5 md:py-2 rounded-2xl",
-          isDarkMode
-            ? "bg-[#9CA3AF]/15 border border-gray-300/15 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_rgba(0,0,0,0.4)]"
-            : "bg-[#E7E6E2]/30 border border-[#8A8578]/25 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6),0_2px_12px_rgba(87,70,36,0.12)]"
+        <div         className={cn(
+          chromeCardClass,
+          "flex items-center justify-center gap-6 md:gap-10 px-4 md:px-8 py-1.5 md:py-2"
         )}>
           <div className="liquid-glass-backdrop -z-10" />
             {/* Bookmark Button */}
@@ -1124,6 +1140,7 @@ const Surah = () => {
         className={cn("z-[100]", (isFullscreen || !currentPlayingAyah) && "pointer-events-none")}
       >
         <AudioProgressBar
+            theme={chromeTheme}
             currentTime={currentTime}
             duration={duration}
             isPlaying={isPlaying}
@@ -1215,15 +1232,20 @@ const Surah = () => {
         }}
         className={cn(
           "w-full z-50",
-          isDarkMode 
-            ? "bg-emerald-950" 
-            : "bg-gradient-to-t from-emerald-800 to-emerald-600",
+          chromeTheme === 'glass'
+            ? isDarkMode
+              ? "bg-black/40 backdrop-blur-xl border-t border-white/10"
+              : "bg-[#E7E6E2]/60 backdrop-blur-md border-t border-[#8A8578]/20 shadow-[0_-2px_12px_rgba(87,70,36,0.08)]"
+            : isDarkMode
+              ? "bg-emerald-950"
+              : "bg-gradient-to-t from-emerald-800 to-emerald-600",
           isFullscreen && "pointer-events-none"
         )}
       >
         <div className="w-full max-w-[1600px] mx-auto rounded-t-2xl">
         {/* Audio Player Bottom Bar */}
         <PlayBar
+          theme={chromeTheme}
           currentPlayingAyah={currentPlayingAyah}
           selectedReciter={audioSource === 'everyayah' ? selectedReciter : null}
           selectedMp3QuranReciter={audioSource === 'mp3quran' ? selectedMp3QuranReciter : null}
@@ -1274,6 +1296,7 @@ const Surah = () => {
 
         {/* Modern Bottom Toolbar */}
         <BottomBar
+        theme={chromeTheme}
         showBottomBarText={showBottomBarText}
         totalBookmarks={getTotalBookmarks()}
         isMobile={isMobile}

@@ -17,6 +17,7 @@ interface TopBarProps {
   onSurahClick: () => void;
   onPageClick: () => void;
   onJuzClick: () => void;
+  theme?: 'green' | 'glass';
 }
 
 export function TopBar({
@@ -28,22 +29,31 @@ export function TopBar({
   onSurahClick,
   onPageClick,
   onJuzClick,
+  theme = 'green',
 }: TopBarProps) {
   const { t, isRTL, language } = useLanguage();
   const { isDarkMode } = useDarkMode();
 
+  const isGlassLight = theme === 'glass' && !isDarkMode;
+  const primaryText = isGlassLight ? 'text-emerald-800' : 'text-[#F2E3BB]';
+  const mutedText = isGlassLight ? 'text-emerald-700/70' : 'text-[#F2E3BB]/70';
+
   return (
     <div className={cn(
       "w-full flex justify-center pt-8",
-      isDarkMode 
-        ? "bg-emerald-950" 
-        : "bg-gradient-to-b from-emerald-800 to-emerald-600"
+      theme === 'glass'
+        ? isDarkMode
+          ? "bg-black/40 backdrop-blur-xl border-b border-white/10"
+          : "bg-[#E7E6E2]/60 backdrop-blur-md border-b border-[#8A8578]/20 shadow-[0_2px_12px_rgba(87,70,36,0.08)]"
+        : isDarkMode
+          ? "bg-emerald-950"
+          : "bg-gradient-to-b from-emerald-800 to-emerald-600"
     )}>
       <header className="w-full max-w-[1600px]">
         {/* Main Header */}
         <div className="relative">
-          {/* Subtle background gradient - only in light mode */}
-          {!isDarkMode && (
+          {/* Subtle background gradient - only in light green theme */}
+          {!isDarkMode && theme === 'green' && (
             <div className="absolute inset-0 bg-gradient-to-b from-emerald-700/20 to-transparent pointer-events-none" />
           )}
           
@@ -55,13 +65,13 @@ export function TopBar({
               className="flex flex-col items-center gap-0 min-w-[70px] hover:opacity-80 transition-opacity"
             >
               <span 
-                className="text-xs text-[#F2E3BB]/70 tracking-wide leading-none"
+                className={cn("text-xs", mutedText, "tracking-wide leading-none")}
                 style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
               >
                 {t('page')}
               </span>
               <span 
-                className="text-xl md:text-2xl font-bold text-[#F2E3BB] leading-none mt-0.5"
+                className={cn("text-xl md:text-2xl font-bold", primaryText, "leading-none mt-0.5")}
                 style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
               >
                 {formatNumber(currentPageNum)}
@@ -77,29 +87,29 @@ export function TopBar({
               className="flex-1 flex flex-col items-center justify-center hover:opacity-80 transition-opacity"
             >
               <div className="flex items-center gap-2">
-                <span className="text-base text-[#F2E3BB]/70 leading-none">﴾</span>
+                <span className={cn("text-base", mutedText, "leading-none")}>﴾</span>
                 <span 
-                  className="text-xl md:text-2xl font-bold text-[#F2E3BB] leading-none"
+                  className={cn("text-xl md:text-2xl font-bold", primaryText, "leading-none")}
                   style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
                 >
                   {language === 'ar' ? currentSurah.name : currentSurah.englishName}
                 </span>
-                <span className="text-base text-[#F2E3BB]/70 leading-none">﴿</span>
+                <span className={cn("text-base", mutedText, "leading-none")}>﴿</span>
               </div>
               <div className="flex items-center gap-2 mt-0.5">
                 {currentAyah && (
                   <>
                     <span 
-                      className="text-[10px] md:text-xs text-[#F2E3BB]/70 leading-none"
+                      className={cn("text-[10px] md:text-xs", mutedText, "leading-none")}
                       style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
                     >
                       {t('ayah')} {formatNumber(currentAyah)}
                     </span>
-                    <span className="text-[10px] text-[#F2E3BB]/50">-</span>
+                    <span className={cn("text-[10px]", isGlassLight ? "text-emerald-700/50" : "text-[#F2E3BB]/50")}>-</span>
                   </>
                 )}
                 <span 
-                  className="text-[10px] md:text-xs text-[#F2E3BB]/70 leading-none"
+                  className={cn("text-[10px] md:text-xs", mutedText, "leading-none")}
                   style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
                 >
                   {t('surah')} {formatNumber(currentSurah.id)}
@@ -116,13 +126,13 @@ export function TopBar({
               className="flex flex-col items-center gap-0 min-w-[70px] hover:opacity-80 transition-opacity"
             >
               <span 
-                className="text-xs text-[#F2E3BB]/70 tracking-wide leading-none"
+                className={cn("text-xs", mutedText, "tracking-wide leading-none")}
                 style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
               >
                 {t('juz')}
               </span>
               <span 
-                className="text-xl md:text-2xl font-bold text-[#F2E3BB] leading-none mt-0.5"
+                className={cn("text-xl md:text-2xl font-bold", primaryText, "leading-none mt-0.5")}
                 style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
               >
                 {formatNumber(currentJuz)}

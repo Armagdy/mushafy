@@ -12,6 +12,7 @@ interface BottomBarProps {
   isMobile: boolean;
   viewMode: 'single' | 'double';
   activeButton?: ActiveBottomButton;
+  theme?: 'green' | 'glass';
   onGoToClick: () => void;
   onSearchClick: () => void;
   onBookmarkClick: () => void;
@@ -26,6 +27,7 @@ export function BottomBar({
   isMobile,
   viewMode,
   activeButton = null,
+  theme = 'green',
   onGoToClick,
   onSearchClick,
   onBookmarkClick,
@@ -36,7 +38,15 @@ export function BottomBar({
   const { isRTL, t } = useLanguage();
 
   const activeIconClass = "text-emerald-800";
-  const inactiveIconClass = "text-[#F2E3BB] group-hover:text-white";
+  const inactiveIconClass = theme === 'glass'
+    ? "text-emerald-800 group-hover:text-emerald-900"
+    : "text-[#F2E3BB] group-hover:text-white";
+  const inactiveTextClass = theme === 'glass'
+    ? "text-emerald-800 group-hover:text-emerald-900"
+    : "text-[#F2E3BB] group-hover:text-white";
+  const viewToggleClass = theme === 'glass'
+    ? "text-emerald-800 hover:text-emerald-900"
+    : "text-[#F2E3BB] hover:text-white";
 
   const buttons = [
     { key: 'navigation' as const, icon: Navigation, label: isRTL ? 'انتقل' : 'Go To', onClick: onGoToClick, title: t('search') },
@@ -86,7 +96,7 @@ export function BottomBar({
                 <Icon className={cn("w-7 h-7 md:w-8 md:h-8 transition-colors", isActive ? activeIconClass : inactiveIconClass)} />
               )}
               {showBottomBarText && (
-                <span className={cn("text-base md:text-xl font-medium transition-colors", isActive ? activeIconClass : "text-[#F2E3BB] group-hover:text-white")}>
+                <span className={cn("text-base md:text-xl font-medium transition-colors", isActive ? activeIconClass : inactiveTextClass)}>
                   {label}
                 </span>
               )}
@@ -102,10 +112,13 @@ export function BottomBar({
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={onViewModeToggle}
-            className="flex flex-col items-center gap-1 text-[#F2E3BB] hover:text-white transition-colors group"
+            className={cn(
+              "flex flex-col items-center gap-1 transition-colors group",
+              viewToggleClass
+            )}
             title={viewMode === 'single' ? (isRTL ? 'عرض صفحتين' : 'Two Pages') : (isRTL ? 'صفحة واحدة' : 'Single Page')}
           >
-            <div className="relative w-8 h-8 text-[#F2E3BB] group-hover:text-white">
+            <div className={cn("relative w-8 h-8", viewToggleClass)}>
               {viewMode === 'single' ? (
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <rect x="7" y="4" width="10" height="16" rx="1" />

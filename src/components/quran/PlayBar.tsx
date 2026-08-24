@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { Play, Pause, Square, Repeat, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useDarkMode } from '@/contexts/DarkModeContext';
+import { cn } from '@/lib/utils';
 import type { Mp3QuranReciter } from '@/lib/mp3quran-service';
 
 interface PlayBarProps {
@@ -16,6 +18,7 @@ interface PlayBarProps {
   currentSurahName?: string;
   hasAyahTimings?: boolean;
   flashAyahPickerIcon?: boolean;
+  theme?: 'green' | 'glass';
   formatNumber: (num: number | string) => string;
   onAyahSelectorClick: () => void;
   onRepeatClick: () => void;
@@ -37,6 +40,7 @@ export function PlayBar({
   currentSurahName,
   hasAyahTimings = false,
   flashAyahPickerIcon = false,
+  theme = 'green',
   formatNumber,
   onAyahSelectorClick,
   onRepeatClick,
@@ -45,6 +49,20 @@ export function PlayBar({
   onTogglePlayPause,
 }: PlayBarProps) {
   const { language, t } = useLanguage();
+  const { isDarkMode } = useDarkMode();
+
+  const isGlassLight = theme === 'glass' && !isDarkMode;
+  const isGlassDark = theme === 'glass' && isDarkMode;
+
+  const chipClass = cn(
+    "flex items-center justify-center rounded-lg px-3 md:px-4 h-10 md:h-12 shadow-md transition-all",
+    isGlassLight
+      ? "bg-[#E7E6E2]/50 hover:bg-[#E7E6E2]/75 border border-[#8A8578]/25"
+      : isGlassDark
+        ? "bg-white/10 hover:bg-white/20 border border-white/15"
+        : "bg-emerald-800/50 hover:bg-emerald-800/70 border border-[#F2E3BB]/30"
+  );
+  const chipTextClass = isGlassLight ? "text-emerald-800" : "text-[#F2E3BB]";
   
   // Debug logging for props
   console.log('[PlayBar] 🎵 PlayBar props:');
@@ -103,12 +121,17 @@ export function PlayBar({
             <button
               onClick={onAyahSelectorClick}
               disabled={audioSource === 'mp3quran' && !hasAyahTimings}
-              className={`flex items-center justify-center bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-[#F2E3BB]/30 shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-800/50 ${
-                flashAyahPickerIcon ? 'animate-flash-gold' : ''
-              }`}
+              className={cn(
+                chipClass,
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+                isGlassLight && "disabled:hover:bg-[#E7E6E2]/50",
+                isGlassDark && "disabled:hover:bg-white/10",
+                !isGlassLight && !isGlassDark && "disabled:hover:bg-emerald-800/50",
+                flashAyahPickerIcon && 'animate-flash-gold'
+              )}
               title={(audioSource === 'mp3quran' && !hasAyahTimings) ? t('ayahSelectionNotAvailable') : ''}
             >
-              <span className="text-[#F2E3BB] text-base md:text-xl font-bold" style={{ fontFamily: "'Amiri', serif" }}>
+              <span className={cn(chipTextClass, "text-base md:text-xl font-bold")} style={{ fontFamily: "'Amiri', serif" }}>
                 {(audioSource === 'mp3quran' && !hasAyahTimings) 
                   ? '--' 
                   : currentPlayingAyah 
@@ -119,23 +142,26 @@ export function PlayBar({
             
             <button
               onClick={onRepeatClick}
-              className={`flex items-center justify-center transition-all rounded-lg px-3 md:px-4 h-10 md:h-12 border shadow-md ${
-                isRepeatActive 
-                  ? 'bg-emerald-800/50 border-[#F2E3BB]/30 text-[#F2E3BB]' 
-                  : 'bg-gray-600/50 border-gray-400/30 text-gray-300 hover:bg-gray-500/50'
-              }`}
+              className={cn(
+                chipClass,
+                !isRepeatActive && (
+                  isGlassLight
+                    ? "bg-gray-400/20 hover:bg-gray-400/30 border-gray-500/20"
+                    : "bg-gray-600/50 hover:bg-gray-500/50 border-gray-400/30"
+                )
+              )}
               title="Repeat"
             >
-              <Repeat className="w-5 h-5 md:w-6 md:h-6" />
+              <Repeat className={cn("w-5 h-5 md:w-6 md:h-6", chipTextClass, !isRepeatActive && (isGlassLight ? "text-gray-500" : "text-gray-300"))} />
             </button>
           </div>
           
           {/* Reciter Selection - Center */}
           <button
             onClick={onReciterClick}
-            className="flex items-center justify-center bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-[#F2E3BB]/30 shadow-md transition-all flex-[2] md:flex-1 min-w-0 md:max-w-md lg:max-w-lg"
+            className={cn(chipClass, "flex-[2] md:flex-1 min-w-0 md:max-w-md lg:max-w-lg")}
           >
-            <span className="text-[#F2E3BB] text-base md:text-xl font-bold truncate" style={{ fontFamily: "'Amiri', serif" }}>
+            <span className={cn(chipTextClass, "text-base md:text-xl font-bold truncate")} style={{ fontFamily: "'Amiri', serif" }}>
               {getReciterName()}
             </span>
           </button>
@@ -146,10 +172,10 @@ export function PlayBar({
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               onClick={onStop}
-              className="flex items-center justify-center bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-[#F2E3BB]/30 shadow-md transition-all"
+              className={chipClass}
               title={t('stop')}
             >
-              <Square className="w-5 h-5 md:w-6 md:h-6 text-[#F2E3BB]" />
+              <Square className={cn("w-5 h-5 md:w-6 md:h-6", chipTextClass)} />
             </motion.button>
             
             <motion.button
@@ -157,22 +183,22 @@ export function PlayBar({
               whileTap={{ scale: 0.9 }}
               onClick={onTogglePlayPause}
               disabled={isPreloadingAyahs}
-              className="flex items-center justify-center bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-[#F2E3BB]/30 shadow-md transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+              className={cn(chipClass, "disabled:opacity-70 disabled:cursor-not-allowed")}
               title={isPreloadingAyahs ? t('loading') : (isPlaying ? t('pause') : t('play'))}
             >
               {isPreloadingAyahs ? (
                 <div className="flex flex-col items-center justify-center gap-0.5">
-                  <Loader2 className="w-5 h-5 md:w-6 md:h-6 text-[#F2E3BB] animate-spin" />
+                  <Loader2 className={cn("w-5 h-5 md:w-6 md:h-6 animate-spin", chipTextClass)} />
                   {preloadProgress.total > 0 && (
-                    <span className="text-[#F2E3BB] text-[8px] md:text-[10px] font-medium">
+                    <span className={cn(chipTextClass, "text-[8px] md:text-[10px] font-medium")}>
                       {preloadProgress.current}/{preloadProgress.total}
                     </span>
                   )}
                 </div>
               ) : isPlaying ? (
-                <Pause className="w-5 h-5 md:w-6 md:h-6 text-[#F2E3BB]" />
+                <Pause className={cn("w-5 h-5 md:w-6 md:h-6", chipTextClass)} />
               ) : (
-                <Play className="w-5 h-5 md:w-6 md:h-6 text-[#F2E3BB]" />
+                <Play className={cn("w-5 h-5 md:w-6 md:h-6", chipTextClass)} />
               )}
             </motion.button>
           </div>

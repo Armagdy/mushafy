@@ -4,7 +4,7 @@ import { useBookmarks } from "@/hooks/useBookmarks";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -162,6 +162,27 @@ export default function ConfigOverlay({
   const { t, language, isRTL } = useLanguage();
   const { isDarkMode } = useDarkMode();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Chrome theme ('green' | 'glass') — read on mount, live-updated from settings
+  const [chromeTheme, setChromeTheme] = useState<'green' | 'glass'>(() => {
+    const saved = localStorage.getItem('quran-chrome-theme');
+    return saved === 'glass' ? 'glass' : 'green';
+  });
+
+  useEffect(() => {
+    const handleSettingChange = (event: Event) => {
+      const { key, value } = (event as CustomEvent).detail || {};
+      if (key === 'quran-chrome-theme') {
+        setChromeTheme(value === 'glass' ? 'glass' : 'green');
+      }
+    };
+    window.addEventListener('quran-setting-changed', handleSettingChange);
+    return () => {
+      window.removeEventListener('quran-setting-changed', handleSettingChange);
+    };
+  }, []);
+
+  const isGlassLight = chromeTheme === 'glass' && !isDarkMode;
   
   // Get bookmarks data
   const {
@@ -389,9 +410,13 @@ export default function ConfigOverlay({
         <div 
           className={cn(
             "sticky top-0 z-10 shadow-lg pt-6",
-            isDarkMode 
-              ? "bg-emerald-950" 
-              : "bg-gradient-to-b from-emerald-800 to-emerald-600"
+            chromeTheme === 'glass'
+              ? isDarkMode
+                ? "bg-black/40 backdrop-blur-xl border-b border-white/10"
+                : "bg-[#E7E6E2]/60 backdrop-blur-md border-b border-[#8A8578]/20"
+              : isDarkMode
+                ? "bg-emerald-950"
+                : "bg-gradient-to-b from-emerald-800 to-emerald-600"
           )}
         >
           <div className="flex items-center justify-between px-4 py-3">
@@ -399,12 +424,18 @@ export default function ConfigOverlay({
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="text-[#F2E3BB] hover:bg-emerald-700/50"
+              className={cn(
+                "hover:bg-emerald-700/10 dark:hover:bg-white/10",
+                isGlassLight ? "text-emerald-800" : "text-[#F2E3BB] hover:bg-emerald-700/50"
+              )}
             >
               <X className="w-6 h-6" />
             </Button>
             
-            <h1 className="text-xl md:text-2xl font-bold text-[#F2E3BB]">
+            <h1 className={cn(
+              "text-xl md:text-2xl font-bold",
+              isGlassLight ? "text-emerald-800" : "text-[#F2E3BB]"
+            )}>
               {getTitle()}
             </h1>
             
@@ -427,11 +458,16 @@ export default function ConfigOverlay({
       {/* Bottom Navigation Bar - Fixed, doesn't slide */}
       <div className={cn(
         "fixed bottom-0 left-0 right-0 z-[101] pt-2",
-        isDarkMode 
-          ? "bg-emerald-950" 
-          : "bg-gradient-to-t from-emerald-800 to-emerald-600"
+        chromeTheme === 'glass'
+          ? isDarkMode
+            ? "bg-black/40 backdrop-blur-xl border-t border-white/10"
+            : "bg-[#E7E6E2]/60 backdrop-blur-md border-t border-[#8A8578]/20"
+          : isDarkMode
+            ? "bg-emerald-950"
+            : "bg-gradient-to-t from-emerald-800 to-emerald-600"
       )}>
         <BottomBar
+          theme={chromeTheme}
           showBottomBarText={showBottomBarText}
           totalBookmarks={getTotalBookmarks()}
           isMobile={isMobile}

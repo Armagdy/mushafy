@@ -189,6 +189,14 @@ export type ConfigType = 'settings'|'bookmarks'|'navigation'|'reciter'|'tafseer'
 - Never hardcode strings: `const { t, isRTL } = useLanguage();` — add keys to **both** `ar` and `en` in `src/i18n/translations.ts`.
 - Arabic UI uses Eastern-Arabic numerals via local `formatNumber` helpers (duplicated across several files).
 
+### 7.6 Chrome theme: `green` | `glass` (header/footer skins)
+User-selectable skin for ALL header/footer chrome (main bars + fullscreen overlay cards). Persisted in `localStorage['quran-chrome-theme']` (default `'green'`); live-updated via the `quran-setting-changed` event (`key: 'quran-chrome-theme'`).
+- **Picker:** Settings → العرض (Style) → `StyleSettings.tsx` row "Bar Theme / سمة الشريط" (Green أخضر / Glass زجاجي buttons).
+- **Owner:** `Surah.tsx` holds `chromeTheme` state, listens for the setting event, passes `theme` prop down.
+- **`green` (default):** classic look — TopBar/bottom-stack emerald gradients (`from-emerald-800 to-emerald-600`, `bg-emerald-950` dark); fullscreen cards get emerald-tinted glass (`bg-emerald-600/10` + `border-emerald-800/15`).
+- **`glass`:** frosted translucent bars — TopBar `bg-[#E7E6E2]/60 backdrop-blur-md` (light) / `bg-black/40 backdrop-blur-xl` (dark) with hairline borders; text flips cream→`emerald-800` in light mode (BottomBar icons/labels likewise); fullscreen cards use pale-gray glass (`bg-[#E7E6E2]/30` + `border-[#8A8578]/25`).
+- **Frosted-card layer:** `.liquid-glass-backdrop` (src/index.css) — absolutely-positioned blur+tint child (green OR glass cards both use it); cards need `relative isolate` + `-z-10` on the layer. (`.liquid-glass-edge` / `.liquid-glass-glow` were removed — edge thickness 0, no glow.)
+
 ---
 
 ## 8. Storage Architecture (know this cold)
@@ -216,6 +224,7 @@ Keys are sanitized (illegal chars → `_`). Instances used:
 
 ### 8.3 localStorage keys (settings/bookmarks — small stuff)
 `quran-app-language`, `quran-app-mushaf`, `quran-dark-mode`, `quran-view-mode`,
+`quran-chrome-theme` (`'green'|'glass'` header/footer skin — §7.6),
 `quran-dialog-text-size`, `quran-last-page`, `quran-last-reciter`,
 `quran-last-mp3quran-moshaf`, `quran-audio-source`,
 `quran-bookmark-bookmarks` / `quran-memorization-bookmarks` / `quran-reading-bookmarks`
@@ -309,6 +318,7 @@ Job types: `pages` (images) | `everyayah` | `mp3quran` | `tafseer`. Parallel wor
 | Add/alter a settings view | new file in `src/components/config/`, register in `ConfigOverlay.tsx` (`ConfigType` + `renderView` switch), trigger via `BottomBar` |
 | Change page↔surah/juz math | `src/lib/quran-mapping.ts` (pure functions; respect multi-surah pages) |
 | Add reciters | update `public/assets/reciters.json` (union schema §9); API lists override via mp3quran-service |
+| Change chrome skin (green/glass) | `StyleSettings.tsx` picker → `quran-chrome-theme` → `Surah.tsx` `chromeTheme` → `theme` props on `TopBar`/`BottomBar` + `chromeCardClass` (§7.6) |
 | Change default audio/reciter | `useAudioPlayer.ts` (~L2827 defaults; `quran-audio-source`, `quran-last-*` keys) |
 | Touch caching | stores table §8.1; keep native chunked-write (>5MB) behavior intact |
 | Build for Android | `npm run cap:sync && npm run cap:open` (see CAPACITOR_SETUP.md) |

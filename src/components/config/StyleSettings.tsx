@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Switch } from "@/components/ui/switch";
-import { Book, Menu, Moon } from "lucide-react";
+import { Book, Menu, Moon, Palette } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { useDarkMode } from "@/contexts/DarkModeContext";
@@ -24,8 +24,22 @@ export function StyleSettings({
   const { t, isRTL } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const { isDarkMode, setIsDarkMode } = useDarkMode();
-  
+
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+
+  // Header/footer chrome theme: 'green' (classic) | 'glass' (frosted translucent)
+  const [chromeTheme, setChromeTheme] = useState<'green' | 'glass'>(() => {
+    const saved = localStorage.getItem('quran-chrome-theme');
+    return saved === 'glass' ? 'glass' : 'green';
+  });
+
+  const updateChromeTheme = (theme: 'green' | 'glass') => {
+    setChromeTheme(theme);
+    localStorage.setItem('quran-chrome-theme', theme);
+    window.dispatchEvent(new CustomEvent('quran-setting-changed', {
+      detail: { key: 'quran-chrome-theme', value: theme }
+    }));
+  };
 
   return (
     <div className="space-y-4">
@@ -65,6 +79,42 @@ export function StyleSettings({
               localStorage.setItem('quran-show-bottom-bar-text', String(checked));
             }}
           />
+        </div>
+      </div>
+
+      {/* Header/Footer Theme */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Palette className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
+            {isRTL ? 'سمة الشريط' : 'Bar Theme'}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => updateChromeTheme('green')}
+            className={cn(
+              "flex items-center justify-center px-3 py-1.5 rounded-lg border transition-all font-medium",
+              textSizeClasses.button,
+              chromeTheme === 'green'
+                ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
+                : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900"
+            )}
+          >
+            {isRTL ? 'أخضر' : 'Green'}
+          </button>
+          <button
+            onClick={() => updateChromeTheme('glass')}
+            className={cn(
+              "flex items-center justify-center px-3 py-1.5 rounded-lg border transition-all font-medium",
+              textSizeClasses.button,
+              chromeTheme === 'glass'
+                ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
+                : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900"
+            )}
+          >
+            {isRTL ? 'زجاجي' : 'Glass'}
+          </button>
         </div>
       </div>
 

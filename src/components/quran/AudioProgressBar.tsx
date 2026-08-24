@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { getCurrentAyahFromTime } from '@/lib/mp3quran-service';
 import type { AyahTiming } from '@/lib/mp3quran-service';
+import { useDarkMode } from '@/contexts/DarkModeContext';
 
 interface RepeatTimestamp {
   surah: number;
@@ -39,6 +40,7 @@ interface AudioProgressBarProps {
   ayahRepeatLabel?: string;
   sectionRepeatLabel?: string;
   ayahLabel?: string;
+  theme?: 'green' | 'glass';
 }
 
 export function AudioProgressBar({ 
@@ -66,8 +68,11 @@ export function AudioProgressBar({
   isRTL = true,
   ayahRepeatLabel = 'تكرار الآية',
   sectionRepeatLabel = 'تكرار المقطع',
-  ayahLabel = 'آية'
+  ayahLabel = 'آية',
+  theme = 'green'
 }: AudioProgressBarProps) {
+  const { isDarkMode } = useDarkMode();
+  const isGlassLight = theme === 'glass' && !isDarkMode;
   const progressBarRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -419,7 +424,8 @@ export function AudioProgressBar({
       <div
         ref={progressBarRef}
         className={cn(
-          "relative h-1.5 md:h-1 bg-emerald-900/30 cursor-pointer transition-all touch-none",
+          "relative h-1.5 md:h-1 cursor-pointer transition-all touch-none",
+          isGlassLight ? "bg-emerald-800/15" : "bg-emerald-900/30",
           "group-hover:h-2",
           isDragging && "h-2.5 md:h-2"
         )}
@@ -431,12 +437,12 @@ export function AudioProgressBar({
         onTouchEnd={handleTouchEnd}
       >
         {/* Background track */}
-        <div className="absolute inset-0 bg-emerald-950/50" />
+        <div className={cn("absolute inset-0", isGlassLight ? "bg-emerald-900/15" : "bg-emerald-950/50")} />
         
         {/* Buffered indicator (like YouTube) */}
         {bufferedPercentage > 0 && (
           <div
-            className="absolute inset-y-0 left-0 bg-gray-400/30 transition-all duration-300"
+            className={cn("absolute inset-y-0 left-0 transition-all duration-300", isGlassLight ? "bg-emerald-600/25" : "bg-gray-400/30")}
             style={{ width: `${bufferedPercentage}%` }}
           />
         )}
@@ -454,7 +460,7 @@ export function AudioProgressBar({
         {ayahMarkers.map((position, index) => (
           <div
             key={`ayah-${index}`}
-            className="absolute top-0 bottom-0 w-0.5 bg-[#F2E3BB]/40"
+            className={cn("absolute top-0 bottom-0 w-0.5", isGlassLight ? "bg-emerald-800/30" : "bg-[#F2E3BB]/40")}
             style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
           />
         ))}
@@ -480,7 +486,8 @@ export function AudioProgressBar({
         {/* Playhead */}
         <div
           className={cn(
-            "absolute top-1/2 -translate-y-1/2 w-6 h-6 md:w-5 md:h-5 bg-[#F2E3BB] rounded-full shadow-lg cursor-grab active:cursor-grabbing z-[110]",
+            "absolute top-1/2 -translate-y-1/2 w-6 h-6 md:w-5 md:h-5 rounded-full shadow-lg cursor-grab active:cursor-grabbing z-[110]",
+            isGlassLight ? "bg-emerald-700" : "bg-[#F2E3BB]",
             !isDragging && "transition-all duration-100",
             isDragging && "will-change-[left,transform]",
             (isDragging || isPlaying) && "opacity-100",
