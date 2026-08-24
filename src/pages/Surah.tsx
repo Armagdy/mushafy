@@ -668,50 +668,58 @@ const Surah = () => {
           !isFullscreen && "pointer-events-none"
         )}
       >
-        {/* Juz */}
         <div className={cn(
-          "text-lg md:text-2xl font-bold",
-          isDarkMode 
-            ? "text-[#F2E3BB]" 
-            : "text-emerald-800 dark:text-emerald-200"
+          "relative isolate flex items-center justify-between w-full px-5 md:px-8 py-1.5 md:py-2 rounded-2xl",
+          isDarkMode
+            ? "bg-[#9CA3AF]/15 border border-gray-300/15 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_rgba(0,0,0,0.4)]"
+            : "bg-[#E7E6E2]/30 border border-[#8A8578]/25 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6),0_2px_12px_rgba(87,70,36,0.12)]"
         )}>
-          {t('juz')} {formatNumber(currentJuz)}
-        </div>
-        
-        {/* Ornament separator */}
-        <div className={cn(
-          "flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent to-transparent",
-          isDarkMode 
-            ? "via-[#F2E3BB]/50" 
-            : "via-emerald-700 dark:via-emerald-500"
-        )}></div>
-        
-        {/* Surah Name */}
-        <div className={cn(
-          "text-lg md:text-2xl font-bold",
-          isDarkMode 
-            ? "text-[#F2E3BB]" 
-            : "text-emerald-800 dark:text-emerald-200"
-        )}>
-          {language === 'ar' ? currentSurah.name : currentSurah.englishName}
-        </div>
-        
-        {/* Ornament separator */}
-        <div className={cn(
-          "flex-shrink-0 w-12 h-px bg-gradient-to-r from-transparent to-transparent",
-          isDarkMode 
-            ? "via-[#F2E3BB]/50" 
-            : "via-emerald-700 dark:via-emerald-500"
-        )}></div>
-        
-        {/* Page */}
-        <div className={cn(
-          "text-lg md:text-2xl font-bold",
-          isDarkMode 
-            ? "text-[#F2E3BB]" 
-            : "text-emerald-800 dark:text-emerald-200"
-        )}>
-          {t('page')} {formatNumber(currentPageNum)}
+          <div className="liquid-glass-backdrop -z-10" />
+          {/* Juz */}
+          <div className={cn(
+            "text-lg md:text-2xl font-bold",
+            isDarkMode
+              ? "text-[#F2E3BB]"
+              : "text-emerald-800 dark:text-emerald-200"
+          )}>
+            {t('juz')} {formatNumber(currentJuz)}
+          </div>
+
+          {/* Ornament separator */}
+          <div className={cn(
+            "flex-shrink-0 w-10 md:w-12 h-px bg-gradient-to-r from-transparent to-transparent",
+            isDarkMode
+              ? "via-[#F2E3BB]/50"
+              : "via-emerald-700 dark:via-emerald-500"
+          )}></div>
+
+          {/* Surah Name */}
+          <div className={cn(
+            "text-lg md:text-2xl font-bold",
+            isDarkMode
+              ? "text-[#F2E3BB]"
+              : "text-emerald-800 dark:text-emerald-200"
+          )}>
+            {language === 'ar' ? currentSurah.name : currentSurah.englishName}
+          </div>
+
+          {/* Ornament separator */}
+          <div className={cn(
+            "flex-shrink-0 w-10 md:w-12 h-px bg-gradient-to-r from-transparent to-transparent",
+            isDarkMode
+              ? "via-[#F2E3BB]/50"
+              : "via-emerald-700 dark:via-emerald-500"
+          )}></div>
+
+          {/* Page */}
+          <div className={cn(
+            "text-lg md:text-2xl font-bold",
+            isDarkMode
+              ? "text-[#F2E3BB]"
+              : "text-emerald-800 dark:text-emerald-200"
+          )}>
+            {t('page')} {formatNumber(currentPageNum)}
+          </div>
         </div>
       </motion.div>
 
@@ -861,11 +869,18 @@ const Surah = () => {
           damping: 30,
         }}
         className={cn(
-          "absolute bottom-0 left-0 right-0 z-[65] flex items-center justify-center gap-8 py-4 px-6 pb-16",
+          "absolute bottom-0 left-0 right-0 z-[65] flex items-center justify-center py-4 px-6 pb-16",
           isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
           !isFullscreen && "pointer-events-none"
         )}
       >
+        <div className={cn(
+          "relative isolate flex items-center justify-center gap-6 md:gap-10 px-4 md:px-8 py-1.5 md:py-2 rounded-2xl",
+          isDarkMode
+            ? "bg-[#9CA3AF]/15 border border-gray-300/15 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_rgba(0,0,0,0.4)]"
+            : "bg-[#E7E6E2]/30 border border-[#8A8578]/25 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6),0_2px_12px_rgba(87,70,36,0.12)]"
+        )}>
+          <div className="liquid-glass-backdrop -z-10" />
             {/* Bookmark Button */}
             <div className="relative">
               <button
@@ -874,9 +889,9 @@ const Surah = () => {
                   setShowBookmarkTypeSelector(!showBookmarkTypeSelector);
                 }}
                 className={cn(
-                  "flex flex-col items-center gap-1",
-                  isDarkMode 
-                    ? "text-[#F2E3BB] hover:text-[#FBF9F4]" 
+                  "flex flex-col items-center gap-1 transition-colors",
+                  isDarkMode
+                    ? "text-[#F2E3BB] hover:text-[#FBF9F4]"
                     : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
                 )}
               >
@@ -1037,9 +1052,9 @@ const Surah = () => {
                 setConfigOverlayType('tafseer');
               }}
               className={cn(
-                "flex flex-col items-center gap-1",
-                isDarkMode 
-                  ? "text-[#F2E3BB] hover:text-[#FBF9F4]" 
+                "flex flex-col items-center gap-1 transition-colors",
+                isDarkMode
+                  ? "text-[#F2E3BB] hover:text-[#FBF9F4]"
                   : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
               )}
             >
@@ -1057,11 +1072,11 @@ const Surah = () => {
               }}
               disabled={isTajweedMushaf}
               className={cn(
-                "flex flex-col items-center gap-1",
+                "flex flex-col items-center gap-1 transition-colors",
                 isTajweedMushaf
                   ? "text-gray-400 cursor-not-allowed opacity-50"
-                  : isDarkMode 
-                    ? "text-[#F2E3BB] hover:text-[#FBF9F4]" 
+                  : isDarkMode
+                    ? "text-[#F2E3BB] hover:text-[#FBF9F4]"
                     : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
               )}
               title={isTajweedMushaf ? t('darkModeNotAvailableTajweed') : (isDarkMode ? t('lightMode') : t('darkMode'))}
@@ -1072,6 +1087,7 @@ const Surah = () => {
                 <Moon className="w-8 h-8" />
               )}
             </button>
+        </div>
           </motion.div>
 
       {/* Preloading indicator overlay */}

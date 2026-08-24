@@ -408,3 +408,30 @@
 .tartel-dark-mode.mushaf-tajweed .bismillah-line {
   filter: none;
 }
+
+/* ========================================
+   Liquid Glass (pale grayish frosted glass)
+   ======================================== */
+.liquid-glass-backdrop {
+  position: absolute;
+  inset: 0;
+  height: 200%;
+  border-radius: inherit;
+  /* pale grayish glass tint */
+  background: hsl(220deg 8% 45% / 0.05);
+  pointer-events: none;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  mask-image: linear-gradient(
+    to bottom,
+    black 0,
+    black 50%,
+    transparent 50%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black 0,
+    black 50%,
+    transparent 50%
+  );
+}
