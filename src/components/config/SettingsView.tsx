@@ -1,19 +1,25 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
-import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Type, ChevronLeft, ChevronRight, Sunrise } from "lucide-react";
+import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Type, ChevronLeft, ChevronRight, Sunrise, BookOpenCheck } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMushaf, MushafType } from "@/contexts/MushafContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
 import { Download } from "./Download";
 import { StyleSettings } from "./StyleSettings";
+import MemorizeView from "./MemorizeView";
 
 /**
  * Settings View Component
  * Used by Configuration page for /config/settings
  */
-export default function SettingsView() {
+interface SettingsViewProps {
+  onNavigateToPage?: (page: number) => void;
+  currentPage?: number;
+}
+
+export default function SettingsView({ onNavigateToPage, currentPage }: SettingsViewProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, isRTL, language } = useLanguage();
@@ -54,6 +60,7 @@ export default function SettingsView() {
   const settingsCategories = [
     { id: 'mushaf', icon: BookOpen, label: isRTL ? 'المصحف' : 'Mushaf' },
     { id: 'azkar', icon: Sunrise, label: isRTL ? 'الأذكار' : 'Azkar' },
+    { id: 'memorize', icon: BookOpenCheck, label: isRTL ? 'الحفظ' : 'Memorization' },
     { id: 'style', icon: Palette, label: isRTL ? 'العرض' : 'Style' },
     { id: 'download', icon: HardDriveDownload, label: t('download') },
     { id: 'test', icon: GraduationCap, label: isRTL ? 'اختبار' : 'Test' },
@@ -245,6 +252,14 @@ export default function SettingsView() {
         
       case 'download':
         return <Download />;
+        
+      case 'memorize':
+        return (
+          <MemorizeView
+            currentPage={currentPage}
+            onNavigateToPage={onNavigateToPage}
+          />
+        );
         
       case 'test':
         return (

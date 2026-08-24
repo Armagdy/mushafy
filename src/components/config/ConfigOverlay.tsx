@@ -278,7 +278,12 @@ export default function ConfigOverlay({
   const renderView = () => {
     switch (type) {
       case 'settings':
-        return <SettingsView />;
+        return (
+          <SettingsView
+            currentPage={currentPage}
+            onNavigateToPage={onNavigate}
+          />
+        );
       case 'bookmarks':
         return (
           <BookmarksView
