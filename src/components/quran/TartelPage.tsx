@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, memo } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState, useRef, memo } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { surahs } from '@/data/surahs';
@@ -85,9 +85,29 @@ const loadQuranPagesData = async (): Promise<QuranData> => {
 
 const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel', isFullscreen = false, isFullscreenDarkMode = false }: TartelPageProps) => {
   const { language, t, isRTL } = useLanguage();
-  const [pageData, setPageData] = useState<PageData | null>(null);
-  // Start with fontLoaded = false - wait for actual font to be ready
-  const [fontLoaded, setFontLoaded] = useState(false);
+  // NOTE: text mushafs are ALWAYS rendered enlarged (see SwiperPageDisplay `pageEnlarged`).
+  // A new TartelPage instance mounts for every swiped-to page, so any async gap
+  // (loading placeholder, null line-height) is visible as shrink-then-enlarge.
+  // Initial states below are therefore seeded synchronously to the enlarged
+  // layout so the incoming page paints at full size on the first frame.
+  const [pageData, setPageData] = useState<PageData | null>(() => {
+    try {
+      if (cachedQuranData && pageNumber >= 1 && pageNumber <= 604) {
+        return cachedQuranData.pages[pageNumber - 1] ?? null;
+      }
+    } catch { /* ignore - async load below covers it */ }
+    return null;
+  });
+  const isFontCssInjected = useCallback(() => {
+    try {
+      return !!document.getElementById(`font-p${pageNumber}-${mushafType}`);
+    } catch {
+      return false;
+    }
+  }, [pageNumber, mushafType]);
+  // Start loaded when the @font-face is already injected (preloaded neighbor
+  // pages). This skips the tiny "loading" flash that caused the shrink.
+  const [fontLoaded, setFontLoaded] = useState(() => isFontCssInjected());
   const [loadError, setLoadError] = useState(false);
   const [hoveredAyah, setHoveredAyah] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -162,7 +182,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   // Load page-specific font from cache/network (non-blocking)
   useEffect(() => {
     let mounted = true;
-    let abortController = new AbortController();
+    const abortController = new AbortController();
 
     const loadFont = async () => {
       try {
@@ -208,8 +228,15 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       }
     };
 
-    // Reset fontLoaded to false when page changes
-    setFontLoaded(false);
+    // Reset fontLoaded only when the font CSS is NOT already injected.
+    // Resetting unconditionally flashed the small "loading" placeholder on
+    // every swipe (shrink), then enlarged again once the async load finished.
+    if (!isFontCssInjected()) {
+      setFontLoaded(false);
+    } else {
+      // Font CSS present: verify readiness in background, render now.
+      setFontLoaded(true);
+    }
     setLoadError(false);
     loadFont();
 
@@ -217,7 +244,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       mounted = false;
       abortController.abort();
     };
-  }, [pageNumber, mushafType, fontLoadTrigger]);
+  }, [pageNumber, mushafType, fontLoadTrigger, isFontCssInjected]);
 
   // Listen for online/offline events to retry failed loads
   useEffect(() => {
@@ -233,11 +260,13 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     return () => window.removeEventListener('online', handleOnline);
   }, [loadError]);
 
-  // Calculate dynamic line-height for fullscreen mode
-  useEffect(() => {
-    // Wait until fontLoaded is true - that's when the content renders and containerRef is populated
-    if (!isFullscreen || !pageData || !fontLoaded || !containerRef.current) {
-      setDynamicLineHeight(null);
+  // Calculate dynamic line-height for fullscreen mode.
+  // IMPORTANT: never reset to null while a new page loads — that collapsed the
+  // line-height back to the 1.75 fallback and was visible as shrink-then-grow
+  // on every swipe. We keep the last value and overwrite it synchronously
+  // (layout effect, before paint) once the new page is measurable.
+  useLayoutEffect(() => {
+    if (!isFullscreen || !pageData || !fontLoaded) {
       return;
     }
 
@@ -245,9 +274,12 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       const container = containerRef.current;
       if (!container) return;
 
-      // Get available height, accounting for fullscreen header (~80px) and footer (~100px) overlays
-      const headerHeight = 80;
-      const footerHeight = 100;
+      // Get available height, accounting for fullscreen overlay header/footer.
+      // Surah.tsx reserves pt-[108px]/pb-[128px] (md: 116/136) for these
+      // overlays, so the text must fit in the space BETWEEN them — never
+      // beneath them.
+      const headerHeight = 112;
+      const footerHeight = 132;
       const availableHeight = window.innerHeight - headerHeight - footerHeight;
       
       // Count total lines on this page
@@ -270,19 +302,75 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       // Clamp between 1.8 and 6.0 for readability
       const clampedLineHeight = Math.max(1.8, Math.min(6.0, calculatedLineHeight));
       
-      setDynamicLineHeight(clampedLineHeight);
+      // Only update state when the value actually changed (avoids re-render loop,
+      // which itself flashed the layout).
+      setDynamicLineHeight((prev) =>
+        prev === null || Math.abs(prev - clampedLineHeight) > 0.01 ? clampedLineHeight : prev
+      );
     };
 
-    // Small delay to ensure font is rendered before measuring
-    const timeoutId = setTimeout(calculateLineHeight, 50);
-    
+    // Measure synchronously before paint (no 50ms delay) so the incoming page
+    // never paints one frame at the fallback line-height (the "shrink" frame).
+    // requestAnimationFrame covers the case where the custom font swaps in a
+    // tick later; resize keeps it correct on rotation.
+    calculateLineHeight();
+    const rafId = requestAnimationFrame(calculateLineHeight);
+
     // Recalculate on resize
     window.addEventListener('resize', calculateLineHeight);
     return () => {
-      clearTimeout(timeoutId);
+      cancelAnimationFrame(rafId);
       window.removeEventListener('resize', calculateLineHeight);
     };
   }, [isFullscreen, pageData, fontLoaded]);
+
+  // Stretch the surah header frame to fill the full element width.
+  // The icon-font glyph has an intrinsic width, so flex centering alone
+  // leaves gaps at the sides. Measure the glyph and grow/shrink the
+  // font-size until the glyph width matches the container width
+  // (proportional scaling like responsive type — no scaleX distortion).
+  useLayoutEffect(() => {
+    if (!pageData || !fontLoaded) return;
+
+    const fitHeaders = () => {
+      const root = containerRef.current;
+      if (!root) return;
+      const headers = root.querySelectorAll('.quran-icon-surah-header');
+      headers.forEach((header) => {
+        const el = header as HTMLElement;
+        const container = el.parentElement;
+        const glyph = el.querySelector('.surah-header-glyph') as HTMLElement | null;
+        if (!container || !glyph) return;
+        const target = container.clientWidth;
+        if (!target) return;
+        // Measure from the CSS base size (clear previous fit first to avoid
+        // compounding on repeated calls).
+        el.style.fontSize = '';
+        const base = parseFloat(window.getComputedStyle(el).fontSize) || 0;
+        const glyphWidth = glyph.offsetWidth;
+        if (!base || !glyphWidth) return;
+        const scale = target / glyphWidth;
+        const clamped = Math.min(2.5, Math.max(0.5, scale));
+        if (Math.abs(clamped - 1) > 0.01) {
+          el.style.fontSize = `${base * clamped}px`;
+        }
+      });
+    };
+
+    fitHeaders();
+    const raf = requestAnimationFrame(fitHeaders);
+    // Glyph metrics change once the icon font finishes loading — re-fit then.
+    try {
+      (document as Document & { fonts?: { ready?: Promise<unknown> } }).fonts?.ready?.then(() => {
+        fitHeaders();
+      });
+    } catch { /* fonts API unavailable — initial fit stands */ }
+    window.addEventListener('resize', fitHeaders);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', fitHeaders);
+    };
+  }, [pageData, fontLoaded]);
 
   // Calculate highlight rectangles for the currently highlighted ayah
   useEffect(() => {
@@ -540,12 +628,23 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     );
   }
 
-  // Show loading state until both page data AND font are loaded
-  // This prevents FOUC (Flash of Unstyled Content)
+  // Loading skeleton: keep the EXACT enlarged footprint (same max-h class +
+  // full-height min-height) so a swiped-to page never paints as a small box
+  // that then jumps to full size. Previously this was a collapsed flex box —
+  // the visible "shrink then enlarge".
   if (!pageData || !fontLoaded) {
     return (
-      <div className={`flex items-center justify-center bg-[#FBF9F4] ${className}`}>
-        <div className="text-emerald-700 text-lg">{t('loading')}</div>
+      <div
+        className={`flex items-center justify-center ${className}`}
+        style={{
+          width: '100%',
+          height: '100%',
+          minHeight: 'calc(100dvh - 250px)',
+          fontFamily: `'p${pageNumber}-${mushafType}', 'Amiri', serif`,
+          direction: 'rtl',
+        }}
+      >
+        <div className="text-emerald-700 text-lg opacity-60">{t('loading')}</div>
       </div>
     );
   }
@@ -567,11 +666,19 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     <div
       ref={containerRef}
       className={`tartel-page tartel-page-transition flex flex-col items-center bg-transparent ${isFullscreenDarkMode ? 'tartel-dark-mode' : ''} ${isTransitioning ? 'tartel-transitioning' : ''} ${className}`}
-      style={{ 
+      style={{
         fontFamily: `'p${pageNumber}-${mushafType}', 'Amiri', serif`,
         direction: 'rtl',
-        maxHeight: '100%',
-        height: isFullscreen ? '100%' : 'auto',
+        // Size from viewport (same in normal + fullscreen) so toggling the
+        // view never shrinks the page. Parent slide scrolls if taller than
+        // its content box; Surah.tsx padding guarantees it starts after the
+        // header instead of beneath it.
+        maxHeight: 'none',
+        height: 'auto',
+        // Lock the enlarged footprint even before the font/line-height settles,
+        // so swipe-incoming pages can't collapse for a frame (no shrink).
+        minHeight: 'calc(100dvh - 250px)',
+        width: '100%',
         position: 'relative',
         justifyContent: isFullscreen ? 'space-between' : 'center',
       }}
@@ -595,10 +702,10 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         />
       ))}
       <div 
-        className={`tartel-content-wrapper w-full flex flex-col px-2 sm:px-4 md:px-6`} 
-        style={{ 
-          maxHeight: '100%', 
-          position: 'relative', 
+        className={`tartel-content-wrapper w-full flex flex-col px-2 sm:px-4 md:px-6`}
+        style={{
+          maxHeight: 'none',
+          position: 'relative',
           zIndex: 1,
           flex: isFullscreen ? '1' : 'none',
           justifyContent: isFullscreen ? 'space-between' : 'center',
@@ -633,10 +740,14 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
                 })}
               </div>
             ) : line.line_type === 'surah_name' ? (
-              // Surah name decorative header with icon fonts
+              // Surah name decorative header with icon fonts.
+              // The glyph span is measured by the auto-fit effect below so the
+              // frame stretches to fill the full element width (not just
+              // centered at its intrinsic size like ayah lines fill via
+              // space-between).
               <div className="surah-header-container text-center">
                 <div className="quran-icon-surah-header">
-                  header
+                  <span className="surah-header-glyph" aria-hidden="true">header</span>
                   <div className="surah-icon-overlay">
                     <span className="surah-name-v4-icon">
                       {`surah${String(line.surah_number || 1).padStart(3, '0')}`}
@@ -676,6 +787,10 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
                       justify-content 0.35s cubic-bezier(0.4, 0, 0.2, 1),
                       padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
           will-change: flex, justify-content, padding;
+          /* Establish a container so the surah header (cqw units below)
+             scales with the PAGE width (incl. side padding) instead of the
+             viewport — it follows the same width as the ayah lines. */
+          container-type: inline-size;
         }
         
         /* While transitioning, ensure smooth line-height changes */
@@ -762,14 +877,23 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         .quran-icon-surah-header {
           position: relative;
           font-family: quran-icon;
-          font-size: min(max(9.5vw, 3.56rem), 5.94rem);
+          font-size: min(max(9.5cqw, 3.56rem), 5.94rem);
           color: #065f46;
           line-height: 1;
           display: flex;
           justify-content: center;
           align-items: center;
-          width: auto;
+          width: 100%;
           max-width: 100%;
+        }
+
+        /* Measurable glyph run for the auto-fit effect: inline-block so
+           offsetWidth reports the true glyph width (not the stretched
+           100% flex-box width), nowrap so it never wraps mid-frame. */
+        .surah-header-glyph {
+          display: inline-block;
+          white-space: nowrap;
+          line-height: 1;
         }
 
         .surah-icon-overlay {
@@ -786,7 +910,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         .surah-name-v4-icon {
           font-family: surah-name-v4;
-          font-size: min(max(8vw, 2.8rem), 4.5rem);
+          font-size: min(max(8cqw, 2.8rem), 4.5rem);
           color: #065f46;
           line-height: 1;
         }
@@ -796,19 +920,19 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
             line-height: ${dynamicLineHeight || 1.75};
           }
           .quran-icon-surah-header {
-            font-size: min(max(12.5vw, 5rem), 7.5rem);
+            font-size: min(max(12.5cqw, 5rem), 7.5rem);
           }
           .surah-name-v4-icon {
-            font-size: min(max(9.5vw, 3.4rem), 5.6rem);
+            font-size: min(max(9.5cqw, 3.4rem), 5.6rem);
           }
         }
 
         @media (min-width: 768px) {
           .quran-icon-surah-header {
-            font-size: min(max(15vw, 6.25rem), 8.75rem);
+            font-size: min(max(15cqw, 6.25rem), 8.75rem);
           }
           .surah-name-v4-icon {
-            font-size: min(max(11vw, 4rem), 6.5rem);
+            font-size: min(max(11cqw, 4rem), 6.5rem);
           }
           
           .surah-header-container {

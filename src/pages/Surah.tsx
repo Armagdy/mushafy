@@ -758,7 +758,13 @@ const Surah = () => {
           "flex-1 flex items-center justify-center overflow-hidden",
           isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
           "fullscreen-container-transition",
-          isFullscreen && "absolute inset-0 z-[60]"
+          isFullscreen && "absolute inset-0 z-[60]",
+          // Reserve space for fullscreen overlay header/footer so text-mushaf
+          // pages (tarteel/tajweed) start AFTER the header, not beneath it.
+          // NOTE: vertical padding only (no horizontal) so page width stays
+          // identical to default view — side padding lives in
+          // SwiperPageDisplay (same in both modes) to avoid shrink on toggle.
+          isFullscreen && "pt-[108px] md:pt-[116px] pb-[128px] md:pb-[136px] box-border"
         )}
         style={{
           // Smooth CSS transition for layout properties

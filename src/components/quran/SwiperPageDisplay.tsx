@@ -267,15 +267,21 @@ export function SwiperPageDisplay({
     // Text mushafs (tarteel/tajweed) are always enlarged, regardless of fullscreen chrome state
     const isTextMushaf = mushafType === 'tarteel' || mushafType === 'tajweed';
     const pageEnlarged = isFullscreen || isTextMushaf;
-    
-    // Dynamic max-height based on fullscreen mode
-    const imageMaxHeight = pageEnlarged 
-      ? 'max-h-[calc(100dvh-80px)]'  // More space in fullscreen (only header/footer overlays)
+
+    // Dynamic max-height: must fit inside the available space BETWEEN header
+    // and footer overlays (Surah.tsx reserves pt-[108px]/pb-[128px] in
+    // fullscreen). The old `100dvh-80px` was taller than the content box, so
+    // text pages rendered beneath the overlays.
+    const imageMaxHeight = pageEnlarged
+      ? 'max-h-[calc(100dvh-250px)] md:max-h-[calc(100dvh-265px)]'
       : 'max-h-[calc(100dvh-170px)]'; // Normal mode with bars visible
     
     if (mushafType === 'tarteel' || mushafType === 'tajweed') {
+      // h-auto + min-h-full: size to content (identical in both modes) instead
+      // of stretching to the parent box (which differs normal vs fullscreen
+      // and caused the shrink on toggle). Parent slide scrolls on overflow.
       return (
-        <div className="relative">
+        <div className="relative w-full h-auto min-h-full flex flex-col justify-start px-2 md:px-4 box-border">
           {renderBookmarkIcons(pageNum, isOddPage ? 'right' : 'left')}
           <div
             aria-hidden="true"
@@ -411,7 +417,12 @@ export function SwiperPageDisplay({
         {slides.map((pageNum) => (
           <SwiperSlide key={pageNum} virtualIndex={pageNum - 1}>
             <div className={cn(
-              "flex items-center justify-center h-full w-full py-1",
+              "flex justify-center h-full w-full py-1 px-3 md:px-6 overflow-y-auto box-border",
+              // Text mushafs fill the content box from the top (after the
+              // header) instead of centering over the full viewport.
+              mushafType === 'tarteel' || mushafType === 'tajweed'
+                ? "items-start"
+                : "items-center",
               isFullscreenDarkMode ? "bg-black" : "bg-[#FBF9F4]"
             )}>
               {renderPage(pageNum)}
