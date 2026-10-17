@@ -667,25 +667,17 @@ const Surah = () => {
 
       {/* Main Content Area - Single instance with animated container for smooth fullscreen transition */}
       
-      {/* Fullscreen Overlay Header - animated in/out with smooth fade and slide */}
-      <motion.div
-        initial={false}
-        animate={{
-          opacity: isFullscreen ? 1 : 0,
-          y: isFullscreen ? 0 : -30,
-          scale: isFullscreen ? 1 : 0.95,
-        }}
-        transition={{
-          type: 'spring',
-          stiffness: 260,
-          damping: 25,
-          mass: 0.8,
-          opacity: { duration: 0.25, ease: 'easeOut' },
-        }}
+      {/* Fullscreen Overlay Header — CSS-class driven (NOT framer-motion).
+          framer wrote a stale inline opacity after the entrance spring settled,
+          blinking the bar out for a frame; class transitions can't be clobbered. */}
+      <div
         className={cn(
           "absolute top-0 left-0 right-0 z-[65] flex items-center justify-between pt-12 pb-3 px-6",
           isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
-          !isFullscreen && "pointer-events-none"
+          "transition-[opacity,transform] duration-300 ease-out",
+          isFullscreen
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 -translate-y-[30px] pointer-events-none"
         )}
       >
         <div         className={cn(
@@ -739,7 +731,7 @@ const Surah = () => {
             {t('page')} {formatNumber(currentPageNum)}
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Page Display Container - Always rendered, animates between normal and fullscreen */}
       <motion.div
@@ -880,22 +872,16 @@ const Surah = () => {
         )}
       </motion.div>
 
-      {/* Fullscreen Footer - Quick Action Buttons (animated in/out) */}
-      <motion.div
-        initial={false}
-        animate={{
-          opacity: isFullscreen ? 1 : 0,
-          y: isFullscreen ? 0 : 20,
-        }}
-        transition={{
-          type: 'spring',
-          stiffness: 300,
-          damping: 30,
-        }}
+      {/* Fullscreen Footer - Quick Action Buttons — CSS-class driven (NOT framer-motion).
+          Same post-settle inline-style clobber fix as the overlay header above. */}
+      <div
         className={cn(
           "absolute bottom-0 left-0 right-0 z-[65] flex items-center justify-center py-4 px-6 pb-16",
           isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
-          !isFullscreen && "pointer-events-none"
+          "transition-[opacity,transform] duration-300 ease-out",
+          isFullscreen
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-[20px] pointer-events-none"
         )}
       >
         <div         className={cn(
@@ -1110,7 +1096,7 @@ const Surah = () => {
               )}
             </button>
         </div>
-          </motion.div>
+          </div>
 
       {/* Preloading indicator overlay */}
       {isPreloadingAyahs && (
