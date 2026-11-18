@@ -90,6 +90,9 @@ export const useAudioPlayer = ({
   // Track last time we updated native controls position (for throttling)
   const lastPositionUpdateRef = useRef<number>(0);
   
+  // Whether we already showed the battery-optimization prompt this app session
+  const batteryPromptShownRef = useRef<boolean>(false);
+  
   // Track if user is actively seeking (dragging progress bar)
   const isSeekingRef = useRef<boolean>(false);
   
@@ -276,12 +279,52 @@ export const useAudioPlayer = ({
     }
   }, [selectedReciter, audioSource, selectedMp3QuranReciter, mp3QuranRecitersAr, audioElement]);
   
+  // One-time: ask the user to exempt the app from battery optimization.
+  // Aggressive OEM ROMs (Xiaomi MIUI, OPPO ColorOS, Huawei EMUI, Samsung...)
+  // kill background apps even when a foreground service is running, unless the
+  // user marks the app as "Unrestricted" / "No battery optimization".
+  const maybePromptBatteryOptimization = useCallback(async () => {
+    if (batteryPromptShownRef.current) return;
+    batteryPromptShownRef.current = true;
+
+    // Only ever show once across installs/sessions (unless the user keeps declining)
+    const PROMPT_FLAG = 'quran-battery-opt-prompted';
+    if (localStorage.getItem(PROMPT_FLAG) === 'accepted') return;
+
+    try {
+      const { ignoring } = await QuranMediaSession.isIgnoringBatteryOptimizations();
+      if (ignoring) {
+        localStorage.setItem(PROMPT_FLAG, 'accepted');
+        return;
+      }
+      
+      const message =
+        'لتشغيل القرآن في الخلفية دون توقف، يُنصح بالسماح للتطبيق بتجاهل تحسينات البطارية.\n\n' +
+        'To keep Quran playing in the background without interruption, allow the app to ignore battery optimizations?';
+      
+      if (window.confirm(message)) {
+        localStorage.setItem(PROMPT_FLAG, 'accepted');
+        await QuranMediaSession.requestIgnoreBatteryOptimizations();
+      } else {
+        // Ask again on the next app session
+        localStorage.setItem(PROMPT_FLAG, 'declined');
+      }
+    } catch (error) {
+      console.warn('[BatteryOptimization] Could not check battery optimization status:', error);
+    }
+  }, []);
+  
   // Update native music controls (for Android notification)
   const updateNativeMusicControls = useCallback(async (surahNum: number, ayahNum: number, playing: boolean) => {
     // Only use native controls on native platforms
     if (!Capacitor.isNativePlatform()) {
       console.log('Skipping native music controls (not on native platform)');
       return;
+    }
+    
+    // First playback of the session: check battery optimization exemption once
+    if (playing) {
+      maybePromptBatteryOptimization().catch(console.error);
     }
     
     try {
@@ -352,7 +395,7 @@ export const useAudioPlayer = ({
       });
       // Don't throw - just log and continue
     }
-  }, [audioSource, selectedReciter, selectedMp3QuranReciter, mp3QuranRecitersAr]);
+  }, [audioSource, selectedReciter, selectedMp3QuranReciter, mp3QuranRecitersAr, maybePromptBatteryOptimization]);
   
   // Get next ayah in sequence
   const getNextAyah = useCallback((currentSurah: number, currentAyah: number): CurrentAyah | null => {

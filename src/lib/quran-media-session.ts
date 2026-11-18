@@ -25,6 +25,19 @@ export interface QuranMediaSessionPlugin {
   destroy(): Promise<void>;
 
   /**
+   * Whether the app is exempt from battery optimization.
+   * Aggressive OEM ROMs (Xiaomi/OPPO/Huawei/Samsung...) kill background
+   * playback unless the user grants this exemption.
+   */
+  isIgnoringBatteryOptimizations(): Promise<{ ignoring: boolean }>;
+
+  /**
+   * Opens the system dialog asking the user to exempt the app from
+   * battery optimization (Android 6.0+).
+   */
+  requestIgnoreBatteryOptimizations(): Promise<void>;
+
+  /**
    * Listen for media session events
    */
   addListener(

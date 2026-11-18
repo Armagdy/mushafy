@@ -40,6 +40,24 @@ public class MainActivity extends BridgeActivity {
             | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
             | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
         );
+
+        // Android 13+ requires the POST_NOTIFICATIONS runtime permission.
+        // Media-style notifications tied to an active MediaSession are exempt,
+        // but requesting it keeps every OEM/launcher variant happy.
+        requestNotificationPermissionIfNeeded();
+    }
+
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                );
+            }
+        }
     }
     
     @Override

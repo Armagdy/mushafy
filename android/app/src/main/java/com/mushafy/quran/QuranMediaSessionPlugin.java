@@ -1,21 +1,12 @@
 package com.mushafy.quran;
 
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.net.Uri;
 import android.os.Build;
-import android.support.v4.media.MediaMetadataCompat;
-import android.support.v4.media.session.MediaSessionCompat;
-import android.support.v4.media.session.PlaybackStateCompat;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.util.Log;
-
-import androidx.core.app.NotificationCompat;
-import androidx.media.session.MediaButtonReceiver;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -23,336 +14,163 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import androidx.core.content.ContextCompat;
+
+/**
+ * Thin router between the WebView (JavaScript) and {@link QuranPlaybackService}.
+ *
+ * The service is a foreground service of type mediaPlayback. Keeping the media
+ * session + notification inside that service (instead of inside this plugin, as
+ * before) is what makes background playback survive: a running foreground service
+ * raises the app process priority so Doze, the low-memory killer and OEM battery
+ * savers no longer kill the app while Quran audio is playing.
+ */
 @CapacitorPlugin(name = "QuranMediaSession")
 public class QuranMediaSessionPlugin extends Plugin {
     private static final String TAG = "QuranMediaSession";
-    private static final String NOTIFICATION_CHANNEL_ID = "capacitor-music-channel-id";
-    private static final int NOTIFICATION_ID = 7825;
-    
-    private MediaSessionCompat mediaSession;
-    private NotificationManager notificationManager;
-    private PlaybackStateCompat.Builder stateBuilder;
-    
-    private String currentTrack = "";
-    private String currentArtist = "";
-    private String currentAlbum = "";
-    private boolean isPlaying = false;
-    private long duration = 0;
-    private long position = 0;
-    
+
     @Override
     public void load() {
         super.load();
-        initializeMediaSession();
-        Log.d(TAG, "QuranMediaSession plugin loaded");
+        // The service routes native media-button events back to JS through this reference.
+        QuranPlaybackService.setPlugin(this);
+        Log.d(TAG, "QuranMediaSession plugin loaded (routed to QuranPlaybackService)");
     }
-    
-    private void initializeMediaSession() {
-        Context context = getContext();
-        notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        
-        // Create notification channel for Android 8.0+
-        createNotificationChannel();
-        
-        // Create MediaSession
-        mediaSession = new MediaSessionCompat(context, TAG);
-        mediaSession.setFlags(
-            MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS |
-            MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
-        );
-        
-        // Set up PlaybackState builder with SEEK_TO action
-        stateBuilder = new PlaybackStateCompat.Builder()
-            .setActions(
-                PlaybackStateCompat.ACTION_PLAY |
-                PlaybackStateCompat.ACTION_PAUSE |
-                PlaybackStateCompat.ACTION_PLAY_PAUSE |
-                PlaybackStateCompat.ACTION_SKIP_TO_NEXT |
-                PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS |
-                PlaybackStateCompat.ACTION_SEEK_TO |  // ← Critical for seek support
-                PlaybackStateCompat.ACTION_STOP
-            );
-        
-        mediaSession.setPlaybackState(stateBuilder.build());
-        
-        // Set up callbacks for media button events
-        mediaSession.setCallback(new MediaSessionCompat.Callback() {
-            @Override
-            public void onPlay() {
-                Log.d(TAG, "▶️ onPlay() called");
-                notifyJavaScript("play", null);
-                isPlaying = true;
-                updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, position);
-                showNotification();
-            }
-            
-            @Override
-            public void onPause() {
-                Log.d(TAG, "⏸️ onPause() called");
-                notifyJavaScript("pause", null);
-                isPlaying = false;
-                updatePlaybackState(PlaybackStateCompat.STATE_PAUSED, position);
-                showNotification();
-            }
-            
-            @Override
-            public void onSkipToNext() {
-                Log.d(TAG, "⏭️ onSkipToNext() called");
-                notifyJavaScript("next", null);
-            }
-            
-            @Override
-            public void onSkipToPrevious() {
-                Log.d(TAG, "⏮️ onSkipToPrevious() called");
-                notifyJavaScript("previous", null);
-            }
-            
-            @Override
-            public void onSeekTo(long pos) {
-                Log.d(TAG, "⏩ onSeekTo() called with position: " + pos + "ms");
-                position = pos;
-                JSObject data = new JSObject();
-                data.put("position", pos / 1000.0); // Convert ms to seconds
-                notifyJavaScript("seek", data);
-                updatePlaybackState(isPlaying ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED, pos);
-            }
-            
-            @Override
-            public void onStop() {
-                Log.d(TAG, "⏹️ onStop() called");
-                notifyJavaScript("stop", null);
-                isPlaying = false;
-                updatePlaybackState(PlaybackStateCompat.STATE_STOPPED, 0);
-                hideNotification();
-            }
-        });
-        
-        mediaSession.setActive(true);
-        Log.d(TAG, "MediaSession initialized with SEEK_TO support");
+
+    @Override
+    protected void handleOnDestroy() {
+        super.handleOnDestroy();
+        // Intentionally do NOT stop the playback service here: it must survive
+        // activity destruction (app in background / rotated / etc.).
+        QuranPlaybackService.setPlugin(null);
+        Log.d(TAG, "QuranMediaSession plugin destroyed (service left running)");
     }
-    
-    private void notifyJavaScript(String action, JSObject data) {
+
+    /**
+     * Called by QuranPlaybackService when a media action originates on the native
+     * side (notification buttons, lock screen, Bluetooth, headset keys).
+     * Emits the same event shape the WebView already handles: { action, data? }.
+     */
+    void onServiceMediaEvent(String action, Double positionSeconds) {
         JSObject ret = new JSObject();
         ret.put("action", action);
-        if (data != null) {
+        if (positionSeconds != null) {
+            JSObject data = new JSObject();
+            data.put("position", positionSeconds);
             ret.put("data", data);
         }
         notifyListeners("mediaSessionEvent", ret);
     }
-    
-    /**
-     * Load mushafy.png from assets as album art.
-     * This creates a large bitmap for the notification background.
-     */
-    private Bitmap loadAlbumArtFromAssets() {
-        try {
-            android.content.res.AssetManager assetManager = getContext().getAssets();
-            java.io.InputStream is = assetManager.open("public/mushafy.png");
-            Bitmap bitmap = BitmapFactory.decodeStream(is);
-            is.close();
-            
-            if (bitmap != null) {
-                // Scale to reasonable size (512x512) for notification
-                int size = 512;
-                return Bitmap.createScaledBitmap(bitmap, size, size, true);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to load album art from assets", e);
-        }
-        return null;
-    }
-    
+
     @PluginMethod
     public void updateMetadata(PluginCall call) {
-        // Reinitialize if media session was destroyed
-        if (mediaSession == null) {
-            Log.d(TAG, "MediaSession was null, reinitializing...");
-            initializeMediaSession();
-        }
-        
-        currentTrack = call.getString("track", "");
-        currentArtist = call.getString("artist", "");
-        currentAlbum = call.getString("album", "");
-        
-        Log.d(TAG, "Updating metadata: " + currentTrack + " - " + currentArtist);
-        
-        MediaMetadataCompat.Builder metadataBuilder = new MediaMetadataCompat.Builder()
-            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTrack)
-            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentArtist)
-            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, currentAlbum)
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration);
-        
-        // Add mushafy.png as album art (large background image)
-        try {
-            Bitmap albumArt = loadAlbumArtFromAssets();
-            if (albumArt != null) {
-                metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, albumArt);
-                Log.d(TAG, "Album art loaded: " + albumArt.getWidth() + "x" + albumArt.getHeight());
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "Could not load album art", e);
-        }
-        
-        mediaSession.setMetadata(metadataBuilder.build());
-        showNotification();
-        
+        Intent intent = new Intent(getContext(), QuranPlaybackService.class);
+        intent.setAction(QuranPlaybackService.ACTION_UPDATE);
+        intent.putExtra(QuranPlaybackService.EXTRA_HAS_METADATA, true);
+        intent.putExtra(QuranPlaybackService.EXTRA_TRACK, call.getString("track", ""));
+        intent.putExtra(QuranPlaybackService.EXTRA_ARTIST, call.getString("artist", ""));
+        intent.putExtra(QuranPlaybackService.EXTRA_ALBUM, call.getString("album", ""));
+        sendToService(intent);
         call.resolve();
     }
-    
+
     @PluginMethod
     public void updatePlaybackState(PluginCall call) {
-        // Reinitialize if media session was destroyed
-        if (mediaSession == null) {
-            Log.d(TAG, "MediaSession was null, reinitializing...");
-            initializeMediaSession();
-        }
-        
-        isPlaying = call.getBoolean("isPlaying", false);
-        // Use getDouble since JavaScript sends float values, then convert to ms
-        position = (long)(call.getDouble("position", 0.0) * 1000); // Convert seconds to ms
-        duration = (long)(call.getDouble("duration", 0.0) * 1000); // Convert seconds to ms
-        
-        Log.d(TAG, "Updating playback state: isPlaying=" + isPlaying + ", position=" + (position/1000.0) + "s, duration=" + (duration/1000.0) + "s");
-        
-        // Update metadata duration (critical for seek bar to appear)
-        if (mediaSession != null && duration > 0) {
-            MediaMetadataCompat currentMetadata = mediaSession.getController().getMetadata();
-            if (currentMetadata != null) {
-                MediaMetadataCompat.Builder metadataBuilder = new MediaMetadataCompat.Builder(currentMetadata)
-                    .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration);
-                mediaSession.setMetadata(metadataBuilder.build());
-                Log.d(TAG, "Updated metadata duration to " + (duration/1000.0) + "s for seek bar");
-            }
-        }
-        
-        int state = isPlaying ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED;
-        updatePlaybackState(state, position);
-        showNotification();
-        
+        Intent intent = new Intent(getContext(), QuranPlaybackService.class);
+        intent.setAction(QuranPlaybackService.ACTION_UPDATE);
+        intent.putExtra(QuranPlaybackService.EXTRA_HAS_STATE, true);
+        intent.putExtra(QuranPlaybackService.EXTRA_IS_PLAYING, call.getBoolean("isPlaying", false));
+        // JS sends seconds - the service converts to ms internally.
+        intent.putExtra(QuranPlaybackService.EXTRA_POSITION, call.getDouble("position", 0.0));
+        intent.putExtra(QuranPlaybackService.EXTRA_DURATION, call.getDouble("duration", 0.0));
+        sendToService(intent);
         call.resolve();
     }
-    
-    private void updatePlaybackState(int state, long position) {
-        // Safety check - reinitialize if needed
-        if (mediaSession == null || stateBuilder == null) {
-            Log.w(TAG, "MediaSession or stateBuilder is null in updatePlaybackState, reinitializing...");
-            initializeMediaSession();
-        }
-        
-        PlaybackStateCompat playbackState = stateBuilder
-            .setState(state, position, 1.0f)
-            .build();
-        mediaSession.setPlaybackState(playbackState);
-    }
-    
+
     @PluginMethod
     public void destroy(PluginCall call) {
-        Log.d(TAG, "Destroying MediaSession");
-        hideNotification();
-        if (mediaSession != null) {
-            mediaSession.setActive(false);
-            mediaSession.release();
-            mediaSession = null;
+        if (QuranPlaybackService.isRunning()) {
+            Intent intent = new Intent(getContext(), QuranPlaybackService.class);
+            intent.setAction(QuranPlaybackService.ACTION_DESTROY);
+            sendToService(intent);
+        } else {
+            // Nothing is running. Never use startForegroundService() on this path:
+            // starting a service just to stop it immediately violates Android's
+            // startForeground() contract and crashes the app.
+            try {
+                getContext().stopService(new Intent(getContext(), QuranPlaybackService.class));
+            } catch (Exception ignored) {
+            }
         }
         call.resolve();
     }
-    
-    private void showNotification() {
-        // Safety check - reinitialize if needed
-        if (mediaSession == null) {
-            Log.w(TAG, "MediaSession is null in showNotification, reinitializing...");
-            initializeMediaSession();
+
+    /**
+     * Whether the user has already exempted the app from battery optimization
+     * ("Unrestricted" / "No battery optimization"). Aggressive OEM ROMs
+     * (Xiaomi MIUI, OPPO ColorOS, Huawei EMUI, Samsung...) kill background apps
+     * even with a foreground service unless this exemption is granted.
+     */
+    @PluginMethod
+    public void isIgnoringBatteryOptimizations(PluginCall call) {
+        boolean ignoring = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+            ignoring = pm != null && pm.isIgnoringBatteryOptimizations(getContext().getPackageName());
         }
-        
+        JSObject ret = new JSObject();
+        ret.put("ignoring", ignoring);
+        call.resolve(ret);
+    }
+
+    /**
+     * Opens the system dialog asking the user to exempt the app from battery
+     * optimization, so background Quran playback is never killed by OEM
+     * battery managers. Requires the REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+     * permission (declared in the manifest).
+     */
+    @PluginMethod
+    public void requestIgnoreBatteryOptimizations(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                Intent intent = new Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:" + getContext().getPackageName())
+                );
+                getActivity().runOnUiThread(() -> {
+                    try {
+                        getActivity().startActivity(intent);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Could not open battery optimization dialog", e);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to build battery optimization intent", e);
+            }
+        }
+        call.resolve();
+    }
+
+    private void sendToService(Intent intent) {
         Context context = getContext();
-        
-        // Create intent to open app when notification is tapped
-        Intent intent = new Intent(context, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent contentIntent = PendingIntent.getActivity(
-            context,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-        );
-        
-        // Load mushafy.png as large icon (full background image)
-        Bitmap largeIcon = null;
         try {
-            largeIcon = loadAlbumArtFromAssets();
-            if (largeIcon != null) {
-                Log.d(TAG, "Large icon loaded: " + largeIcon.getWidth() + "x" + largeIcon.getHeight());
+            if (QuranPlaybackService.isRunning()) {
+                // Service already alive: a plain startService is always allowed
+                // because an app with a running foreground service is not
+                // considered background.
+                context.startService(intent);
+            } else {
+                // First start (user pressed play while app was in the foreground).
+                // On Android 12+ startForegroundService is only legal from the
+                // foreground, and playback is always user-initiated, so this is fine.
+                ContextCompat.startForegroundService(context, intent);
             }
         } catch (Exception e) {
-            Log.w(TAG, "Could not load large icon", e);
-        }
-        
-        // Build notification with MediaStyle
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle(currentTrack)
-            .setContentText(currentArtist)
-            .setSubText(currentAlbum)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setLargeIcon(largeIcon) // This shows as the background image
-            .setContentIntent(contentIntent)
-            .setDeleteIntent(MediaButtonReceiver.buildMediaButtonPendingIntent(context, PlaybackStateCompat.ACTION_STOP))
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(true) // Keep notification visible
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
-                .setMediaSession(mediaSession.getSessionToken())
-                .setShowActionsInCompactView(0, 1, 2) // Show 3 actions in compact view
-            );
-        
-        // Add action buttons
-        builder.addAction(createAction(android.R.drawable.ic_media_previous, "Previous", PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS));
-        
-        if (isPlaying) {
-            builder.addAction(createAction(android.R.drawable.ic_media_pause, "Pause", PlaybackStateCompat.ACTION_PAUSE));
-        } else {
-            builder.addAction(createAction(android.R.drawable.ic_media_play, "Play", PlaybackStateCompat.ACTION_PLAY));
-        }
-        
-        builder.addAction(createAction(android.R.drawable.ic_media_next, "Next", PlaybackStateCompat.ACTION_SKIP_TO_NEXT));
-        
-        Notification notification = builder.build();
-        notificationManager.notify(NOTIFICATION_ID, notification);
-        
-        Log.d(TAG, "Notification shown with seek support");
-    }
-    
-    private NotificationCompat.Action createAction(int icon, String title, long action) {
-        Context context = getContext();
-        PendingIntent pendingIntent = MediaButtonReceiver.buildMediaButtonPendingIntent(context, action);
-        return new NotificationCompat.Action.Builder(icon, title, pendingIntent).build();
-    }
-    
-    private void hideNotification() {
-        if (notificationManager != null) {
-            notificationManager.cancel(NOTIFICATION_ID);
-        }
-    }
-    
-    /**
-     * Create notification channel for Android 8.0+ (API 26+)
-     * Required for notifications to appear on modern Android versions
-     */
-    private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                NOTIFICATION_CHANNEL_ID,
-                "Quran Audio Player",
-                NotificationManager.IMPORTANCE_LOW
-            );
-            channel.setDescription("Controls for Quran audio playback");
-            channel.setShowBadge(false);
-            channel.setSound(null, null); // Silent channel (audio plays separately)
-            channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-            
-            if (notificationManager != null) {
-                notificationManager.createNotificationChannel(channel);
-                Log.d(TAG, "✅ Notification channel created: " + NOTIFICATION_CHANNEL_ID);
-            }
+            // E.g. startForegroundService denied because the app was backgrounded
+            // between the play tap and this call. Playback still works in-app;
+            // the next update will run through the plain startService path once
+            // the service is alive.
+            Log.e(TAG, "Failed to send command to playback service", e);
         }
     }
 }

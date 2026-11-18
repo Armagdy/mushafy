@@ -23,12 +23,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             
-            <!-- Support for Media Session API / Android Auto / Bluetooth controls -->
-            <intent-filter>
-                <action android:name="android.media.browse.MediaBrowserService" />
-            </intent-filter>
-
         </activity>
+
+        <!--
+            Foreground service that hosts the media session and the media-style
+            notification while Quran audio plays. This is what keeps the app
+            process alive in the background (Doze / low-memory killer / OEM
+            battery savers no longer kill playback) and keeps the media
+            notification from being removed.
+        -->
+        <service
+            android:name=".QuranPlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -47,6 +54,11 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+    <!-- Allows asking the user to exempt the app from battery optimization,
+         so aggressive OEM ROMs (Xiaomi/OPPO/Huawei/Samsung...) never kill
+         background Quran playback. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     
     <!-- Required for showing media notifications on Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
