@@ -102,6 +102,17 @@ export const useAudioPlayer = ({
   // Throttle timeupdate processing (for performance on large surahs)
   const lastTimeUpdateRef = useRef<number>(0);
   
+  // Whether the user manually browsed (swiped) to a page that doesn't contain
+  // the currently playing audio. While true, MP3Quran ayah tracking must NOT
+  // drag the view back to the playing ayah - the user is reading freely and
+  // the selection stays on the first ayah of the viewed page. Cleared as soon
+  // as the recitation (or the user) reaches the page being viewed.
+  const userBrowsedAwayRef = useRef<boolean>(false);
+  
+  // Last ayah reported by the audio stream itself. Distinguishes genuine
+  // audio advancement from view-side selection resets.
+  const lastAudioAyahRef = useRef<number>(0);
+  
   // Reciter state
   const [reciters, setReciters] = useState<Reciter[]>([]);
   const [selectedReciter, setSelectedReciter] = useState<Reciter | null>(null);
@@ -1407,13 +1418,17 @@ export const useAudioPlayer = ({
     updateNativeMusicControls(surahNum, ayahNum, true).catch(console.error);
     requestWakeLock();
     
-    // Navigate to the page containing this ayah if not already on it
-    const surahData = ayahData.find(s => s.number === surahNum);
-    if (surahData && surahData.verses) {
-      const verse = surahData.verses.find((v: any) => v.number === ayahNum);
-      if (verse && verse.page && verse.page !== currentPageNum) {
-        isAyahNavigation.current = true;
-        navigate(`/page/${verse.page}#${surahNum}-${ayahNum}`);
+    // Navigate to the page containing this ayah if not already on it.
+    // Skip while the user has manually browsed to another page - the view
+    // re-syncs when the user (or the recitation) reaches the audio again.
+    if (!userBrowsedAwayRef.current) {
+      const surahData = ayahData.find(s => s.number === surahNum);
+      if (surahData && surahData.verses) {
+        const verse = surahData.verses.find((v: any) => v.number === ayahNum);
+        if (verse && verse.page && verse.page !== currentPageNum) {
+          isAyahNavigation.current = true;
+          navigate(`/page/${verse.page}#${surahNum}-${ayahNum}`);
+        }
       }
     }
     
@@ -2269,11 +2284,12 @@ export const useAudioPlayer = ({
       
       // Check if the next surah is available for this reciter
       if (isSurahAvailableInMoshaf(nextSurah)) {
-        // Navigate to the next surah page and play
+        // Navigate to the next surah page and play - but don't move the view
+        // if the user has manually browsed to another page
         const nextSurahData = ayahData.find(s => s.number === nextSurah);
         if (nextSurahData && nextSurahData.verses && nextSurahData.verses.length > 0) {
           const firstVerse = nextSurahData.verses[0];
-          if (firstVerse && firstVerse.page) {
+          if (firstVerse && firstVerse.page && !userBrowsedAwayRef.current) {
             isAyahNavigation.current = true;
             navigate(`/page/${firstVerse.page}#${nextSurah}-1`);
           }
@@ -2423,28 +2439,51 @@ export const useAudioPlayer = ({
     const handleTimeUpdate = () => {
       const currentAyah = getCurrentAyahFromTime(ayahTimings, audioElement.currentTime);
       
-      if (currentAyah !== null && currentSurahAudio && currentPlayingAyah) {
-        // Update current ayah if it changed (but not if it's ayah 0 which is intro/bismillah)
-        if (currentAyah > 0 && currentAyah !== currentPlayingAyah.ayah) {
-          setCurrentPlayingAyah({ surah: currentSurahAudio, ayah: currentAyah });
+      if (currentAyah !== null && currentSurahAudio && currentPlayingAyah && currentAyah > 0) {
+        // Did the AUDIO itself advance to a new ayah? (vs. the view moving)
+        const audioAyahChanged = currentAyah !== lastAudioAyahRef.current;
+        
+        const surahData = ayahData.find(s => s.number === currentSurahAudio);
+        const verse = surahData?.verses?.find((v: any) => v.number === currentAyah);
+        const audioOnCurrentPage = !!verse && verse.page === currentPageNum;
+        
+        if (audioAyahChanged) {
+          lastAudioAyahRef.current = currentAyah;
+          // Keep lock screen / notification accurate with what is PLAYING,
+          // even while the user browses another page
           updateMediaSession(currentSurahAudio, currentAyah, true);
           updateNativeMusicControls(currentSurahAudio, currentAyah, true).catch(console.error);
-          
-          // Navigate to the page containing this ayah (same pattern as EveryAyah)
-          const surahData = ayahData.find(s => s.number === currentSurahAudio);
-          if (surahData && surahData.verses) {
-            const verse = surahData.verses.find((v: any) => v.number === currentAyah);
-            console.log(`MP3Quran: Ayah changed to ${currentSurahAudio}:${currentAyah}, verse page: ${verse?.page}, currentPage: ${currentPageNum}, isAyahNav: ${isAyahNavigation.current}`);
-            if (verse && verse.page && verse.page !== currentPageNum && !isAyahNavigation.current) {
-              console.log(`🔄 MP3Quran: Navigating from page ${currentPageNum} to page ${verse.page} for ayah ${currentSurahAudio}:${currentAyah}`);
-              isAyahNavigation.current = true;
-              navigate(`/page/${verse.page}#${currentSurahAudio}-${currentAyah}`);
-              setTimeout(() => {
-                isAyahNavigation.current = false;
-              }, 300);
-            }
-          }
         }
+        
+        if (audioOnCurrentPage) {
+          // The recitation's page is the page being viewed - the user is
+          // reading along (or just came back): follow mode is active
+          userBrowsedAwayRef.current = false;
+          if (currentAyah !== currentPlayingAyah.ayah) {
+            setCurrentPlayingAyah({ surah: currentSurahAudio, ayah: currentAyah });
+          }
+        } else if (audioAyahChanged && !userBrowsedAwayRef.current && !isAyahNavigation.current) {
+          // The audio advanced to an ayah on another page while the user was
+          // following the recitation - turn the page with it
+          console.log(`🔄 MP3Quran: Following recitation from page ${currentPageNum} to page ${verse?.page} for ayah ${currentSurahAudio}:${currentAyah}`);
+          setCurrentPlayingAyah({ surah: currentSurahAudio, ayah: currentAyah });
+          if (verse && verse.page) {
+            isAyahNavigation.current = true;
+            navigate(`/page/${verse.page}#${currentSurahAudio}-${currentAyah}`);
+            setTimeout(() => {
+              isAyahNavigation.current = false;
+            }, 300);
+          }
+        } else if (!audioAyahChanged && !isAyahNavigation.current) {
+          // The audio is on the same ayah but the view is on another page:
+          // the USER swiped away manually - suspend follow so the view isn't
+          // dragged back. The selection stays on the viewed page (managed by
+          // loadPageInfo in Surah.tsx). Follow resumes automatically when the
+          // recitation (or the user) reaches the viewed page again.
+          userBrowsedAwayRef.current = true;
+        }
+        // else: the audio advanced while the user is browsing away - keep the
+        // flag set and leave the view where the user put it
       }
     };
     
@@ -3306,6 +3345,10 @@ export const useAudioPlayer = ({
     // MP3Quran current surah (for tracking which surah is playing)
     currentSurahAudio,
     ayahTimings,
+    
+    // True (ref) while the user has manually browsed to a page away from the
+    // playing audio - view sync should not drag them back
+    userBrowsedAwayRef,
     
     // Audio control functions
     playAyah,

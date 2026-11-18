@@ -228,7 +228,8 @@ const Surah = () => {
     ayahTimestamps,
     concatenatedSurah,
     currentSurahAudio,
-    ayahTimings
+    ayahTimings,
+    userBrowsedAwayRef
   } = useAudioPlayer({
     currentPageNum,
     secondPageNum: currentPageNum < 604 ? currentPageNum + 1 : undefined,
@@ -467,6 +468,16 @@ const Surah = () => {
   useEffect(() => {
     if (useSwiperMode && currentPlayingAyah && navigateToPage) {
       const syncAudioWithSwiper = async () => {
+        // Don't drag the view back to the playing ayah while the user has
+        // manually swiped to another page - their selection stays on the
+        // viewed page until the recitation (or the user) reaches it again.
+        // NOTE: currentPageNum is intentionally NOT a dependency - this effect
+        // must only run when the selected ayah changes, never on page changes
+        // (otherwise a swipe would be immediately reverted by a stale
+        // selection and the view would get stuck in a navigation loop).
+        if (userBrowsedAwayRef.current) {
+          return;
+        }
         const { surah, ayah } = currentPlayingAyah;
         const targetPage = await getAyahPage(surah, ayah);
         // Only navigate if not already on the target page
@@ -1494,6 +1505,18 @@ const Surah = () => {
               // Quarter/Rob3 navigation with specific ayah
               isAyahNavigation.current = true;
               setCurrentPlayingAyah(ayah);
+              
+              // Entire-surah (MP3Quran) playback: if the selected ayah has
+              // timing data, seek the playing surah audio to it as well.
+              // (A different surah gets loaded automatically by playAyah.)
+              if (audioSource === 'mp3quran' && hasAyahTimings) {
+                if (isPlaying) {
+                  playAyah(ayah.surah, ayah.ayah);
+                } else if (currentSurahAudio === ayah.surah) {
+                  // Audio loaded but paused: just move the position to the ayah
+                  seekToAyahPosition(ayah.surah, ayah.ayah);
+                }
+              }
             }
             // Update URL for browser history
             navigate(`/page/${page}`);

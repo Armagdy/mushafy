@@ -17,13 +17,15 @@ interface NavigationViewProps {
   initialJuz?: number;
   initialPage?: number;
   initialQuarter?: number;
+  audioSource?: 'everyayah' | 'mp3quran';
+  hasAyahTimings?: boolean;
 }
 
 /**
  * Navigation View - Full page navigation interface
  * Extracted from NavigationDialog.tsx for use in Configuration page
  */
-export default function NavigationView({ onNavigate, onClose, initialType, initialSurah, initialJuz, initialPage, initialQuarter }: NavigationViewProps) {
+export default function NavigationView({ onNavigate, onClose, initialType, initialSurah, initialJuz, initialPage, initialQuarter, audioSource = 'everyayah', hasAyahTimings = false }: NavigationViewProps) {
   const { t, isRTL, language } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
@@ -443,6 +445,25 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
     }
   }, [searchJuzHezb]);
 
+  // Entire-surah (MP3Quran) reciter without ayah timings selected.
+  // Ayah-level navigation/seeking is impossible in this mode, so clicking a
+  // surah should navigate directly to it (no ayah-selection step in between).
+  const isEntireSurahWithoutTimings = audioSource === 'mp3quran' && !hasAyahTimings;
+
+  // Navigate directly to the first page of the given surah
+  const handleDirectSurahNavigation = async (surahId: number) => {
+    const { getSurahFirstPage } = await import('@/lib/quran-mapping');
+    const firstPage = await getSurahFirstPage(surahId);
+    if (onNavigate) {
+      onNavigate(firstPage, { surah: surahId, ayah: 1 });
+      onClose?.();
+    } else {
+      navigate(`/page/${firstPage}`);
+    }
+    setSearchSurah('');
+    setSearchAyah('');
+  };
+
   const handleGoToSurah = async () => {
     if (searchSurah) {
       const surahId = parseInt(searchSurah);
@@ -453,7 +474,12 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
         const ayahInfo = selectedSurahAyahs.find(v => v.number === ayahNumber);
         if (ayahInfo && ayahInfo.page) {
           if (onNavigate) {
-            onNavigate(ayahInfo.page);
+            // In entire-surah (MP3Quran) mode, pass the selected ayah along so
+            // the parent can seek the surah audio to it when timing data exists
+            onNavigate(
+              ayahInfo.page,
+              audioSource === 'mp3quran' ? { surah: surahId, ayah: ayahNumber } : undefined
+            );
             onClose?.();
           } else {
             navigate(`/page/${ayahInfo.page}`);
@@ -464,7 +490,12 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
         const { getSurahFirstPage } = await import('@/lib/quran-mapping');
         const firstPage = await getSurahFirstPage(surahId);
         if (onNavigate) {
-          onNavigate(firstPage);
+          // In entire-surah (MP3Quran) mode, target the surah's first ayah so
+          // the audio seeks to the surah start when timing data exists
+          onNavigate(
+            firstPage,
+            audioSource === 'mp3quran' ? { surah: surahId, ayah: 1 } : undefined
+          );
           onClose?.();
         } else {
           navigate(`/page/${firstPage}`);
@@ -781,6 +812,12 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
                       <button
                         key={surah.id}
                         onClick={() => {
+                          // Entire-surah mode without timings: navigate directly
+                          // to this surah (ayah selection is not possible)
+                          if (isEntireSurahWithoutTimings) {
+                            handleDirectSurahNavigation(surah.id);
+                            return;
+                          }
                           setSearchSurah(surah.id.toString());
                           setSearchAyah('1');
                         }}

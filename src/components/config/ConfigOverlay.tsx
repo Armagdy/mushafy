@@ -299,8 +299,10 @@ export default function ConfigOverlay({
             currentSurahId={currentSurahId}
             currentPage={currentPage}
             currentPlayingAyah={currentPlayingAyah}
-            onNavigate={(page) => {
-              onNavigate(page);
+            onNavigate={(page, surahId, ayahNum) => {
+              // Forward the bookmark's surah/ayah so the parent can seek the
+              // surah audio to it when ayah timing data is available
+              onNavigate(page, surahId && ayahNum ? { surah: surahId, ayah: ayahNum } : undefined);
               onClose();
             }}
             onToggleBookmark={toggleBookmark}
@@ -321,6 +323,8 @@ export default function ConfigOverlay({
             initialSurah={initialNavigationSurah}
             initialJuz={initialNavigationJuz}
             initialPage={initialNavigationPage}
+            audioSource={audioSource}
+            hasAyahTimings={hasAyahTimings}
           />
         );
       case 'search':
