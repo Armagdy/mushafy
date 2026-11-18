@@ -23,8 +23,10 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useMushaf } from '@/contexts/MushafContext';
+import { useDarkMode } from '@/contexts/DarkModeContext';
 import { useToast } from '@/hooks/use-toast';
 import TartelPage from '@/components/quran/TartelPage';
+import { getChromeTextClass, type ChromeTheme } from '@/lib/chrome-theme';
 import { isNativePlatform } from '@/lib/native-storage';
 import { getCachedAsset, getCachedAssetUri } from '@/lib/asset-cache';
 import {
@@ -53,6 +55,8 @@ interface AnnotationEditorProps {
   imageSrc?: string;
   /** Asset cache category, e.g. 'mushaf-mwdoa'. */
   cacheCategory?: string;
+  /** Reader chrome theme ('green' | 'glass') so the editor bars match. */
+  theme?: ChromeTheme;
   onClose: (saved: boolean) => void;
 }
 
@@ -61,9 +65,9 @@ const MAX_ZOOM = 6;
 const DEFAULT_THICKNESS = 0.004;
 /** Default thickness per drawing tool. */
 const TOOL_DEFAULT_THICKNESS: Record<'pen' | 'line' | 'rect', number> = {
-  pen: 0.004,
-  line: 0.005,
-  rect: 0.005,
+  pen: 0.006,
+  line: 0.007,
+  rect: 0.007,
 };
 const DEFAULT_TEXT_SIZE = 0.035;
 /** Eraser: visual/tolerance radius in CSS px and sample step (normalized). */
@@ -96,13 +100,37 @@ const LineStylePreview = ({ style }: { style: LineStyle }) => {
   );
 };
 
-export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorProps) {
+export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: AnnotationEditorProps) {
   const { t } = useLanguage();
   const { mushafType } = useMushaf();
+  const { isDarkMode } = useDarkMode();
   const { toast } = useToast();
 
   // Text mushafs (tarteel/tajweed) render via TartelPage instead of an image
   const isTextMushaf = mushafType === 'tarteel' || mushafType === 'tajweed';
+
+  // Chrome styling identical to the reader's fullscreen bars
+  const chromeTextClass = getChromeTextClass(isDarkMode);
+  const chromeTitleClass = isDarkMode ? 'text-[#F2E3BB]' : 'text-emerald-800 dark:text-emerald-200';
+  // Tool group pills sitting on the transparent toolbar
+  const chromeGroupClass = cn(
+    'flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-xl',
+    isDarkMode
+      ? 'bg-white/10 border border-white/10'
+      : theme === 'glass'
+        ? 'bg-white/50 border border-[#8A8578]/20'
+        : 'bg-white/60 border border-emerald-800/10'
+  );
+  // Thin themed divider line between the page and the header/toolbar
+  const chromeDividerColor = theme === 'glass'
+    ? isDarkMode
+      ? 'border-gray-300/15'
+      : 'border-[#8A8578]/25'
+    : isDarkMode
+      ? 'border-emerald-200/20'
+      : 'border-emerald-800/15';
+  const chromeDividerClass = cn('border-t', chromeDividerColor);
+  const chromeHeaderDividerClass = cn('border-b', chromeDividerColor);
 
   // ---------------------------------------------------------------- state ---
   const [shapes, setShapes] = useState<AnnotationShape[]>([]);
@@ -998,7 +1026,7 @@ export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorPr
         'p-2 sm:p-2.5 rounded-lg transition-colors',
         tool === key
           ? 'bg-emerald-600 text-white shadow'
-          : 'text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
+          : cn(chromeTextClass, 'hover:bg-black/5 dark:hover:bg-white/10')
       )}
     >
       <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -1010,54 +1038,59 @@ export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorPr
 
   return (
     <div
-      className="fixed inset-0 z-[200] bg-[#FBF9F4] dark:bg-gray-950 flex flex-col select-none"
+      className={cn(
+        'fixed inset-0 z-[200] flex flex-col select-none',
+        isDarkMode ? 'bg-black' : 'bg-[#FBF9F4]'
+      )}
       style={{
-        // Respect notches / status bar / Android gesture-nav area
+        // Respect notches / status bar; the bottom inset is handled by the
+        // toolbar itself so the border line runs edge-to-edge
         paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
       {/* ---------------------------------------------------------- header */}
-      <header className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-emerald-800 dark:bg-emerald-950 text-[#F2E3BB] shadow z-10">
-        <button
-          onClick={handleClose}
-          className="p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors"
-          title={t('close')}
-        >
-          <X className="w-5 h-5 sm:w-6 sm:h-6" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm sm:text-base font-bold truncate">{t('editPage')}</div>
-          <div className="text-[10px] sm:text-xs opacity-80">
-            {t('page')} {page} · {shapes.length} {t('annotationsCount')}
+      {/* No background: the page shows through; a thin themed border line
+          separates the header from the page (same as the toolbar below). */}
+      <div className={cn('flex items-center gap-1 sm:gap-2 px-2 py-1.5 sm:py-2 z-10', chromeHeaderDividerClass)}>
+          <button
+            onClick={handleClose}
+            className={cn('p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors', chromeTextClass)}
+            title={t('close')}
+          >
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className={cn('text-sm sm:text-base font-bold truncate', chromeTitleClass)}>{t('editPage')}</div>
+            <div className={cn('text-[10px] sm:text-xs opacity-70', chromeTitleClass)}>
+              {t('page')} {page} · {shapes.length} {t('annotationsCount')}
+            </div>
           </div>
-        </div>
 
-        <button onClick={undo} disabled={disabledUndo} title={t('undo')}
-          className={cn('p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors', disabledUndo && 'opacity-40 cursor-not-allowed')}>
-          <Undo2 className="w-4 h-4 sm:w-5 sm:h-5" />
-        </button>
-        <button onClick={redo} disabled={disabledRedo} title={t('redo')}
-          className={cn('p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors', disabledRedo && 'opacity-40 cursor-not-allowed')}>
-          <Redo2 className="w-4 h-4 sm:w-5 sm:h-5" />
-        </button>
-        <button onClick={resetZoom} title={t('resetZoom')}
-          className="px-1.5 sm:px-2 py-1 sm:py-1.5 rounded-lg hover:bg-white/10 transition-colors text-xs sm:text-sm font-semibold tabular-nums">
-          {Math.round(zoom * 100)}% <Maximize2 className="inline w-3.5 h-3.5 sm:w-4 sm:h-4 -mt-0.5" />
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={isSaving || !annotationsLoaded}
-          className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-bold transition-colors',
-            'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow',
-            (isSaving || !annotationsLoaded) && 'opacity-60 cursor-not-allowed'
-          )}
-        >
-          {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-          <span className="hidden sm:inline">{t('save')}</span>
-        </button>
-      </header>
+          <button onClick={undo} disabled={disabledUndo} title={t('undo')}
+            className={cn('p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors', chromeTextClass, disabledUndo && 'opacity-40 cursor-not-allowed')}>
+            <Undo2 className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+          <button onClick={redo} disabled={disabledRedo} title={t('redo')}
+            className={cn('p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors', chromeTextClass, disabledRedo && 'opacity-40 cursor-not-allowed')}>
+            <Redo2 className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+          <button onClick={resetZoom} title={t('resetZoom')}
+            className={cn('px-1.5 sm:px-2 py-1 sm:py-1.5 rounded-lg hover:bg-white/10 transition-colors text-xs sm:text-sm font-semibold tabular-nums', chromeTextClass)}>
+            {Math.round(zoom * 100)}% <Maximize2 className="inline w-3.5 h-3.5 sm:w-4 sm:h-4 -mt-0.5" />
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving || !annotationsLoaded}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-bold transition-colors',
+              'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow',
+              (isSaving || !annotationsLoaded) && 'opacity-60 cursor-not-allowed'
+            )}
+          >
+            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            <span className="hidden sm:inline">{t('save')}</span>
+          </button>
+      </div>
 
       {/* ------------------------------------------------------ canvas area */}
       <div
@@ -1089,7 +1122,7 @@ export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorPr
              (same max-width + paddings, isFullscreen like the reader's
              always-enlarged text pages) so saved drawings align with the
              same lines when reading. */
-          <div className="absolute inset-0 flex items-start justify-center">
+          <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-full max-w-7xl px-3 md:px-6">
               <div className="w-full px-2 md:px-4">
                 <div
@@ -1097,7 +1130,7 @@ export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorPr
                   className="relative"
                   style={{
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                    transformOrigin: 'top center',
+                    transformOrigin: 'center center',
                   }}
                   // Neutralize TartelPage's internal touch handlers
                   // (long-press ayah selection) — the editor's container
@@ -1159,23 +1192,19 @@ export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorPr
           </div>
         </div>
         )}
-
-        {imageReady && shapes.length === 0 && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-2xl bg-emerald-700/90 text-white text-xs sm:text-sm shadow pointer-events-none max-w-[94%] text-center">
-            {t('annotationEditorHint')}
-          </div>
-        )}
       </div>
 
       {/* ------------------------------------------------------ bottom bar */}
-      <div className="relative z-20 bg-white dark:bg-gray-900 border-t border-emerald-200 dark:border-emerald-800 shadow-lg">
+      {/* No background: the page shows through; a thin themed border line
+          separates the page from the toolbar (same as the quick bar). */}
+      <div className={cn('relative z-20 pt-1', chromeDividerClass)} style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 6px)' }}>
         {/* popover backdrop */}
         {popover && (
           <div className="fixed inset-0 z-10" onPointerDown={(e) => { e.stopPropagation(); setPopover(null); }} />
         )}
 
         {popover && (
-          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-20 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-emerald-200 dark:border-emerald-700 p-3 w-[280px]">
+          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-20 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-2xl border border-emerald-200 dark:border-emerald-700 p-3 w-[280px]">
             {popover === 'color' && (
               <div>
                 <div className="text-sm font-semibold mb-2 text-emerald-800 dark:text-emerald-200">{t('color')}</div>
@@ -1308,31 +1337,31 @@ export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorPr
         {/* Groups wrap to multiple rows on narrow phones so every tool stays visible */}
         <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5 px-1.5 sm:px-2 py-1.5 sm:py-2">
           {/* Navigation: select & pan next to each other */}
-          <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-xl bg-emerald-50 dark:bg-emerald-900/40">
+          <div className={chromeGroupClass}>
             {toolButton('select', MousePointer2, t('toolSelect'))}
             {toolButton('pan', Hand, t('toolPan'))}
           </div>
 
           {/* Freehand: pen & text */}
-          <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-xl bg-emerald-50 dark:bg-emerald-900/40">
+          <div className={chromeGroupClass}>
             {toolButton('pen', Pen, t('toolPen'))}
             {toolButton('text', Type, t('toolText'))}
           </div>
 
           {/* Shapes: line & rectangle */}
-          <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-xl bg-emerald-50 dark:bg-emerald-900/40">
+          <div className={chromeGroupClass}>
             {toolButton('line', Minus, t('toolLine'))}
             {toolButton('rect', Square, t('toolRect'))}
           </div>
 
           {/* Style controls: color, thickness/size, contextual options */}
           {showStyleGroup && (
-          <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-xl bg-emerald-50 dark:bg-emerald-900/40">
+          <div className={chromeGroupClass}>
             {/* color */}
             <button
               onClick={() => setPopover(popover === 'color' ? null : 'color')}
               title={t('color')}
-              className="p-2 sm:p-2.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+              className={cn('p-2 sm:p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'color' && 'bg-black/10 dark:bg-white/15')}
             >
               <span
                 className="block w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-black/10 shadow-inner"
@@ -1343,7 +1372,7 @@ export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorPr
             <button
               onClick={() => setPopover(popover === 'thickness' ? null : 'thickness')}
               title={isTextSizing ? t('fontSize') : t('thickness')}
-              className={cn('p-2 sm:p-2.5 rounded-lg text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/50', popover === 'thickness' && 'bg-emerald-100 dark:bg-emerald-900/50')}
+              className={cn(chromeTextClass, 'p-2 sm:p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'thickness' && 'bg-black/10 dark:bg-white/15')}
             >
               <Diameter className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
@@ -1352,7 +1381,7 @@ export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorPr
               <button
                 onClick={() => setPopover(popover === 'style' ? null : 'style')}
                 title={t('lineStyle')}
-                className={cn('p-2 sm:p-2.5 rounded-lg text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/50', popover === 'style' && 'bg-emerald-100 dark:bg-emerald-900/50')}
+                className={cn(chromeTextClass, 'p-2 sm:p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'style' && 'bg-black/10 dark:bg-white/15')}
               >
                 <Waves className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
@@ -1362,7 +1391,7 @@ export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorPr
               <button
                 onClick={() => setPopover(popover === 'rect' ? null : 'rect')}
                 title={t('cornerRadius')}
-                className={cn('p-2 sm:p-2.5 rounded-lg text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/50', popover === 'rect' && 'bg-emerald-100 dark:bg-emerald-900/50')}
+                className={cn(chromeTextClass, 'p-2 sm:p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'rect' && 'bg-black/10 dark:bg-white/15')}
               >
                 <div
                   className="w-5 h-5 sm:w-6 sm:h-6 border-[2.5px] border-current"
@@ -1379,7 +1408,7 @@ export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorPr
                   setTextDraft({ pos: { x: s.x, y: s.y }, id: s.id });
                 }}
                 title={t('editText')}
-                className={cn('p-2 sm:p-2.5 rounded-lg text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/50')}
+                className={cn(chromeTextClass, 'p-2 sm:p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors')}
               >
                 <Type className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
@@ -1388,7 +1417,7 @@ export function AnnotationEditor({ page, imageSrc, onClose }: AnnotationEditorPr
           )}
 
           {/* Eraser — own group, last in the row so it sits at the far left in RTL */}
-          <div className="flex items-center gap-0.5 sm:gap-1 p-0.5 sm:p-1 rounded-xl bg-emerald-50 dark:bg-emerald-900/40">
+          <div className={chromeGroupClass}>
             {toolButton('erase', Eraser, t('toolErase'))}
           </div>
         </div>

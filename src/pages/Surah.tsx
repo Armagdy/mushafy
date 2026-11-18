@@ -603,18 +603,6 @@ const Surah = () => {
   // Minimum swipe distance (in px)
   const minSwipeDistance = 50;
 
-  // Fullscreen chrome glass card styling, per chrome theme
-  const chromeCardClass = cn(
-    "relative isolate rounded-2xl",
-    chromeTheme === 'glass'
-      ? isDarkMode
-        ? "bg-[#9CA3AF]/15 border border-gray-300/15 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_2px_12px_rgba(0,0,0,0.4)]"
-        : "bg-[#E7E6E2]/30 border border-[#8A8578]/25 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6),0_2px_12px_rgba(87,70,36,0.12)]"
-      : isDarkMode
-        ? "bg-emerald-400/10 border border-emerald-200/20 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),0_2px_12px_rgba(0,0,0,0.35)]"
-        : "bg-emerald-600/10 border border-emerald-800/15 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7),0_2px_12px_rgba(6,78,59,0.10)]"
-  );
-
   return (
     <div 
       className={cn("w-full h-screen max-h-screen flex flex-col overflow-hidden", isDarkMode ? "bg-black" : "bg-[#FBF9F4]")} 
@@ -686,67 +674,41 @@ const Surah = () => {
       
       {/* Fullscreen Overlay Header — CSS-class driven (NOT framer-motion).
           framer wrote a stale inline opacity after the entrance spring settled,
-          blinking the bar out for a frame; class transitions can't be clobbered. */}
+          blinking the bar out for a frame; class transitions can't be clobbered.
+          Positioning matches the annotation editor: floating themed card with
+          small margins + safe-area insets, no full-width background strip. */}
+      {/* Fullscreen Overlay Header — CSS-class driven (NOT framer-motion).
+          Bare text over the page (no background card): surah name + page,
+          positioned like the annotation editor with safe-area insets. */}
       <div
         className={cn(
-          "absolute top-0 left-0 right-0 z-[65] flex items-center justify-between pt-12 pb-3 px-6",
-          isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
+          "absolute top-0 left-0 right-0 z-[65] flex items-center justify-between px-4",
+          "drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]",
           "transition-[opacity,transform] duration-300 ease-out",
           isFullscreen
             ? "opacity-100 translate-y-0"
             : "opacity-0 -translate-y-[30px] pointer-events-none"
         )}
+        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 10px)' }}
       >
-        <div         className={cn(
-          chromeCardClass,
-          "flex items-center justify-between w-full px-5 md:px-8 py-1.5 md:py-2"
+        {/* Surah Name */}
+        <div className={cn(
+          "text-lg md:text-2xl font-bold",
+          isDarkMode
+            ? "text-[#F2E3BB]"
+            : "text-emerald-800 dark:text-emerald-200"
         )}>
-          <div className="liquid-glass-backdrop -z-10" />
-          {/* Juz */}
-          <div className={cn(
-            "text-lg md:text-2xl font-bold",
-            isDarkMode
-              ? "text-[#F2E3BB]"
-              : "text-emerald-800 dark:text-emerald-200"
-          )}>
-            {t('juz')} {formatNumber(currentJuz)}
-          </div>
+          {language === 'ar' ? currentSurah.name : currentSurah.englishName}
+        </div>
 
-          {/* Ornament separator */}
-          <div className={cn(
-            "flex-shrink-0 w-10 md:w-12 h-px bg-gradient-to-r from-transparent to-transparent",
-            isDarkMode
-              ? "via-[#F2E3BB]/50"
-              : "via-emerald-700 dark:via-emerald-500"
-          )}></div>
-
-          {/* Surah Name */}
-          <div className={cn(
-            "text-lg md:text-2xl font-bold",
-            isDarkMode
-              ? "text-[#F2E3BB]"
-              : "text-emerald-800 dark:text-emerald-200"
-          )}>
-            {language === 'ar' ? currentSurah.name : currentSurah.englishName}
-          </div>
-
-          {/* Ornament separator */}
-          <div className={cn(
-            "flex-shrink-0 w-10 md:w-12 h-px bg-gradient-to-r from-transparent to-transparent",
-            isDarkMode
-              ? "via-[#F2E3BB]/50"
-              : "via-emerald-700 dark:via-emerald-500"
-          )}></div>
-
-          {/* Page */}
-          <div className={cn(
-            "text-lg md:text-2xl font-bold",
-            isDarkMode
-              ? "text-[#F2E3BB]"
-              : "text-emerald-800 dark:text-emerald-200"
-          )}>
-            {t('page')} {formatNumber(currentPageNum)}
-          </div>
+        {/* Page */}
+        <div className={cn(
+          "text-lg md:text-2xl font-bold",
+          isDarkMode
+            ? "text-[#F2E3BB]"
+            : "text-emerald-800 dark:text-emerald-200"
+        )}>
+          {t('page')} {formatNumber(currentPageNum)}
         </div>
       </div>
 
@@ -890,22 +852,27 @@ const Surah = () => {
       </motion.div>
 
       {/* Fullscreen Footer - Quick Action Buttons — CSS-class driven (NOT framer-motion).
-          Same post-settle inline-style clobber fix as the overlay header above. */}
+          No background: the page shows through; a thin themed border line
+          separates the page from the quick bar. */}
       <div
         className={cn(
-          "absolute bottom-0 left-0 right-0 z-[65] flex items-center justify-center py-4 px-6 pb-16",
-          isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
+          "absolute bottom-0 left-0 right-0 z-[65] flex items-center justify-center py-1.5 px-4",
+          "border-t",
+          chromeTheme === 'glass'
+            ? isDarkMode
+              ? 'border-gray-300/15'
+              : 'border-[#8A8578]/25'
+            : isDarkMode
+              ? 'border-emerald-200/20'
+              : 'border-emerald-800/15',
           "transition-[opacity,transform] duration-300 ease-out",
           isFullscreen
             ? "opacity-100 translate-y-0"
             : "opacity-0 translate-y-[20px] pointer-events-none"
         )}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 6px)' }}
       >
-        <div         className={cn(
-          chromeCardClass,
-          "flex items-center justify-center gap-6 md:gap-10 px-4 md:px-8 py-1.5 md:py-2"
-        )}>
-          <div className="liquid-glass-backdrop -z-10" />
+        <div className="flex items-center justify-center gap-6 md:gap-10 px-4 md:px-8 py-1.5 md:py-2">
             {/* Bookmark Button */}
             <div className="relative">
               <button
@@ -1642,6 +1609,7 @@ const Surah = () => {
           page={currentPageNum}
           imageSrc={isTextMushaf ? undefined : `${getMushafPath()}/${getPageImageFilename(currentPageNum)}`}
           cacheCategory={`mushaf-${mushafType}`}
+          theme={chromeTheme}
           onClose={() => setIsAnnotationEditMode(false)}
         />
       )}
