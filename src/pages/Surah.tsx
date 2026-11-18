@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, BookText, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat, Sun, Moon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, BookText, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat, Sun, Moon, PenLine } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { surahs } from '@/data/surahs';
@@ -15,6 +15,7 @@ import { RepeatDialog } from '@/components/quran/RepeatDialog';
 import { NavigationDialog } from '@/components/quran/NavigationDialog';
 import { TafseerDialog } from '@/components/quran/TafseerDialog';
 import ConfigOverlay, { type ConfigType } from '@/components/config/ConfigOverlay';
+import { AnnotationEditor } from '@/components/annotation/AnnotationEditor';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,6 +42,11 @@ const Surah = () => {
   
   // Disable dark mode when using Tajweed mushaf (colored glyphs don't work with dark mode)
   const isTajweedMushaf = mushafType === 'tajweed';
+  // Text mushafs (tarteel/tajweed) render HTML, not page images — used to
+  // decide what page content the annotation editor receives.
+  const isTextMushaf = mushafType === 'tarteel' || mushafType === 'tajweed';
+  // Page annotation editor overlay
+  const [isAnnotationEditMode, setIsAnnotationEditMode] = useState(false);
   
   // Auto-disable dark mode when switching to Tajweed mushaf
   useEffect(() => {
@@ -1080,6 +1086,24 @@ const Surah = () => {
               <BookText className="w-8 h-8" />
             </button>
 
+            {/* Edit Page (draw on page) - works for image AND text mushafs */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowBookmarkTypeSelector(false);
+                setIsAnnotationEditMode(true);
+              }}
+              className={cn(
+                "flex flex-col items-center gap-1 transition-colors",
+                isDarkMode
+                  ? "text-[#F2E3BB] hover:text-[#FBF9F4]"
+                  : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
+              )}
+              title={t('editPage')}
+            >
+              <PenLine className="w-8 h-8" />
+            </button>
+
             {/* Dark/Light Mode Toggle - disabled for Tajweed (colored glyphs) */}
             <button
               onClick={(e) => {
@@ -1606,6 +1630,19 @@ const Surah = () => {
           onPlayAyah={playAyah}
           onSetCurrentPlayingAyah={setCurrentPlayingAyah}
           onSeekToAyahPosition={seekToAyahPosition}
+        />
+      )}
+
+      {/* Page Annotation Editor — full-screen overlay; while it is open the
+          swiper is covered, so page swiping is disabled. Text mushafs
+          (tarteel/tajweed) render the page inside the editor via TartelPage;
+          image mushafs use the page image. */}
+      {isAnnotationEditMode && (
+        <AnnotationEditor
+          page={currentPageNum}
+          imageSrc={isTextMushaf ? undefined : `${getMushafPath()}/${getPageImageFilename(currentPageNum)}`}
+          cacheCategory={`mushaf-${mushafType}`}
+          onClose={() => setIsAnnotationEditMode(false)}
         />
       )}
     </div>

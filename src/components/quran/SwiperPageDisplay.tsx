@@ -5,12 +5,14 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/virtual';
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Bookmark, BookMarked, BookOpen } from 'lucide-react';
+import { Bookmark, BookMarked, BookOpen, PenLine } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useMushaf } from '@/contexts/MushafContext';
 import { getPageImageFilename } from '@/lib/quran-mapping';
 import { CachedImage } from './CachedImage';
 import TartelPage from './TartelPage';
+import { AnnotationOverlay } from '@/components/annotation/AnnotationOverlay';
+import { useAnnotatedPages } from '@/hooks/useAnnotations';
 import { useToast } from '@/hooks/use-toast';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { cn } from '@/lib/utils';
@@ -56,6 +58,9 @@ export function SwiperPageDisplay({
   const { getMushafPath, mushafType } = useMushaf();
   const { toast } = useToast();
   const swiperRef = useRef<SwiperType | null>(null);
+  
+  // Pages that have a saved annotation layer (drives the pen indicator badge)
+  const annotatedPages = useAnnotatedPages(mushafType);
   
   // Track if we're currently transitioning between slides
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -228,8 +233,9 @@ export function SwiperPageDisplay({
     const hasBookmark = bookmarks.includes(pageNum);
     const hasMemorization = memorizationBookmarks.includes(pageNum);
     const hasReading = readingBookmarks.includes(pageNum);
+    const hasAnnotations = annotatedPages.has(pageNum);
     
-    if (!hasBookmark && !hasMemorization && !hasReading) return null;
+    if (!hasBookmark && !hasMemorization && !hasReading && !hasAnnotations) return null;
     
     return (
       <div 
@@ -247,9 +253,12 @@ export function SwiperPageDisplay({
         {hasReading && (
           <BookOpen className="w-6 h-6 md:w-8 md:h-8 fill-blue-600 text-blue-600 drop-shadow-lg" />
         )}
+        {hasAnnotations && (
+          <PenLine className="w-6 h-6 md:w-8 md:h-8 text-purple-600 drop-shadow-lg" />
+        )}
       </div>
     );
-  }, [bookmarks, memorizationBookmarks, readingBookmarks]);
+  }, [bookmarks, memorizationBookmarks, readingBookmarks, annotatedPages]);
   
   // Render page content
   const renderPage = useCallback((pageNum: number) => {
@@ -291,23 +300,27 @@ export function SwiperPageDisplay({
             )}
             style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 75%, 0 100%)' }}
           />
-          <TartelPage
-            pageNumber={pageNum}
-            onClick={() => {
-              if (!longPressTriggeredRef.current) {
-                onImageClick();
-              }
-            }}
-            onAyahSelect={onAyahSelect}
-            currentPlayingAyah={isTransitioning ? null : currentPlayingAyah}
-            mushafType={mushafType as 'tarteel' | 'tajweed'}
-            isFullscreen={pageEnlarged}
-            isFullscreenDarkMode={isFullscreenDarkMode}
-            className={cn(
-              "max-w-full w-auto h-auto mx-auto cursor-pointer transition-all duration-300 ease-out",
-              imageMaxHeight
-            )}
-          />
+          <div className="relative w-full">
+            <TartelPage
+              pageNumber={pageNum}
+              onClick={() => {
+                if (!longPressTriggeredRef.current) {
+                  onImageClick();
+                }
+              }}
+              onAyahSelect={onAyahSelect}
+              currentPlayingAyah={isTransitioning ? null : currentPlayingAyah}
+              mushafType={mushafType as 'tarteel' | 'tajweed'}
+              isFullscreen={pageEnlarged}
+              isFullscreenDarkMode={isFullscreenDarkMode}
+              className={cn(
+                "max-w-full w-auto h-auto mx-auto cursor-pointer transition-all duration-300 ease-out",
+                imageMaxHeight
+              )}
+            />
+            {/* Saved annotation layer (drawings) on top of the page */}
+            <AnnotationOverlay page={pageNum} />
+          </div>
         </div>
       );
     }
@@ -330,23 +343,27 @@ export function SwiperPageDisplay({
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchEnd}
         >
-          <CachedImage
-            src={`${getMushafPath()}/${getPageImageFilename(pageNum)}`}
-            alt={`${t('page')} ${pageNum}`}
-            className={cn(
-              "max-w-full w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300 ease-out",
-              imageMaxHeight,
-              isFullscreenDarkMode && "invert sepia-[0.2] brightness-[0.85]"
-            )}
-            loading="lazy"
-            cacheCategory={cacheCategory}
-            onClick={(e) => {
-              // Only trigger click if long press wasn't triggered
-              if (!longPressTriggeredRef.current) {
-                onImageClick();
-              }
-            }}
-          />
+          <div className="relative w-fit max-w-full mx-auto">
+            <CachedImage
+              src={`${getMushafPath()}/${getPageImageFilename(pageNum)}`}
+              alt={`${t('page')} ${pageNum}`}
+              className={cn(
+                "block max-w-full w-auto h-auto object-contain cursor-pointer transition-all duration-300 ease-out",
+                imageMaxHeight,
+                isFullscreenDarkMode && "invert sepia-[0.2] brightness-[0.85]"
+              )}
+              loading="lazy"
+              cacheCategory={cacheCategory}
+              onClick={(e) => {
+                // Only trigger click if long press wasn't triggered
+                if (!longPressTriggeredRef.current) {
+                  onImageClick();
+                }
+              }}
+            />
+            {/* Saved annotation layer (drawings) on top of the page */}
+            <AnnotationOverlay page={pageNum} />
+          </div>
         </div>
       </div>
     );

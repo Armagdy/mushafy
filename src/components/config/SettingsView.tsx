@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
-import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Type, ChevronLeft, ChevronRight, Sunrise, BookOpenCheck } from "lucide-react";
+import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Type, ChevronLeft, ChevronRight, Sunrise, BookOpenCheck, PenLine } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMushaf, MushafType } from "@/contexts/MushafContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
+import { useAnnotationsVisible } from "@/hooks/useAnnotations";
 import { cn } from "@/lib/utils";
 import { Download } from "./Download";
 import { StyleSettings } from "./StyleSettings";
@@ -46,6 +47,7 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
     const saved = localStorage.getItem('quran-show-bottom-bar-text');
     return saved !== null ? saved === 'true' : true;
   });
+  const { annotationsVisible, setAnnotationsVisible } = useAnnotationsVisible();
   // Swiper mode is now always enabled (default)
   
   const handleMushafChange = (mushaf: MushafType) => {
@@ -200,6 +202,20 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
                 }));
               }}
             />
+
+            {/* Show/hide page drawings (annotations) while reading */}
+            <div className="flex items-center justify-between gap-3 pt-2">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <PenLine className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
+                  {t('showAnnotations')}
+                </span>
+              </div>
+              <Switch
+                checked={annotationsVisible}
+                onCheckedChange={setAnnotationsVisible}
+              />
+            </div>
 
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-2 sm:gap-3">
