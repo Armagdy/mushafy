@@ -41,6 +41,14 @@ interface TartelPageProps {
   mushafType?: 'tarteel' | 'tajweed';
   isFullscreen?: boolean;
   isFullscreenDarkMode?: boolean;
+  /**
+   * Viewport space (px) the page text must leave for the fullscreen overlay
+   * header/quick bar. Only the reader's fullscreen passes this (tarteel/
+   * tajweed) so the text fills the ENTIRE space between the header and the
+   * footer. Omitted everywhere else (annotation editor, normal mode) —
+   * the defaults below reproduce the classic layout exactly.
+   */
+  fillReserves?: { header: number; footer: number };
 }
 
 // Cache for the complete Quran pages data (loaded once, used for all pages)
@@ -83,8 +91,18 @@ const loadQuranPagesData = async (): Promise<QuranData> => {
   return dataLoadingPromise;
 };
 
-const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel', isFullscreen = false, isFullscreenDarkMode = false }: TartelPageProps) => {
+const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel', isFullscreen = false, isFullscreenDarkMode = false, fillReserves }: TartelPageProps) => {
   const { language, t, isRTL } = useLanguage();
+  // Viewport space (px) reserved for the fullscreen overlay header/footer.
+  // Defaults (112/132) reproduce the classic layout used by the annotation
+  // editor and normal mode; the fullscreen reader passes measured values so
+  // the text fills the whole band between header and quick bar.
+  const fillHeaderReserve = fillReserves?.header ?? 112;
+  const fillFooterReserve = fillReserves?.footer ?? 132;
+  // Footprint lock for skeleton/pre-font frames: same height the fill
+  // line-height produces (reserves + 6px slack). Default sums to the
+  // historical hard-coded 'calc(100dvh - 250px)'.
+  const fillMinHeight = `calc(100dvh - ${fillHeaderReserve + fillFooterReserve + 6}px)`;
   // NOTE: text mushafs are ALWAYS rendered enlarged (see SwiperPageDisplay `pageEnlarged`).
   // A new TartelPage instance mounts for every swiped-to page, so any async gap
   // (loading placeholder, null line-height) is visible as shrink-then-enlarge.
@@ -112,6 +130,14 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   const [hoveredAyah, setHoveredAyah] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dynamicLineHeight, setDynamicLineHeight] = useState<number | null>(null);
+  // Horizontal fit: ayah font multiplier (<= 1) shrinks the font when the
+  // widest line would overflow the line box on narrow widths. Applied via
+  // the --ayah-font-scale CSS variable on the page container.
+  const [ayahFontScale, setAyahFontScale] = useState(1);
+  // Mirror of ayahFontScale that stays current BEFORE React re-renders, so
+  // the fit math can convert measured (already-scaled) word widths back to
+  // their unscaled base widths in a single pass (no oscillation).
+  const ayahFontScaleRef = useRef(1);
   
   // Track fullscreen state changes for smooth transitions
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -274,30 +300,63 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       const container = containerRef.current;
       if (!container) return;
 
-      // Get available height, accounting for fullscreen overlay header/footer.
-      // Surah.tsx reserves pt-[108px]/pb-[128px] (md: 116/136) for these
-      // overlays, so the text must fit in the space BETWEEN them — never
-      // beneath them.
-      const headerHeight = 112;
-      const footerHeight = 132;
+      // Get available height, accounting for the fullscreen overlay
+      // header/footer. Either the classic fixed reserves (112/132) or, when
+      // the reader passes fillReserves, the actual header/quick-bar bands —
+      // so the text fills the ENTIRE space between them.
+      const headerHeight = fillHeaderReserve;
+      const footerHeight = fillFooterReserve;
       const availableHeight = window.innerHeight - headerHeight - footerHeight;
       
       // Count total lines on this page
       const totalLines = pageData.lines.length;
       if (totalLines === 0) return;
 
-      // Get actual computed font size from the first line-content element
+      // Base (unscaled) computed font size from the first line-content
+      // element. The DOM currently renders at the previously applied scale,
+      // so convert back to the unscaled base for stable math.
       const lineContentEl = container.querySelector('.line-content');
-      let actualFontSize = 28; // fallback
+      let baseFontSize = 28; // fallback
       if (lineContentEl) {
         const computed = window.getComputedStyle(lineContentEl);
-        actualFontSize = parseFloat(computed.fontSize) || 28;
+        const measuredSize = parseFloat(computed.fontSize) || 28;
+        baseFontSize = measuredSize / (ayahFontScaleRef.current || 1);
       }
+
+      // ---- Width fit: shrink the ayah font when a line overflows horizontally.
+      // Quran lines never wrap, and the font-size has a floor (1.75rem), so on
+      // narrow widths the widest line's words can exceed the line box. The
+      // layout then stays anchored to the right (RTL start) and clips at the
+      // viewport edge — "shows from the right side, not centered". Scale the
+      // font down proportionally so the widest line fits exactly (same
+      // fit-to-space idea as the line-height fill below, but horizontal).
+      const lineEls = container.querySelectorAll('.line-content');
+      let widthScale = 1;
+      lineEls.forEach((el) => {
+        const boxWidth = el.clientWidth;
+        const words = el.querySelectorAll('.char-word');
+        if (!words.length || boxWidth <= 0) return;
+        let naturalWidth = 0;
+        words.forEach((w) => { naturalWidth += w.getBoundingClientRect().width; });
+        // Words were measured at the CURRENT scale — convert back to the
+        // unscaled base width so the target scale converges in one pass.
+        naturalWidth /= ayahFontScaleRef.current || 1;
+        if (naturalWidth > boxWidth) {
+          widthScale = Math.min(widthScale, (boxWidth / naturalWidth) * 0.98);
+        }
+      });
+      if (Math.abs((ayahFontScaleRef.current || 1) - widthScale) > 0.005) {
+        ayahFontScaleRef.current = widthScale;
+        setAyahFontScale(widthScale);
+      }
+
+      // Effective font size after the width fit
+      const effectiveFontSize = baseFontSize * widthScale;
       
       // Calculate line-height needed to fill available space
       // Total height = totalLines * fontSize * lineHeight
       // So: lineHeight = availableHeight / (totalLines * fontSize)
-      const calculatedLineHeight = availableHeight / (totalLines * actualFontSize);
+      const calculatedLineHeight = availableHeight / (totalLines * effectiveFontSize);
       
       // Clamp between 1.8 and 6.0 for readability
       const clampedLineHeight = Math.max(1.8, Math.min(6.0, calculatedLineHeight));
@@ -322,7 +381,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       cancelAnimationFrame(rafId);
       window.removeEventListener('resize', calculateLineHeight);
     };
-  }, [isFullscreen, pageData, fontLoaded]);
+  }, [isFullscreen, pageData, fontLoaded, fillHeaderReserve, fillFooterReserve]);
 
   // Stretch the surah header frame to fill the full element width.
   // The icon-font glyph has an intrinsic width, so flex centering alone
@@ -439,7 +498,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     // Small delay to allow layout to settle after fullscreen toggle
     const timeoutId = setTimeout(calculateRects, 50);
     return () => clearTimeout(timeoutId);
-  }, [hoveredAyah, currentPlayingAyah, fontLoaded, pageData, isFullscreen, dynamicLineHeight, highlightRecalcTrigger]);
+  }, [hoveredAyah, currentPlayingAyah, fontLoaded, pageData, isFullscreen, dynamicLineHeight, ayahFontScale, highlightRecalcTrigger]);
 
   // Recalculate highlight positions after layout changes (resize)
   useEffect(() => {
@@ -628,10 +687,10 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
     );
   }
 
-  // Loading skeleton: keep the EXACT enlarged footprint (same max-h class +
-  // full-height min-height) so a swiped-to page never paints as a small box
-  // that then jumps to full size. Previously this was a collapsed flex box —
-  // the visible "shrink then enlarge".
+  // Loading skeleton: keep the EXACT enlarged footprint (fill min-height)
+  // so a swiped-to page never paints as a small box that then jumps to full
+  // size. Previously this was a collapsed flex box — the visible
+  // "shrink then enlarge".
   if (!pageData || !fontLoaded) {
     return (
       <div
@@ -639,7 +698,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         style={{
           width: '100%',
           height: '100%',
-          minHeight: 'calc(100dvh - 250px)',
+          minHeight: fillMinHeight,
           fontFamily: `'p${pageNumber}-${mushafType}', 'Amiri', serif`,
           direction: 'rtl',
         }}
@@ -669,6 +728,9 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       style={{
         fontFamily: `'p${pageNumber}-${mushafType}', 'Amiri', serif`,
         direction: 'rtl',
+        // Horizontal fit multiplier (<= 1): shrinks the ayah font when the
+        // widest line would overflow the line box on narrow widths.
+        '--ayah-font-scale': ayahFontScale,
         // Size from viewport (same in normal + fullscreen) so toggling the
         // view never shrinks the page. Parent slide scrolls if taller than
         // its content box; Surah.tsx padding guarantees it starts after the
@@ -677,11 +739,11 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         height: 'auto',
         // Lock the enlarged footprint even before the font/line-height settles,
         // so swipe-incoming pages can't collapse for a frame (no shrink).
-        minHeight: 'calc(100dvh - 250px)',
+        minHeight: fillMinHeight,
         width: '100%',
         position: 'relative',
         justifyContent: isFullscreen ? 'space-between' : 'center',
-      }}
+      } as React.CSSProperties}
     >
       {/* Highlight overlay rectangles */}
       {highlightRects.map((rect, idx) => (
@@ -808,7 +870,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         }
 
         .line-content {
-          font-size: ${mushafType === 'tajweed' ? 'min(max(2.3vw, 1.6rem), 2.3rem)' : 'min(max(2.5vw, 1.75rem), 2.5rem)'};
+          font-size: calc(${mushafType === 'tajweed' ? 'min(max(2.3vw, 1.6rem), 2.3rem)' : 'min(max(2.5vw, 1.75rem), 2.5rem)'} * var(--ayah-font-scale, 1));
           line-height: ${dynamicLineHeight || 1.75};
           padding: 0;
           margin: 0;
@@ -821,7 +883,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         @media (min-width: 640px) {
           .line-content {
-            font-size: ${mushafType === 'tajweed' ? 'min(max(2vw, 1.85rem), 2.3rem)' : 'min(max(2.2vw, 2rem), 2.5rem)'};
+            font-size: calc(${mushafType === 'tajweed' ? 'min(max(2vw, 1.85rem), 2.3rem)' : 'min(max(2.2vw, 2rem), 2.5rem)'} * var(--ayah-font-scale, 1));
             line-height: ${dynamicLineHeight || 1.85};
           }
         }
@@ -956,7 +1018,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
 
         @media (min-width: 768px) {
           .line-content {
-            font-size: ${mushafType === 'tajweed' ? '2.3rem' : '2.5rem'};
+            font-size: calc(${mushafType === 'tajweed' ? '2.3rem' : '2.5rem'} * var(--ayah-font-scale, 1));
             line-height: ${dynamicLineHeight || 2};
           }
           

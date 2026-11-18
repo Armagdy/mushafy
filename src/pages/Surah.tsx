@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, BookText, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat, Sun, Moon, PenLine } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, BookText, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat, Sun, Moon, PenLine, Layers } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { surahs } from '@/data/surahs';
@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useMushaf, type MushafType } from '@/contexts/MushafContext';
+import { useAnnotatedPages } from '@/hooks/useAnnotations';
 import { useDarkMode } from '@/contexts/DarkModeContext';
 import { useToast } from '@/hooks/use-toast';
 import { useBookmarks } from '@/hooks/useBookmarks';
@@ -45,6 +46,9 @@ const Surah = () => {
   // Text mushafs (tarteel/tajweed) render HTML, not page images — used to
   // decide what page content the annotation editor receives.
   const isTextMushaf = mushafType === 'tarteel' || mushafType === 'tajweed';
+  // Pages of the current mushaf that have saved drawings — drives the quick
+  // bar's show/hide edits toggle (Eye/EyeOff, only for spreads with edits).
+  const annotatedPages = useAnnotatedPages(mushafType);
   // Page annotation editor overlay
   const [isAnnotationEditMode, setIsAnnotationEditMode] = useState(false);
   
@@ -142,12 +146,54 @@ const Surah = () => {
     const saved = localStorage.getItem('quran-show-bottom-bar-text');
     return saved !== null ? saved === 'true' : true;
   });
+  // Whether saved page drawings (annotation overlays) are visible while
+  // reading. Toggled from the quick bar's Eye/EyeOff button; persisted so
+  // the choice survives reloads.
+  const [showAnnotations, setShowAnnotations] = useState<boolean>(() => {
+    const saved = localStorage.getItem('quran-show-annotations');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const toggleAnnotations = useCallback(() => {
+    setShowAnnotations((prev) => {
+      localStorage.setItem('quran-show-annotations', prev ? 'false' : 'true');
+      return !prev;
+    });
+  }, []);
   // Header/footer chrome theme: 'green' (classic emerald gradient) | 'glass' (frosted translucent)
   const [chromeTheme, setChromeTheme] = useState<'green' | 'glass'>(() => {
     const saved = localStorage.getItem('quran-chrome-theme');
     return saved === 'glass' ? 'glass' : 'green';
   });
   const [flashAyahPickerIcon, setFlashAyahPickerIcon] = useState(false);
+  // Measured height of the fullscreen quick bar (footer overlay). Text-mushaf
+  // pages (tarteel/tajweed) in fullscreen reserve exactly this much space so
+  // the page text fills the entire band above the bar. Measured live via
+  // ResizeObserver so safe-area insets / icon size changes are included.
+  const quickBarRef = useRef<HTMLDivElement>(null);
+  const [quickBarHeight, setQuickBarHeight] = useState(56);
+  useEffect(() => {
+    const el = quickBarRef.current;
+    if (!el) return;
+    const update = () => setQuickBarHeight(el.offsetHeight || 56);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  // Measured height of the fullscreen header overlay (surah name + page).
+  // For text mushafs, the page container's top padding is derived from it so
+  // the page text starts right below the header (no dead band above it).
+  const fullscreenHeaderRef = useRef<HTMLDivElement>(null);
+  const [fullscreenHeaderHeight, setFullscreenHeaderHeight] = useState(38);
+  useEffect(() => {
+    const el = fullscreenHeaderRef.current;
+    if (!el) return;
+    const update = () => setFullscreenHeaderHeight(el.offsetHeight || 38);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   
   // Swiper mode is now the default page display
   const useSwiperMode = true;
@@ -310,6 +356,11 @@ const Surah = () => {
   const secondPageNum = currentPageNum < 604 ? currentPageNum + 1 : currentPageNum;
   const leftPageNum = isRTL ? secondPageNum : currentPageNum;
   const rightPageNum = isRTL ? currentPageNum : secondPageNum;
+  // Does the currently visible spread have saved drawings? Drives the quick
+  // bar's show/hide-edits toggle (only rendered when there are edits to show).
+  const visiblePagesHaveEdits =
+    annotatedPages.has(currentPageNum) ||
+    (viewMode === 'double' && !isMobile && annotatedPages.has(secondPageNum));
 
   // Debug logging for images
   console.log('=== Page Debug Info ===');
@@ -673,17 +724,16 @@ const Surah = () => {
       {/* Main Content Area - Single instance with animated container for smooth fullscreen transition */}
       
       {/* Fullscreen Overlay Header — CSS-class driven (NOT framer-motion).
-          framer wrote a stale inline opacity after the entrance spring settled,
-          blinking the bar out for a frame; class transitions can't be clobbered.
-          Positioning matches the annotation editor: floating themed card with
-          small margins + safe-area insets, no full-width background strip. */}
-      {/* Fullscreen Overlay Header — CSS-class driven (NOT framer-motion).
-          Bare text over the page (no background card): surah name + page,
-          positioned like the annotation editor with safe-area insets. */}
+          Plain bold text (normal color, NO drop-shadow shading): surah name
+          + page, pinned to the top edge with safe-area insets (all mushafs).
+          Its height is measured (fullscreenHeaderHeight) and the page
+          container's top padding for text mushafs (tarteel/tajweed) is set
+          from it, so the page text starts right below the header — no dead
+          band above or below it. */}
       <div
+        ref={fullscreenHeaderRef}
         className={cn(
           "absolute top-0 left-0 right-0 z-[65] flex items-center justify-between px-4",
-          "drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]",
           "transition-[opacity,transform] duration-300 ease-out",
           isFullscreen
             ? "opacity-100 translate-y-0"
@@ -695,8 +745,8 @@ const Surah = () => {
         <div className={cn(
           "text-lg md:text-2xl font-bold",
           isDarkMode
-            ? "text-[#F2E3BB]"
-            : "text-emerald-800 dark:text-emerald-200"
+            ? "text-white"
+            : "text-gray-900 dark:text-gray-100"
         )}>
           {language === 'ar' ? currentSurah.name : currentSurah.englishName}
         </div>
@@ -705,8 +755,8 @@ const Surah = () => {
         <div className={cn(
           "text-lg md:text-2xl font-bold",
           isDarkMode
-            ? "text-[#F2E3BB]"
-            : "text-emerald-800 dark:text-emerald-200"
+            ? "text-white"
+            : "text-gray-900 dark:text-gray-100"
         )}>
           {t('page')} {formatNumber(currentPageNum)}
         </div>
@@ -735,7 +785,16 @@ const Surah = () => {
           // NOTE: vertical padding only (no horizontal) so page width stays
           // identical to default view — side padding lives in
           // SwiperPageDisplay (same in both modes) to avoid shrink on toggle.
-          isFullscreen && "pt-[108px] md:pt-[116px] pb-[128px] md:pb-[136px] box-border"
+          // Text mushafs: BOTH paddings are set inline from the MEASURED
+          // overlay heights (fullscreenHeaderHeight / quickBarHeight) so the
+          // page text fills the entire band between header and quick bar —
+          // no dead space above the header or above the bar. Image mushafs
+          // keep the classic fixed 108/116 + 128/136px bands.
+          isFullscreen && (
+            isTextMushaf
+              ? "box-border"
+              : "pt-[108px] md:pt-[116px] pb-[128px] md:pb-[136px] box-border"
+          )
         )}
         style={{
           // Smooth CSS transition for layout properties
@@ -743,6 +802,15 @@ const Surah = () => {
           position: isFullscreen ? 'absolute' : 'relative',
           inset: isFullscreen ? 0 : 'auto',
           zIndex: isFullscreen ? 60 : 'auto',
+          // Text mushafs in fullscreen: page starts right below the header
+          // (+4px padding +4px slide padding = the validated 8px gap) and
+          // ends right above the quick bar's measured height (+ small gap).
+          paddingTop:
+            isFullscreen && isTextMushaf
+              ? `${fullscreenHeaderHeight + 4}px`
+              : undefined,
+          paddingBottom:
+            isFullscreen && isTextMushaf ? `${quickBarHeight + 8}px` : undefined,
         }}
       >
         {useSwiperMode ? (
@@ -795,6 +863,12 @@ const Surah = () => {
             onSwiperReady={useCallback((navFunc: (page: number) => void) => {
               setNavigateToPage(() => navFunc);
             }, [])}
+            // Measured quick bar + header heights — lets text-mushaf pages in
+            // fullscreen fill the entire space between them.
+            fullscreenFooterHeight={quickBarHeight}
+            fullscreenHeaderHeight={fullscreenHeaderHeight}
+            // Show/hide saved page drawings (Eye/EyeOff quick bar toggle)
+            showAnnotations={showAnnotations}
           />
         ) : (
           <PageDisplay
@@ -855,6 +929,7 @@ const Surah = () => {
           No background: the page shows through; a thin themed border line
           separates the page from the quick bar. */}
       <div
+        ref={quickBarRef}
         className={cn(
           "absolute bottom-0 left-0 right-0 z-[65] flex items-center justify-center py-1.5 px-4",
           "border-t",
@@ -1070,6 +1145,30 @@ const Surah = () => {
             >
               <PenLine className="w-8 h-8" />
             </button>
+
+            {/* Show/Hide saved edits (drawings layer) — only rendered when the
+                visible spread actually has saved annotations. Replaces the
+                old purple pen badge that used to sit at the page's corner.
+                Layers icon: dimmed when the drawings layer is hidden. */}
+            {visiblePagesHaveEdits && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowBookmarkTypeSelector(false);
+                  toggleAnnotations();
+                }}
+                className={cn(
+                  "flex flex-col items-center gap-1 transition-all",
+                  isDarkMode
+                    ? "text-[#F2E3BB] hover:text-[#FBF9F4]"
+                    : "text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300",
+                  !showAnnotations && "opacity-40"
+                )}
+                title={showAnnotations ? t('hideEdits') : t('showEdits')}
+              >
+                <Layers className="w-8 h-8" />
+              </button>
+            )}
 
             {/* Dark/Light Mode Toggle - disabled for Tajweed (colored glyphs) */}
             <button

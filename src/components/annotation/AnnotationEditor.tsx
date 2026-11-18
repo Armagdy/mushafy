@@ -14,7 +14,7 @@
  *    via annotation-storage (same storage location as page images).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   X, Save, Undo2, Redo2, MousePointer2, Pen, Minus, Square, Hand,
   Waves, Diameter, Eraser, Loader2, Maximize2, Check, Type,
@@ -190,6 +190,21 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+  // Text mushafs: fill the ENTIRE stage (between this editor's header and
+  // toolbar) — same "expand to all available space" behavior as the reader's
+  // fullscreen. TartelPage sizes its fill from viewport reserves
+  // (innerHeight - header - footer), so pass reserves that SUM to
+  // (innerHeight - measured stage height); the individual split is
+  // irrelevant. Memoized: TartelPage is memo-wrapped and compares the object
+  // identity. Drawings stay aligned: annotations are stored normalized
+  // (0..1 of the page) and every line shares one dynamic line-height, so
+  // relative line positions don't move when the fill height changes.
+  const editorFillReserves = useMemo(() => {
+    if (!isTextMushaf || !availableHeight || availableHeight <= 120) return undefined;
+    const sum = Math.max(0, window.innerHeight - availableHeight);
+    const header = Math.round(sum / 2);
+    return { header, footer: sum - header };
+  }, [isTextMushaf, availableHeight]);
   const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -983,7 +998,8 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
       await savePageAnnotations(mushafType, page, shapesRef.current);
       savedIndexRef.current = historyIndexRef.current;
       setDirty(false);
-      toast({ title: t('annotationsSaved'), description: `${t('page')} ${page}` });
+      // No success toast — the editor closing right after saving IS the
+      // feedback; errors still surface via the destructive toast below.
       onClose(true);
     } catch (error) {
       console.error('[AnnotationEditor] save failed', error);
@@ -1119,9 +1135,12 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
 
         {isTextMushaf ? (
           /* Text mushafs: render the page exactly like the reader slide
-             (same max-width + paddings, isFullscreen like the reader's
-             always-enlarged text pages) so saved drawings align with the
-             same lines when reading. */
+             (same max-width + paddings) but FILLED to the editor's whole
+             stage height (editorFillReserves) — the same expand-to-fit the
+             reader's fullscreen uses. Saved drawings stay aligned:
+             annotations are normalized (0..1 of the page) and every line
+             shares one dynamic line-height, so relative positions don't
+             move when the fill height changes. */
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-full max-w-7xl px-3 md:px-6">
               <div className="w-full px-2 md:px-4">
@@ -1144,6 +1163,7 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
                     pageNumber={page}
                     mushafType={mushafType as 'tarteel' | 'tajweed'}
                     isFullscreen
+                    fillReserves={editorFillReserves}
                   />
                   <canvas
                     ref={canvasRef}

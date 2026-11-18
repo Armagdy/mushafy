@@ -4,15 +4,14 @@ import type { Swiper as SwiperType } from 'swiper';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/virtual';
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { Bookmark, BookMarked, BookOpen, PenLine } from 'lucide-react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { Bookmark, BookMarked, BookOpen } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useMushaf } from '@/contexts/MushafContext';
 import { getPageImageFilename } from '@/lib/quran-mapping';
 import { CachedImage } from './CachedImage';
 import TartelPage from './TartelPage';
 import { AnnotationOverlay } from '@/components/annotation/AnnotationOverlay';
-import { useAnnotatedPages } from '@/hooks/useAnnotations';
 import { useToast } from '@/hooks/use-toast';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { cn } from '@/lib/utils';
@@ -34,6 +33,23 @@ interface SwiperPageDisplayProps {
   hasAyahTimings?: boolean;
   onLongPressNotification?: () => void;
   onSwiperReady?: (navigateToPage: (page: number) => void) => void;
+  /**
+   * Measured height (px) of the fullscreen quick bar. Only used for text
+   * mushafs (tarteel/tajweed) in fullscreen so the page text can fill the
+   * entire space between the header and the quick bar.
+   */
+  fullscreenFooterHeight?: number;
+  /**
+   * Measured height (px) of the fullscreen header overlay (surah name +
+   * page). Same purpose as fullscreenFooterHeight — the text starts right
+   * below the header instead of beneath a fixed-size band.
+   */
+  fullscreenHeaderHeight?: number;
+  /**
+   * Whether saved page drawings (annotation overlays) are visible in the
+   * reader. Toggled from the quick bar (Eye/EyeOff button). Default: true.
+   */
+  showAnnotations?: boolean;
 }
 
 export function SwiperPageDisplay({
@@ -53,14 +69,35 @@ export function SwiperPageDisplay({
   hasAyahTimings = true,
   onLongPressNotification,
   onSwiperReady,
+  fullscreenFooterHeight,
+  fullscreenHeaderHeight,
+  showAnnotations = true,
 }: SwiperPageDisplayProps) {
   const { t, isRTL } = useLanguage();
   const { getMushafPath, mushafType } = useMushaf();
   const { toast } = useToast();
   const swiperRef = useRef<SwiperType | null>(null);
-  
-  // Pages that have a saved annotation layer (drives the pen indicator badge)
-  const annotatedPages = useAnnotatedPages(mushafType);
+  // Text mushafs in fullscreen: real overlay bands — the header's measured
+  // height (+ container padding + slide padding) and the measured quick-bar
+  // height (+ paddings) — so the page text fills the ENTIRE space between
+  // the header and the quick bar. Normal mode uses undefined — TartelPage
+  // falls back to its classic fixed reserves. Memoized: TartelPage is
+  // memo-wrapped, so the object identity must stay stable across renders.
+  // Every swiped slide gets the same values, so all pages render
+  // identically.
+  const isTextMushaf = mushafType === 'tarteel' || mushafType === 'tajweed';
+  const fillReserves = useMemo(
+    () =>
+      isFullscreen && isTextMushaf
+        ? {
+            // Page top offset: container pt (header + 4) + slide py-1 (4).
+            header: (fullscreenHeaderHeight ?? 40) + 8,
+            // Page bottom offset: container pb (bar + 8) + slide py-1 (4).
+            footer: (fullscreenFooterHeight ?? 120) + 12,
+          }
+        : undefined,
+    [isFullscreen, isTextMushaf, fullscreenHeaderHeight, fullscreenFooterHeight]
+  );
   
   // Track if we're currently transitioning between slides
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -233,9 +270,8 @@ export function SwiperPageDisplay({
     const hasBookmark = bookmarks.includes(pageNum);
     const hasMemorization = memorizationBookmarks.includes(pageNum);
     const hasReading = readingBookmarks.includes(pageNum);
-    const hasAnnotations = annotatedPages.has(pageNum);
     
-    if (!hasBookmark && !hasMemorization && !hasReading && !hasAnnotations) return null;
+    if (!hasBookmark && !hasMemorization && !hasReading) return null;
     
     return (
       <div 
@@ -253,12 +289,9 @@ export function SwiperPageDisplay({
         {hasReading && (
           <BookOpen className="w-6 h-6 md:w-8 md:h-8 fill-blue-600 text-blue-600 drop-shadow-lg" />
         )}
-        {hasAnnotations && (
-          <PenLine className="w-6 h-6 md:w-8 md:h-8 text-purple-600 drop-shadow-lg" />
-        )}
       </div>
     );
-  }, [bookmarks, memorizationBookmarks, readingBookmarks, annotatedPages]);
+  }, [bookmarks, memorizationBookmarks, readingBookmarks]);
   
   // Render page content
   const renderPage = useCallback((pageNum: number) => {
@@ -289,6 +322,8 @@ export function SwiperPageDisplay({
       // h-auto + min-h-full: size to content (identical in both modes) instead
       // of stretching to the parent box (which differs normal vs fullscreen
       // and caused the shrink on toggle). Parent slide scrolls on overflow.
+      // fillReserves (see above) sizes the text to fill the whole band
+      // between the header and the quick bar when the reader is fullscreen.
       return (
         <div className="relative w-full h-auto min-h-full flex flex-col justify-start px-2 md:px-4 box-border">
           {renderBookmarkIcons(pageNum, isOddPage ? 'right' : 'left')}
@@ -313,13 +348,15 @@ export function SwiperPageDisplay({
               mushafType={mushafType as 'tarteel' | 'tajweed'}
               isFullscreen={pageEnlarged}
               isFullscreenDarkMode={isFullscreenDarkMode}
+              fillReserves={fillReserves}
               className={cn(
                 "max-w-full w-auto h-auto mx-auto cursor-pointer transition-all duration-300 ease-out",
                 imageMaxHeight
               )}
             />
-            {/* Saved annotation layer (drawings) on top of the page */}
-            <AnnotationOverlay page={pageNum} />
+            {/* Saved annotation layer (drawings) on top of the page —
+                toggleable from the quick bar (Eye/EyeOff button) */}
+            {showAnnotations && <AnnotationOverlay page={pageNum} />}
           </div>
         </div>
       );
@@ -361,8 +398,9 @@ export function SwiperPageDisplay({
                 }
               }}
             />
-            {/* Saved annotation layer (drawings) on top of the page */}
-            <AnnotationOverlay page={pageNum} />
+            {/* Saved annotation layer (drawings) on top of the page —
+                toggleable from the quick bar (Eye/EyeOff button) */}
+            {showAnnotations && <AnnotationOverlay page={pageNum} />}
           </div>
         </div>
       </div>
@@ -383,6 +421,8 @@ export function SwiperPageDisplay({
     handleTouchMove,
     handleTouchEnd,
     renderBookmarkIcons,
+    showAnnotations,
+    fillReserves,
   ]);
   
   // Generate slides array
