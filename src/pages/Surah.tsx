@@ -1154,6 +1154,7 @@ const Surah = () => {
           concatenatedSurah={concatenatedSurah}
           mp3QuranAyahTimings={ayahTimings}
           currentSurahAudio={currentSurahAudio}
+          currentPlayingAyah={currentPlayingAyah}
           formatNumber={formatNumber}
           isRepeatActive={isRepeatActive}
           isRepeatConcatenatedMode={isRepeatConcatenatedMode}

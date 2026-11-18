@@ -223,6 +223,35 @@ export const getCachedIndividualAyah = async (
 };
 
 /**
+ * Get native file URI for a cached individual ayah (Android/iOS only).
+ * Instant - returns a URI without loading the blob into memory.
+ * Returns null on web or if the ayah is not cached.
+ * Use with Capacitor.convertFileSrc() to get a WebView-playable URL.
+ */
+export const getCachedIndividualAyahUri = async (
+  reciterFolder: string,
+  surahNum: number,
+  ayahNum: number
+): Promise<string | null> => {
+  if (!isNativePlatform()) return null;
+
+  try {
+    await audioStorage.init();
+
+    const key = getAyahCacheKey(reciterFolder, surahNum, ayahNum);
+
+    const exists = await audioStorage.hasItem(key);
+    if (!exists) return null;
+
+    const uri = await audioStorage.getFileUri(key);
+    return uri || null;
+  } catch (error) {
+    console.error('Error getting cached individual ayah URI:', error);
+    return null;
+  }
+};
+
+/**
  * Get all cached ayahs for a surah
  * Returns a map of ayah number to Blob
  */

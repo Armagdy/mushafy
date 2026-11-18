@@ -4,16 +4,23 @@ import { ASSETS_BASE_URL } from '@/config/assets';
 import { getAudioData } from '@/lib/quran-data-service';
 import { getMp3QuranReciters, getAyahTiming, getSurahAudioUrl, getCurrentAyahFromTime, seekToAyah, type Mp3QuranReciter, type Mp3QuranMoshaf, type AyahTiming } from '@/lib/mp3quran-service';
 import { surahs } from '@/data/surahs';
-import { cacheAudio, getCachedAudio, getCachedAudioUri, cacheMp3QuranAudio, getCachedMp3QuranAudio, getCachedMp3QuranAudioUri, cacheIndividualAyah, getCachedIndividualAyah, getAllCachedAyahsForSurah, getCachedAyahTiming, cacheAyahTiming } from '@/lib/audio-cache';
+import { cacheMp3QuranAudio, getCachedMp3QuranAudio, getCachedMp3QuranAudioUri, cacheIndividualAyah, getCachedIndividualAyah, getCachedIndividualAyahUri, getCachedAyahTiming, cacheAyahTiming } from '@/lib/audio-cache';
 import { isNetworkError } from '@/hooks/useNetwork';
 import { debugMediaSession } from '@/lib/media-session-debug';
 import QuranMediaSession from '@/lib/quran-media-session';
 import { Capacitor } from '@capacitor/core';
-import { Filesystem, Directory } from '@capacitor/filesystem';
 
 interface CurrentAyah {
   surah: number;
   ayah: number;
+}
+
+// A single ayah's ready-to-play audio URL (per-ayah streaming mode)
+interface AyahUrlEntry {
+  url: string;
+  // True when url is a blob: URL that must be revoked after use.
+  // False for native file URIs (Android/iOS), which are never revoked.
+  isBlobUrl: boolean;
 }
 
 interface Reciter {
@@ -83,10 +90,7 @@ export const useAudioPlayer = ({
   
   // AbortController to cancel ongoing preloading operations
   const preloadAbortControllerRef = useRef<AbortController | null>(null);
-  
-  // Track last concatenation error type for better error reporting
-  const lastConcatenationErrorRef = useRef<'network' | 'other' | null>(null);
-  
+
   // Track last time we updated native controls position (for throttling)
   const lastPositionUpdateRef = useRef<number>(0);
   
@@ -112,6 +116,29 @@ export const useAudioPlayer = ({
   // Last ayah reported by the audio stream itself. Distinguishes genuine
   // audio advancement from view-side selection resets.
   const lastAudioAyahRef = useRef<number>(0);
+  
+  // ============================================================================
+  // PER-AYAH STREAMING (EveryAyah reciters)
+  // ============================================================================
+  // Instead of downloading and concatenating the whole surah before playback,
+  // only the current ayah is loaded and the next few ayahs are buffered in the
+  // background while it plays - so ayah-to-ayah transitions are near-instant
+  // and playback starts after a single ayah download.
+  
+  // In-memory buffer of ready-to-play ayah URLs (current + next few ayahs only)
+  const ayahBufferRef = useRef<Map<string, { surah: number; ayah: number } & AyahUrlEntry>>(new Map());
+  
+  // In-flight ayah downloads (dedupes the current-ayah load racing the prefetch)
+  const ayahFetchesRef = useRef<Map<string, Promise<AyahUrlEntry>>>(new Map());
+  
+  // Token that invalidates a playAyah load superseded by a newer play request
+  const ayahLoadTokenRef = useRef(0);
+  
+  // Token that cancels a prefetch chain (new play request / stop)
+  const ayahPrefetchTokenRef = useRef(0);
+  
+  // True while playing EveryAyah audio one ayah at a time (per-ayah streaming)
+  const [isIndividualAyahMode, setIsIndividualAyahMode] = useState(false);
   
   // Reciter state
   const [reciters, setReciters] = useState<Reciter[]>([]);
@@ -441,6 +468,122 @@ export const useAudioPlayer = ({
     preloadAudioElement.load();
   }, [preloadAudioElement, selectedReciter, getNextAyah]);
   
+  // Get a playable URL for a single EveryAyah ayah.
+  // Resolution order: in-memory buffer -> persistent individual-ayah cache
+  // (native file URI on Android/iOS - instant, no blob loading) -> web blob
+  // cache -> download (and persist for future sessions).
+  // In-flight downloads are deduped so the current-ayah load and the prefetch
+  // chain never download the same ayah twice.
+  const ensureAyahUrl = useCallback(async (
+    surahNum: number,
+    ayahNum: number
+  ): Promise<AyahUrlEntry> => {
+    if (!selectedReciter) throw new Error('No reciter selected');
+    
+    const folder = selectedReciter.folder;
+    const key = `${folder}:${surahNum}:${ayahNum}`;
+    
+    const buffered = ayahBufferRef.current.get(key);
+    if (buffered) return { url: buffered.url, isBlobUrl: buffered.isBlobUrl };
+    
+    let load = ayahFetchesRef.current.get(key);
+    if (!load) {
+      load = (async () => {
+        // 1. Persistent individual-ayah cache
+        // Native: file URI (instant - no blob loading into memory)
+        const cachedUri = await getCachedIndividualAyahUri(folder, surahNum, ayahNum);
+        if (cachedUri) {
+          const url = Capacitor.convertFileSrc(cachedUri);
+          ayahBufferRef.current.set(key, { surah: surahNum, ayah: ayahNum, url, isBlobUrl: false });
+          console.log(`✓ Ayah ${surahNum}:${ayahNum} served from native cache (file URI)`);
+          return { url, isBlobUrl: false };
+        }
+        
+        // Web: blob from IndexedDB-backed cache
+        const cachedBlob = await getCachedIndividualAyah(folder, surahNum, ayahNum);
+        if (cachedBlob) {
+          const url = URL.createObjectURL(cachedBlob);
+          ayahBufferRef.current.set(key, { surah: surahNum, ayah: ayahNum, url, isBlobUrl: true });
+          console.log(`✓ Ayah ${surahNum}:${ayahNum} served from cache`);
+          return { url, isBlobUrl: true };
+        }
+        
+        // 2. Download the single ayah
+        if (!navigator.onLine) {
+          const err = new Error('Cannot download ayah - device is offline');
+          (err as any).isNetworkError = true;
+          throw err;
+        }
+        
+        const surahPadded = surahNum.toString().padStart(3, '0');
+        const ayahPadded = ayahNum.toString().padStart(3, '0');
+        const audioUrl = `${selectedReciter.baseUrl}/${surahPadded}${ayahPadded}.mp3`;
+        
+        const response = await fetch(audioUrl);
+        if (!response.ok) {
+          const err = new Error(`Failed to fetch: ${audioUrl}`);
+          (err as any).isNetworkError = response.status === 0;
+          throw err;
+        }
+        
+        const blob = await response.blob();
+        
+        // Persist for future sessions (best-effort - never blocks playback)
+        cacheIndividualAyah(folder, surahNum, ayahNum, blob).catch(err => {
+          console.warn(`⚠️ Failed to cache ayah ${surahNum}:${ayahNum}:`, err);
+        });
+        
+        const url = URL.createObjectURL(blob);
+        ayahBufferRef.current.set(key, { surah: surahNum, ayah: ayahNum, url, isBlobUrl: true });
+        console.log(`⬇️ Downloaded ayah ${surahNum}:${ayahNum} (${(blob.size / 1024).toFixed(0)}KB)`);
+        return { url, isBlobUrl: true };
+      })();
+      
+      ayahFetchesRef.current.set(key, load);
+      load.catch(() => {}).finally(() => ayahFetchesRef.current.delete(key));
+    }
+    
+    return load;
+  }, [selectedReciter]);
+  
+  // Keep only the current ayah and the next few in the in-memory buffer.
+  // Older entries (and far-ahead leftovers) are revoked and dropped.
+  const pruneAyahBuffer = useCallback((surahNum: number, ayahNum: number, keepAhead = 3) => {
+    const buffer = ayahBufferRef.current;
+    for (const [key, entry] of buffer.entries()) {
+      const keep = (entry.surah === surahNum && entry.ayah >= ayahNum && entry.ayah <= ayahNum + keepAhead)
+        || (entry.surah === surahNum + 1 && entry.ayah <= keepAhead);
+      if (!keep) {
+        if (entry.isBlobUrl) URL.revokeObjectURL(entry.url);
+        buffer.delete(key);
+      }
+    }
+  }, []);
+  
+  // Silently buffer the next few ayahs while the current one plays, so
+  // switching to the next ayah when it ends has negligible delay.
+  const scheduleAyahPrefetch = useCallback((surahNum: number, ayahNum: number, count = 3) => {
+    const token = ++ayahPrefetchTokenRef.current;
+    
+    (async () => {
+      let next = getNextAyah(surahNum, ayahNum);
+      let buffered = 0;
+      
+      while (next && buffered < count) {
+        // A newer play request or stopAudio cancelled this chain
+        if (ayahPrefetchTokenRef.current !== token) return;
+        try {
+          await ensureAyahUrl(next.surah, next.ayah);
+        } catch (error) {
+          console.warn(`Prefetch failed for ayah ${next.surah}:${next.ayah} (will retry when it plays)`, error);
+          return;
+        }
+        next = getNextAyah(next.surah, next.ayah);
+        buffered++;
+      }
+    })();
+  }, [getNextAyah, ensureAyahUrl]);
+  
   // Convert AudioBuffer to WAV blob
   const audioBufferToWav = useCallback((buffer: AudioBuffer): Blob => {
     // Convert to mono to save memory (especially important on Android WebView)
@@ -501,252 +644,6 @@ export const useAudioPlayer = ({
     
     return new Blob([arrayBuffer], { type: 'audio/wav' });
   }, []);
-  
-  // Get MP3 duration without decoding (lightweight)
-  const getMp3Duration = useCallback((blob: Blob): Promise<number> => {
-    return new Promise((resolve, reject) => {
-      const audio = new Audio();
-      const url = URL.createObjectURL(blob);
-      
-      audio.addEventListener('loadedmetadata', () => {
-        const duration = audio.duration;
-        URL.revokeObjectURL(url);
-        audio.src = '';
-        resolve(duration);
-      }, { once: true });
-      
-      audio.addEventListener('error', (e) => {
-        URL.revokeObjectURL(url);
-        reject(new Error('Failed to load audio metadata'));
-      }, { once: true });
-      
-      audio.src = url;
-    });
-  }, []);
-  
-  // Concatenate all ayahs in a surah into a single MP3 file
-  // Strategy: Cache individual ayahs, build concatenated blob on-the-fly
-  const concatenateAllSurahAyahs = useCallback(async (surahNum: number): Promise<{ blobUrl: string; timestamps: number[] } | null> => {
-    if (!selectedReciter || audioSource !== 'everyayah') return null;
-    
-    const surahData = ayahData.find(s => s.number === surahNum);
-    if (!surahData || !surahData.verses) return null;
-    
-    const totalAyahs = surahData.verses.length;
-    const isNative = Capacitor.isNativePlatform();
-    
-    // 🔥 NATIVE ANDROID: Check if concatenated MP3 already exists on phone storage
-    // Use getCachedAudioUri for instant file URI (no loading!)
-    if (isNative) {
-      console.log(`📱 [NATIVE] Checking for cached concatenated MP3: ${selectedReciter.folder} surah ${surahNum}`);
-      const cachedUri = await getCachedAudioUri(selectedReciter.folder, surahNum);
-      
-      if (cachedUri) {
-        // ✅ Found! Convert native file:// URI to WebView-accessible URI
-        console.log(`✅ [NATIVE] Concatenated MP3 found! Converting file URI for WebView`);
-        
-        // Verify the file is actually accessible before using it
-        try {
-          const { uri } = cachedUri;
-          // Try to read file stats to verify it exists and is accessible
-          const fileName = uri.split('/').pop() || '';
-          
-          const stat = await Filesystem.stat({
-            path: fileName,
-            directory: Directory.Data
-          });
-          
-          console.log(`✅ [NATIVE] File verified: ${(stat.size / (1024 * 1024)).toFixed(1)}MB`);
-          
-          // Revoke old blob URL if exists
-          if (concatenatedBlobUrl) {
-            URL.revokeObjectURL(concatenatedBlobUrl);
-          }
-          
-          // Convert native file:// URI to capacitor:// or http://localhost protocol that WebView allows
-          const webViewUri = Capacitor.convertFileSrc(uri);
-          console.log(`🔄 [NATIVE] Converted URI: ${webViewUri}`);
-          
-          setConcatenatedBlobUrl(webViewUri);
-          setConcatenatedSurah(surahNum);
-          setAyahTimestamps(cachedUri.timestamps);
-          
-          return { blobUrl: webViewUri, timestamps: cachedUri.timestamps };
-        } catch (verifyError) {
-          console.error(`⚠️ [NATIVE] Cached file exists in metadata but not accessible:`, verifyError);
-          console.log(`🔄 [NATIVE] Will rebuild the file...`);
-          // Fall through to rebuild the file
-        }
-      }
-      
-      console.log(`📥 [NATIVE] Concatenated MP3 not found - will build and save to phone storage`);
-    }
-    
-    // Check if we already have all individual ayahs cached
-    const cachedAyahs = await getAllCachedAyahsForSurah(selectedReciter.folder, surahNum, totalAyahs);
-    const cachedCount = cachedAyahs.size;
-    const missingAyahs = totalAyahs - cachedCount;
-    
-    if (missingAyahs > 0) {
-      console.log(`⬇️ Need to download ${missingAyahs} ayahs for ${selectedReciter.folder} surah ${surahNum}`);
-      // Check if we're offline - if so, can't download missing ayahs
-      if (!navigator.onLine) {
-        console.error('❌ Cannot download ayahs - device is offline');
-        setIsPreloadingAyahs(false);
-        setPreloadProgress({ current: 0, total: 0 });
-        lastConcatenationErrorRef.current = 'network';
-        return null;
-      }
-    } else {
-      console.log(`✅ All ${totalAyahs} ayahs already cached for ${selectedReciter.folder} surah ${surahNum}`);
-    }
-    
-    // Create new AbortController for this operation
-    preloadAbortControllerRef.current = new AbortController();
-    const signal = preloadAbortControllerRef.current.signal;
-    
-    setIsPreloadingAyahs(true);
-    setPreloadProgress({ current: cachedCount, total: totalAyahs });
-    
-    const surahPadded = surahNum.toString().padStart(3, '0');
-    
-    try {
-      // Download missing ayahs and cache them individually
-      const mp3Blobs: Blob[] = [];
-      const timestamps: number[] = [0]; // Start time of each ayah
-      let currentTime = 0;
-      let downloadedCount = cachedCount;
-      
-      for (let ayahNum = 1; ayahNum <= totalAyahs; ayahNum++) {
-        // Check if aborted
-        if (signal.aborted) {
-          console.log('⛔ Preload aborted');
-          setIsPreloadingAyahs(false);
-          setPreloadProgress({ current: 0, total: 0 });
-          return null;
-        }
-        
-        let mp3Blob: Blob;
-        
-        // Check if this ayah is already cached
-        if (cachedAyahs.has(ayahNum)) {
-          mp3Blob = cachedAyahs.get(ayahNum)!;
-          console.log(`✓ Using cached ayah ${surahNum}:${ayahNum}`);
-        } else {
-          // Download this ayah
-          const ayahPadded = ayahNum.toString().padStart(3, '0');
-          const audioUrl = `${selectedReciter.baseUrl}/${surahPadded}${ayahPadded}.mp3`;
-          
-          try {
-            const response = await fetch(audioUrl, { signal });
-            if (!response.ok) throw new Error(`Failed to fetch: ${audioUrl}`);
-            
-            mp3Blob = await response.blob();
-            
-            // Cache this individual ayah for future use
-            try {
-              await cacheIndividualAyah(selectedReciter.folder, surahNum, ayahNum, mp3Blob);
-              console.log(`💾 Cached individual ayah ${surahNum}:${ayahNum}`);
-            } catch (cacheError) {
-              console.warn(`⚠️ Failed to cache ayah ${surahNum}:${ayahNum}:`, cacheError);
-              // Continue anyway - we can still use the blob
-            }
-            
-            downloadedCount++;
-            setPreloadProgress({ current: downloadedCount, total: totalAyahs });
-          } catch (error) {
-            // Check if this was an abort
-            if (error instanceof Error && error.name === 'AbortError') {
-              console.log('⛔ Preload aborted during fetch');
-              setIsPreloadingAyahs(false);
-              setPreloadProgress({ current: 0, total: 0 });
-              lastConcatenationErrorRef.current = null;
-              return null;
-            }
-            console.error(`Failed to load ayah ${surahNum}:${ayahNum}:`, error);
-            setIsPreloadingAyahs(false);
-            setPreloadProgress({ current: 0, total: 0 });
-            // Track if this is a network error or if user is offline
-            const isNetError = !navigator.onLine || isNetworkError(error);
-            lastConcatenationErrorRef.current = isNetError ? 'network' : 'other';
-            console.log(`Error type detected: ${lastConcatenationErrorRef.current}`);
-            return null;
-          }
-        }
-        
-        // Add blob to concatenation array
-        mp3Blobs.push(mp3Blob);
-        
-        // Get duration using lightweight metadata loading (no full decode)
-        const duration = await getMp3Duration(mp3Blob);
-        currentTime += duration;
-        
-        // Calculate timestamp for next ayah
-        if (ayahNum < totalAyahs) {
-          timestamps.push(currentTime);
-        }
-      }
-      
-      // Check if aborted before concatenation
-      if (signal.aborted) {
-        console.log('⛔ Preload aborted before concatenation');
-        setIsPreloadingAyahs(false);
-        setPreloadProgress({ current: 0, total: 0 });
-        return null;
-      }
-      
-      console.log(`🎵 Building concatenated blob from ${mp3Blobs.length} ayahs (total: ${currentTime.toFixed(1)}s)`);
-      
-      // Concatenate MP3 blobs directly (simple and fast!)
-      const concatenatedMp3 = new Blob(mp3Blobs, { type: 'audio/mpeg' });
-      const fileSizeMB = (concatenatedMp3.size / (1024 * 1024)).toFixed(1);
-      
-      // 🔥 NATIVE ANDROID: Save concatenated MP3 to phone storage
-      if (isNative) {
-        console.log(`💾 [NATIVE] Saving concatenated MP3 to phone storage: ${fileSizeMB} MB`);
-        try {
-          await cacheAudio(selectedReciter.folder, surahNum, concatenatedMp3, timestamps);
-          console.log(`✅ [NATIVE] Concatenated MP3 saved to phone storage successfully!`);
-        } catch (cacheError) {
-          console.error(`⚠️ [NATIVE] Failed to save concatenated MP3 to phone storage:`, cacheError);
-          // Continue anyway - we can still play from memory
-        }
-      } else {
-        console.log(`✅ [WEB] Blob created in memory: ${fileSizeMB} MB (NOT cached - will be kept until stop)`);
-      }
-      
-      const blobUrl = URL.createObjectURL(concatenatedMp3);
-      
-      // Revoke old blob URL if exists (from previous playback)
-      if (concatenatedBlobUrl && concatenatedBlobUrl !== blobUrl) {
-        URL.revokeObjectURL(concatenatedBlobUrl);
-        console.log('🗑️ Revoked previous blob URL');
-      }
-      
-      setConcatenatedBlobUrl(blobUrl);
-      setConcatenatedSurah(surahNum);
-      setAyahTimestamps(timestamps);
-      setIsPreloadingAyahs(false);
-      setPreloadProgress({ current: 0, total: 0 });
-      
-      return { blobUrl, timestamps };
-    } catch (error) {
-      console.error('❌ Error concatenating ayahs:', error);
-      
-      // Clean up on error
-      if (concatenatedBlobUrl) {
-        URL.revokeObjectURL(concatenatedBlobUrl);
-        setConcatenatedBlobUrl(null);
-      }
-      
-      setIsPreloadingAyahs(false);
-      setPreloadProgress({ current: 0, total: 0 });
-      setConcatenatedSurah(null);
-      setAyahTimestamps([]);
-      
-      return null;
-    }
-  }, [selectedReciter, ayahData, audioSource, concatenatedBlobUrl, getMp3Duration]);
   
   // Concatenate repeat section with ayah repeats and passage repeats baked in
   const concatenateRepeatAyahs = useCallback(async (
@@ -1434,6 +1331,7 @@ export const useAudioPlayer = ({
     
     if (audioSource === 'mp3quran' && selectedMoshaf) {
       // MP3Quran mode: Continuous surah audio with timing
+      setIsIndividualAyahMode(false);
       setIsPlaying(true);
       
       try {
@@ -1630,145 +1528,70 @@ export const useAudioPlayer = ({
         setPreloadProgress({ current: 0, total: 0 });
         setPreloadProgress({ current: 0, total: 0 });
       }
-    } else if (audioSource === 'everyayah' && selectedReciter && audioContext) {
+    } else if (audioSource === 'everyayah' && selectedReciter) {
       if (selectedReciter.folder) {
         localStorage.setItem('quran-last-reciter', selectedReciter.folder);
       }
       
-      const wasPlaying = isPlaying;
-      let blobUrl: string;
-      let timestamps: number[];
-      let needsNewSource = false;
+      // ⚡ PER-AYAH STREAMING: only load the requested ayah and play it right
+      // away. The next few ayahs are buffered in the background while this one
+      // plays, so ayah-to-ayah transitions have negligible delay. The whole
+      // surah is never downloaded up-front.
+      const loadToken = ++ayahLoadTokenRef.current;
+      const bufferKey = `${selectedReciter.folder}:${surahNum}:${ayahNum}`;
+      const isBuffered = ayahBufferRef.current.has(bufferKey);
       
-      // Check if we need to concatenate the surah or if it's already concatenated
-      if (concatenatedSurah !== surahNum || !concatenatedBlobUrl) {
-        // Different surah - need to load new audio
-        // Pause current playback if playing
-        if (wasPlaying) {
-          audioElement.pause();
-        }
-        
-        // Don't set isPlaying yet - wait for concatenation to complete
-        setIsPlaying(false);
-        
-        // Show loading spinner immediately (before cache check which can be slow)
+      // Show the spinner only if the ayah isn't buffered yet (first play of
+      // an uncached ayah). Buffered transitions start instantly.
+      if (!isBuffered) {
         setIsPreloadingAyahs(true);
+      }
+      
+      try {
+        const { url } = await ensureAyahUrl(surahNum, ayahNum);
         
-        // Concatenate all ayahs in this surah (checks cache first, then downloads if needed)
-        const result = await concatenateAllSurahAyahs(surahNum);
+        // A newer play request superseded this one - discard the result
+        if (ayahLoadTokenRef.current !== loadToken) return;
         
-        if (!result) {
-          console.error('Failed to concatenate ayahs');
+        setIsIndividualAyahMode(true);
+        audioElement.src = url;
+        audioElement.load();
+        
+        setIsPlaying(true);
+        
+        audioElement.play().then(() => {
+          setIsPreloadingAyahs(false); // Hide spinner once playing
+          if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'playing';
+          }
+        }).catch(err => {
+          console.error('Failed to play audio:', err);
           setIsPlaying(false);
           setIsPreloadingAyahs(false);
           releaseWakeLock();
-          // Notify based on error type
-          if (onSurahUnavailable) {
-            const errorType = lastConcatenationErrorRef.current;
-            console.log(`Notifying error type: ${errorType}`);
-            if (errorType === 'network') {
-              onSurahUnavailable('network-error');
-            } else if (errorType === 'other') {
-              onSurahUnavailable('unavailable');
-            } else {
-              // Fallback - if no error type was set, assume unavailable
-              console.warn('No error type set, defaulting to unavailable');
-              onSurahUnavailable('unavailable');
-            }
-            // Reset error ref
-            lastConcatenationErrorRef.current = null;
-          }
-          return;
-        }
+        });
         
-        blobUrl = result.blobUrl;
-        timestamps = result.timestamps;
-        needsNewSource = true;
-      } else {
-        // Same surah - already have the blob URL
-        blobUrl = concatenatedBlobUrl;
-        timestamps = ayahTimestamps;
-        needsNewSource = audioElement.src !== blobUrl;
-      }
-      
-      // Calculate start time for the requested ayah
-      const startTime = timestamps[ayahNum - 1] || 0;
-      
-      if (needsNewSource) {
-        // New source needed - set it and wait for load
-        audioElement.src = blobUrl;
+        // While this ayah plays, buffer the next ones & release old ones
+        scheduleAyahPrefetch(surahNum, ayahNum);
+        pruneAyahBuffer(surahNum, ayahNum);
+      } catch (error) {
+        console.error(`Failed to load ayah ${surahNum}:${ayahNum}:`, error);
         
-        // Set flag to prevent automatic navigation during initial seek
-        isAyahNavigation.current = true;
+        // A newer play request superseded this one - ignore the error
+        if (ayahLoadTokenRef.current !== loadToken) return;
         
-        // Wait for the audio to be ready before seeking
-        const handleLoadedMetadata = () => {
-          audioElement.currentTime = startTime;
-          audioElement.play().then(() => {
-            setIsPlaying(true);
-            setIsPreloadingAyahs(false); // Hide spinner once playing
-            if ('mediaSession' in navigator) {
-              navigator.mediaSession.playbackState = 'playing';
-            }
-            // Reset flag after successful playback start
-            setTimeout(() => {
-              isAyahNavigation.current = false;
-            }, 500);
-          }).catch(err => {
-            console.error('Failed to play audio:', err);
-            setIsPlaying(false);
-            setIsPreloadingAyahs(false);
-            releaseWakeLock();
-            isAyahNavigation.current = false;
-          });
-        };
+        setIsPlaying(false);
+        setIsPreloadingAyahs(false);
+        releaseWakeLock();
         
-        audioElement.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
-        audioElement.load();
-      } else {
-        // Same source, just seek to new position
-        // If already playing, this will seamlessly jump to the new ayah
-        audioElement.currentTime = startTime;
-        
-        // Set flag to prevent navigation during seek
-        isAyahNavigation.current = true;
-        
-        if (wasPlaying) {
-          // Continue playing from new position
-          audioElement.play().then(() => {
-            setIsPlaying(true);
-            if ('mediaSession' in navigator) {
-              navigator.mediaSession.playbackState = 'playing';
-            }
-            setTimeout(() => {
-              isAyahNavigation.current = false;
-            }, 300);
-          }).catch(err => {
-            console.error('Failed to play audio:', err);
-            setIsPlaying(false);
-            releaseWakeLock();
-            isAyahNavigation.current = false;
-          });
-        } else {
-          // Start playing from this position
-          audioElement.play().then(() => {
-            setIsPlaying(true);
-            if ('mediaSession' in navigator) {
-              navigator.mediaSession.playbackState = 'playing';
-            }
-            setTimeout(() => {
-              isAyahNavigation.current = false;
-            }, 300);
-          }).catch(err => {
-            console.error('Failed to play audio:', err);
-            setIsPlaying(false);
-            releaseWakeLock();
-            isAyahNavigation.current = false;
-          });
+        if (onSurahUnavailable) {
+          const isNetError = !navigator.onLine || isNetworkError(error) || (error as any).isNetworkError;
+          onSurahUnavailable(isNetError ? 'network-error' : 'unavailable');
         }
       }
     }
-  }, [audioElement, audioSource, selectedReciter, selectedMoshaf, ayahData, currentPageNum, navigate, preloadNextAyah, isAyahNavigation, updateMediaSession, requestWakeLock, currentSurahAudio, ayahTimings, audioContext, concatenatedSurah, concatenatedBlobUrl, concatenateAllSurahAyahs, ayahTimestamps, releaseWakeLock, onSurahUnavailable]);
+  }, [audioElement, audioSource, selectedReciter, selectedMoshaf, ayahData, currentPageNum, navigate, isAyahNavigation, updateMediaSession, requestWakeLock, currentSurahAudio, ayahTimings, ensureAyahUrl, scheduleAyahPrefetch, pruneAyahBuffer, releaseWakeLock, onSurahUnavailable]);
+
   
   // Toggle play/pause
   const togglePlayPause = useCallback(() => {
@@ -1877,6 +1700,17 @@ export const useAudioPlayer = ({
       preloadAbortControllerRef.current.abort();
       preloadAbortControllerRef.current = null;
     }
+    
+    // Cancel per-ayah streaming: prefetch chains and any superseded loads
+    ayahPrefetchTokenRef.current++;
+    ayahLoadTokenRef.current++;
+    setIsIndividualAyahMode(false);
+    
+    // Release all buffered ayah URLs
+    for (const entry of ayahBufferRef.current.values()) {
+      if (entry.isBlobUrl) URL.revokeObjectURL(entry.url);
+    }
+    ayahBufferRef.current.clear();
     
     // Reset preloading state
     setIsPreloadingAyahs(false);
@@ -2119,6 +1953,7 @@ export const useAudioPlayer = ({
       // Set up repeat mode
       setIsRepeatActive(true);
       setIsRepeatConcatenatedMode(true);
+      setIsIndividualAyahMode(false); // repeat audio is one concatenated blob
       setCurrentRepeatPassage(1);
       setCurrentRepeatSurah(startSurah);
       setCurrentRepeatAyah(startAyah);
@@ -2188,6 +2023,7 @@ export const useAudioPlayer = ({
       // Set up repeat mode
       setIsRepeatActive(true);
       setIsRepeatConcatenatedMode(true);
+      setIsIndividualAyahMode(false); // repeat audio is one concatenated blob
       setCurrentRepeatPassage(1);
       setCurrentRepeatSurah(startSurah);
       setCurrentRepeatAyah(startAyah);
@@ -2574,6 +2410,9 @@ export const useAudioPlayer = ({
     preloadAudio.preload = 'metadata';
     setPreloadAudioElement(preloadAudio);
     
+    // Stable reference to the per-ayah buffer for cleanup on unmount
+    const ayahBufferMap = ayahBufferRef.current;
+    
     // Initialize Web Audio API context for concatenation
     const context = new (window.AudioContext || (window as any).webkitAudioContext)();
     setAudioContext(context);
@@ -2617,6 +2456,12 @@ export const useAudioPlayer = ({
       if (concatenatedBlobUrl) {
         URL.revokeObjectURL(concatenatedBlobUrl);
       }
+      
+      // Release any buffered per-ayah URLs
+      for (const entry of ayahBufferMap.values()) {
+        if (entry.isBlobUrl) URL.revokeObjectURL(entry.url);
+      }
+      ayahBufferMap.clear();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2699,6 +2544,13 @@ export const useAudioPlayer = ({
     };
     
     const handleEnded = () => {
+      // PER-AYAH STREAMING: 'ended' fires after every single ayah and the
+      // next one starts immediately. Don't tear down the media session here -
+      // the next ayah's 'play' event will refresh it. Updating it now makes
+      // the Android notification flash between ayahs (see
+      // INDIVIDUAL_AYAH_PLAYBACK.md issue #4).
+      if (isIndividualAyahMode) return;
+      
       if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'none';
         console.log('🎵 Media Session: ended');
@@ -2753,7 +2605,7 @@ export const useAudioPlayer = ({
       audioElement.removeEventListener('seeking', handleSeeking);
       audioElement.removeEventListener('seeked', handleSeeked);
     };
-  }, [audioElement, isPlaying]);
+  }, [audioElement, isPlaying, isIndividualAyahMode]);
   
   // Set up Media Session action handlers for Android notification controls
   useEffect(() => {

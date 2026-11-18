@@ -25,6 +25,9 @@ interface AudioProgressBarProps {
   concatenatedSurah?: number | null;
   mp3QuranAyahTimings?: AyahTiming[];
   currentSurahAudio?: number | null;
+  // Per-ayah streaming mode (EveryAyah): the playing ayah, used for the
+  // tooltip when there are no whole-surah timestamps
+  currentPlayingAyah?: { surah: number; ayah: number } | null;
   formatNumber?: (num: number | string) => string;
   // Repeat mode props
   isRepeatActive?: boolean;
@@ -56,6 +59,7 @@ export function AudioProgressBar({
   concatenatedSurah = null,
   mp3QuranAyahTimings = [],
   currentSurahAudio = null,
+  currentPlayingAyah = null,
   formatNumber = (n) => n.toString(),
   isRepeatActive = false,
   isRepeatConcatenatedMode = false,
@@ -240,13 +244,13 @@ export function AudioProgressBar({
     };
     const handleGlobalMouseMove = (e: MouseEvent) => {
       if (isDragging) {
-        handleSeek(e.clientX);
+        updateDragPosition(e.clientX);
       }
     };
     const handleGlobalTouchMove = (e: TouchEvent) => {
       if (isDragging && e.touches.length > 0) {
         e.preventDefault();
-        handleSeek(e.touches[0].clientX);
+        updateDragPosition(e.touches[0].clientX);
       }
     };
 
@@ -329,6 +333,11 @@ export function AudioProgressBar({
       return ayahNum;
     }
     
+    // Per-ayah streaming mode: the entire bar represents the current ayah
+    if (audioSource === 'everyayah' && currentPlayingAyah) {
+      return currentPlayingAyah.ayah;
+    }
+    
     if (audioSource === 'mp3quran' && currentSurahAudio && mp3QuranAyahTimings.length > 0) {
       return getCurrentAyahFromTime(mp3QuranAyahTimings, time);
     }
@@ -339,6 +348,10 @@ export function AudioProgressBar({
   const getSurahFromTime = (time: number): number | null => {
     if (audioSource === 'everyayah' && concatenatedSurah) {
       return concatenatedSurah;
+    }
+    // Per-ayah streaming mode: the entire bar represents the current ayah
+    if (audioSource === 'everyayah' && currentPlayingAyah) {
+      return currentPlayingAyah.surah;
     }
     if (audioSource === 'mp3quran' && currentSurahAudio) {
       return currentSurahAudio;
