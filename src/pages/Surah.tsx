@@ -780,21 +780,16 @@ const Surah = () => {
           isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
           "fullscreen-container-transition",
           isFullscreen && "absolute inset-0 z-[60]",
-          // Reserve space for fullscreen overlay header/footer so text-mushaf
-          // pages (tarteel/tajweed) start AFTER the header, not beneath it.
-          // NOTE: vertical padding only (no horizontal) so page width stays
-          // identical to default view — side padding lives in
-          // SwiperPageDisplay (same in both modes) to avoid shrink on toggle.
-          // Text mushafs: BOTH paddings are set inline from the MEASURED
-          // overlay heights (fullscreenHeaderHeight / quickBarHeight) so the
-          // page text fills the entire band between header and quick bar —
-          // no dead space above the header or above the bar. Image mushafs
-          // keep the classic fixed 108/116 + 128/136px bands.
-          isFullscreen && (
-            isTextMushaf
-              ? "box-border"
-              : "pt-[108px] md:pt-[116px] pb-[128px] md:pb-[136px] box-border"
-          )
+          // Reserve space for fullscreen overlay header/footer so pages
+          // start AFTER the header, not beneath it. NOTE: vertical padding
+          // only (no horizontal) so page width stays identical to default
+          // view — side padding lives in SwiperPageDisplay (same in both
+          // modes) to avoid shrink on toggle. BOTH paddings are set inline
+          // from the MEASURED overlay heights (fullscreenHeaderHeight /
+          // quickBarHeight) for ALL mushaf types (text AND image) so the
+          // page fills the entire band between header and quick bar — the
+          // same sizing as the annotation editor's stage. No dead space.
+          isFullscreen && "box-border"
         )}
         style={{
           // Smooth CSS transition for layout properties
@@ -802,15 +797,14 @@ const Surah = () => {
           position: isFullscreen ? 'absolute' : 'relative',
           inset: isFullscreen ? 0 : 'auto',
           zIndex: isFullscreen ? 60 : 'auto',
-          // Text mushafs in fullscreen: page starts right below the header
-          // (+4px padding +4px slide padding = the validated 8px gap) and
-          // ends right above the quick bar's measured height (+ small gap).
+          // Fullscreen: page starts right below the header (+4px padding
+          // +4px slide padding = the validated 8px gap) and ends right above
+          // the quick bar's measured height (+ small gap). Applies to every
+          // mushaf type.
           paddingTop:
-            isFullscreen && isTextMushaf
-              ? `${fullscreenHeaderHeight + 4}px`
-              : undefined,
+            isFullscreen ? `${fullscreenHeaderHeight + 4}px` : undefined,
           paddingBottom:
-            isFullscreen && isTextMushaf ? `${quickBarHeight + 8}px` : undefined,
+            isFullscreen ? `${quickBarHeight + 8}px` : undefined,
         }}
       >
         {useSwiperMode ? (

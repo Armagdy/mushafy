@@ -98,6 +98,24 @@ export function SwiperPageDisplay({
         : undefined,
     [isFullscreen, isTextMushaf, fullscreenHeaderHeight, fullscreenFooterHeight]
   );
+  // Image mushafs in fullscreen: cap the image at the ENTIRE band between
+  // the measured header and quick bar — the same "fill the stage" sizing the
+  // annotation editor uses (its measured stage height minus a 12px slack).
+  // The old fixed calc(100dvh-250px) reserved ~150px more than the actual
+  // overlays, so the fullscreen page rendered visibly smaller than the
+  // editor's. Derived from the MEASURED overlay heights so safe-area insets
+  // and icon-size changes are included. Returns the px reserve subtracted
+  // from 100dvh — applied as an inline style because the value is dynamic
+  // (a Tailwind arbitrary-value class built at runtime wouldn't be
+  // JIT-compiled). Memoized: renderPage is a callback consuming this value.
+  const fullscreenImageReservePx = useMemo(() => {
+    if (!isFullscreen) return undefined;
+    const headerReserve = (fullscreenHeaderHeight ?? 40) + 4; // container pt
+    const footerReserve = (fullscreenFooterHeight ?? 56) + 8; // container pb
+    const slidePadding = 8; // slide py-1 (top + bottom)
+    const editorSlack = 12; // same -12px slack as the editor's stage
+    return Math.round(headerReserve + footerReserve + slidePadding + editorSlack);
+  }, [isFullscreen, fullscreenHeaderHeight, fullscreenFooterHeight]);
   
   // Track if we're currently transitioning between slides
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -310,13 +328,23 @@ export function SwiperPageDisplay({
     const isTextMushaf = mushafType === 'tarteel' || mushafType === 'tajweed';
     const pageEnlarged = isFullscreen || isTextMushaf;
 
-    // Dynamic max-height: must fit inside the available space BETWEEN header
-    // and footer overlays (Surah.tsx reserves pt-[108px]/pb-[128px] in
-    // fullscreen). The old `100dvh-80px` was taller than the content box, so
-    // text pages rendered beneath the overlays.
-    const imageMaxHeight = pageEnlarged
-      ? 'max-h-[calc(100dvh-250px)] md:max-h-[calc(100dvh-265px)]'
-      : 'max-h-[calc(100dvh-170px)]'; // Normal mode with bars visible
+    // Dynamic max-height: must fit inside the available space BETWEEN the
+    // header and footer bands reserved by Surah.tsx. Image mushafs in
+    // fullscreen drop the fixed class cap and use the MEASURED band
+    // (fullscreenImageStyle) so the image fills the whole space between
+    // header and quick bar — same size/view as the annotation editor's
+    // stage. Text mushafs keep the classic cap (their fill comes from
+    // fillReserves inside TartelPage). Normal mode keeps the classic
+    // bars-visible cap.
+    const measuredImageStyle =
+      !isTextMushaf && fullscreenImageReservePx
+        ? { maxHeight: `calc(100dvh - ${fullscreenImageReservePx}px)` }
+        : undefined;
+    const imageMaxHeight = measuredImageStyle
+      ? undefined // inline maxHeight (measured band) takes over
+      : pageEnlarged
+        ? 'max-h-[calc(100dvh-250px)] md:max-h-[calc(100dvh-265px)]'
+        : 'max-h-[calc(100dvh-170px)]'; // Normal mode with bars visible
     
     if (mushafType === 'tarteel' || mushafType === 'tajweed') {
       // h-auto + min-h-full: size to content (identical in both modes) instead
@@ -389,6 +417,9 @@ export function SwiperPageDisplay({
                 imageMaxHeight,
                 isFullscreenDarkMode && "invert sepia-[0.2] brightness-[0.85]"
               )}
+              // Fullscreen (image mushafs): measured band as max-height —
+              // same fill-the-stage sizing as the annotation editor.
+              style={measuredImageStyle}
               loading="lazy"
               cacheCategory={cacheCategory}
               onClick={(e) => {
@@ -423,6 +454,7 @@ export function SwiperPageDisplay({
     renderBookmarkIcons,
     showAnnotations,
     fillReserves,
+    fullscreenImageReservePx,
   ]);
   
   // Generate slides array
@@ -474,7 +506,14 @@ export function SwiperPageDisplay({
         {slides.map((pageNum) => (
           <SwiperSlide key={pageNum} virtualIndex={pageNum - 1}>
             <div className={cn(
-              "flex justify-center h-full w-full py-1 px-3 md:px-6 overflow-y-auto box-border",
+              "flex justify-center h-full w-full py-1 overflow-y-auto box-border",
+              // Fullscreen image mushafs: no side padding so the page spans
+              // the FULL viewport width — same as the annotation editor's
+              // stage (which is a full-width absolute inset-0 flex box).
+              // Everything else keeps the classic side padding; text
+              // mushafs keep it in BOTH modes so toggling fullscreen never
+              // changes their page width.
+              isFullscreen && !isTextMushaf ? "px-0" : "px-3 md:px-6",
               // Text mushafs fill the content box from the top (after the
               // header) instead of centering over the full viewport.
               mushafType === 'tarteel' || mushafType === 'tajweed'
