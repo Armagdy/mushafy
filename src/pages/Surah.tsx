@@ -865,11 +865,11 @@ const Surah = () => {
           paddingBottom:
             isFullscreen
               ? isTextMushaf
-                ? // Text mushafs: the quick bar floats transparently OVER the
-                  // page, so reserve only half its height — the text extends
-                  // down into the bar's upper area instead of leaving a full
-                  // dead band above it.
-                  `${Math.round(quickBarHeight / 2) + 8}px`
+                ? // Text mushafs: reserve the FULL measured quick-bar height
+                  // so the text RESPECTS the floating bar (never runs beneath
+                  // it) with essentially no extra gap — only the slide's 2px
+                  // py-0.5 remains between text and bar.
+                  `${quickBarHeight}px`
                 : `${quickBarHeight + 8}px`
               : undefined,
         }}

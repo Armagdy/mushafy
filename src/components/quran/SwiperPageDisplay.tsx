@@ -78,13 +78,13 @@ export function SwiperPageDisplay({
   const { toast } = useToast();
   const swiperRef = useRef<SwiperType | null>(null);
   // Text mushafs in fullscreen: real overlay bands — the measured header
-  // height (+ container pt + slide py) and HALF the measured quick-bar
+  // height (+ container pt + slide py) and the FULL measured quick-bar
   // height (+ container pb + slide py) — so the page text fills the ENTIRE
-  // space down into the quick bar's transparent upper area (the bar floats
-  // OVER the page with no background, so reserving its full height left a
-  // dead band). The slide uses py-0.5 in fullscreen, so these reserves
-  // exactly match where the slide's content box starts/ends. Normal mode
-  // uses undefined — TartelPage falls back to its classic fixed reserves.
+  // space between the header and the quick bar while RESPECTING the bar
+  // (text never runs beneath the floating bar; the gap stays minimal).
+  // The slide uses py-0.5 in fullscreen, so these reserves exactly match
+  // where the slide's content box starts/ends. Normal mode uses undefined
+  // — TartelPage falls back to its classic fixed reserves.
   // Memoized: TartelPage is memo-wrapped, so the object identity must stay
   // stable across renders. Every swiped slide gets the same values, so all
   // pages render identically.
@@ -95,9 +95,10 @@ export function SwiperPageDisplay({
         ? {
             // Page top offset: container pt (header + 4) + slide py-0.5 (2).
             header: (fullscreenHeaderHeight ?? 40) + 6,
-            // Page bottom offset: container pb (half the bar + 8) + slide
-            // py-0.5 (2) — matches Surah.tsx's conditional paddingBottom.
-            footer: Math.round((fullscreenFooterHeight ?? 120) / 2) + 10,
+            // Page bottom offset: container pb (FULL bar, no extra gap, so
+            // the text respects the quick bar) + slide py-0.5 (2) — matches
+            // Surah.tsx's conditional paddingBottom.
+            footer: (fullscreenFooterHeight ?? 120) + 2,
           }
         : undefined,
     [isFullscreen, isTextMushaf, fullscreenHeaderHeight, fullscreenFooterHeight]
