@@ -979,20 +979,11 @@ const Surah = () => {
       </motion.div>
 
       {/* Fullscreen Footer - Quick Action Buttons — CSS-class driven (NOT framer-motion).
-          No background: the page shows through; a thin themed border line
-          separates the page from the quick bar. */}
+          No background: the page shows through with no separating border. */}
       <div
         ref={quickBarRef}
         className={cn(
           "absolute bottom-0 left-0 right-0 z-[65] flex items-center justify-center py-1.5 px-4",
-          "border-t",
-          chromeTheme === 'glass'
-            ? isDarkMode
-              ? 'border-gray-300/15'
-              : 'border-[#8A8578]/25'
-            : isDarkMode
-              ? 'border-emerald-200/20'
-              : 'border-emerald-800/15',
           "transition-[opacity,transform] duration-300 ease-out",
           isFullscreen
             ? "opacity-100 translate-y-0"
