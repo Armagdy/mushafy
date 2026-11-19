@@ -34,6 +34,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null); // Direct DOM access for Android IME
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Pending debounced auto-search
 
   // Validate that text contains only Arabic characters
   const isArabicText = (text: string): boolean => {
@@ -114,11 +115,17 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
     );
   };
 
-  // Word search functionality - runs only when the user triggers it
-  // (search button or Enter), never automatically while typing
-  const performWordSearch = () => {
+  // Word search functionality - runs automatically while typing (debounced)
+  // or immediately on Enter
+  const performWordSearch = (queryArg?: string) => {
+    // Cancel any pending debounced search (e.g. Enter pressed first)
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
+    }
+
     // Read directly from the input to avoid stale state (Android IME polling)
-    const query = (searchInputRef.current?.value ?? searchWord).trim();
+    const query = (queryArg ?? searchInputRef.current?.value ?? searchWord).trim();
 
     if (query.length >= 2 && ayahData.length > 0) {
       setIsSearchLoading(true);
@@ -149,6 +156,11 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
           });
         });
 
+        // Skip stale results if the input was cleared/changed while searching
+        if ((searchInputRef.current?.value ?? '').trim() !== query) {
+          return;
+        }
+
         setWordSearchResults(results);
         setIsSearchLoading(false);
       }, 100);
@@ -159,6 +171,40 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
       setSearchedWord('');
     }
   };
+
+  // Auto-search: search automatically as the user types (debounced, no button needed)
+  useEffect(() => {
+    const query = searchWord.trim();
+
+    if (query.length < 2 || ayahData.length === 0) {
+      // Reset transient search state when the query is too short
+      if (query.length < 2) {
+        setIsSearchLoading(false);
+        setHasSearched(false);
+        setSearchedWord('');
+      }
+      return;
+    }
+
+    // Show loading state while the user is still typing
+    setIsSearchLoading(true);
+    setHasSearched(true);
+    setSearchedWord(query);
+
+    // Run the search shortly after typing stops
+    debounceTimeoutRef.current = setTimeout(() => {
+      debounceTimeoutRef.current = null;
+      performWordSearch(query);
+    }, 400);
+
+    // Cancel the pending search if the user keeps typing (or on unmount)
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
+    };
+  }, [searchWord, ayahData.length]);
 
   const handleResultClick = (page: number, surahNumber: number, ayahNumber: number) => {
     if (onNavigate) {
@@ -214,15 +260,6 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
               textSizeClasses.text
             )}
           />
-          <button
-            type="button"
-            onClick={performWordSearch}
-            className="flex items-center justify-center gap-1.5 px-4 h-11 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-[#F2E3BB] font-medium shadow-md shrink-0 transition-colors"
-            aria-label={isRTL ? 'بحث' : 'Search'}
-          >
-            <Search className="w-4 h-4" />
-            <span className="hidden sm:inline">{isRTL ? 'بحث' : 'Search'}</span>
-          </button>
           {searchWord && (
             <button
               onClick={clearSearch}
