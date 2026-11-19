@@ -141,7 +141,7 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
   }, []);
 
   const [tool, setTool] = useState<Tool>('pen');
-  const [color, setColor] = useState('#ef4444');
+  const [color, setColor] = useState('#3b82f6');
   // Thickness remembered per drawing tool
   const [toolThickness, setToolThickness] =
     useState<Record<'pen' | 'line' | 'rect', number>>(() => ({
@@ -1245,7 +1245,7 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
                   <span className="text-sm text-emerald-800 dark:text-emerald-200">{t('customColor')}</span>
                   <input
                     type="color"
-                    value={color.startsWith('#') ? color : '#ef4444'}
+                    value={color.startsWith('#') ? color : '#3b82f6'}
                     onChange={(e) => pickColor(e.target.value)}
                     className="w-10 h-8 rounded cursor-pointer bg-transparent"
                   />
