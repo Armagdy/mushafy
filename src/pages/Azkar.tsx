@@ -6,12 +6,15 @@ import { Card } from '@/components/ui/card';
 import { Check, ChevronLeft, RotateCcw, Sunrise, MoonStar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { azkarSabah, azkarMasa, Dhikr } from '@/data/azkar';
+import { useDialogTextSize, getQuranTextSizeClasses } from '@/contexts/DialogTextSizeContext';
 
 type AzkarTab = 'sabah' | 'masa';
 
 export default function Azkar({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const { t, isRTL, language } = useLanguage();
+  const { dialogTextSize } = useDialogTextSize();
+  const quranTextClasses = getQuranTextSizeClasses(dialogTextSize);
 
   const [tab, setTab] = useState<AzkarTab>(() =>
     typeof window !== 'undefined' && new Date().getHours() >= 15 ? 'masa' : 'sabah'
@@ -163,13 +166,12 @@ export default function Azkar({ embedded = false }: { embedded?: boolean }) {
                     dir="rtl"
                     lang="ar"
                     className={cn(
-                      'text-center leading-loose',
-                      dhikr.quran ? 'text-2xl md:text-3xl' : 'text-xl md:text-2xl',
+                      'font-quran text-center leading-[2.2]',
+                      quranTextClasses,
                       isDone
                         ? 'text-emerald-800 dark:text-emerald-200'
-                        : 'text-emerald-950 dark:text-emerald-100'
+                        : 'text-emerald-900 dark:text-emerald-100'
                     )}
-                    style={{ fontFamily: "'Changa', sans-serif" }}
                   >
                     {dhikr.text}
                   </p>
@@ -200,7 +202,7 @@ export default function Azkar({ embedded = false }: { embedded?: boolean }) {
                     <p
                       dir="rtl"
                       lang="ar"
-                      className="text-sm md:text-base text-center text-emerald-700/80 dark:text-emerald-300/70 border-t border-emerald-100 dark:border-emerald-800 pt-3 w-full leading-relaxed"
+                      className="font-quran text-base md:text-lg text-center text-emerald-700/80 dark:text-emerald-300/70 border-t border-emerald-100 dark:border-emerald-800 pt-3 w-full leading-relaxed"
                     >
                       {dhikr.virtue}
                     </p>
