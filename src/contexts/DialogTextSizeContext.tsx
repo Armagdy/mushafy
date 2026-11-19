@@ -92,15 +92,15 @@ export function getDialogTextSizeClasses(size: DialogTextSize) {
 }
 
 // Quranic script (KFGQPC HAFS) renders visually smaller than sans-serif at
-// the same size, so ayah text gets one size step above the regular dialog
+// the same size, so ayah text gets two size steps above the regular dialog
 // text by default while still following the user's text size setting.
 export function getQuranTextSizeClasses(size: DialogTextSize) {
   switch (size) {
     case 'small':
-      return 'text-lg md:text-2xl';
-    case 'medium':
       return 'text-xl md:text-3xl';
-    case 'large':
+    case 'medium':
       return 'text-2xl md:text-4xl';
+    case 'large':
+      return 'text-3xl md:text-5xl';
   }
 }

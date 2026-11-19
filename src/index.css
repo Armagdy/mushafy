@@ -196,7 +196,7 @@
   .font-quran {
     font-family: var(--font-quran);
     /* Quranic script renders visually smaller than sans-serif at the same size */
-    font-size: 1.3em;
+    font-size: 1.45em;
   }
 
   .font-display {
