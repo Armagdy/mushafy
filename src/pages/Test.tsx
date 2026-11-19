@@ -1109,8 +1109,7 @@ export default function Test() {
                     "text-right"
                   )}>
                     <p
-                      className="text-2xl md:text-3xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200"
-                      style={{ fontFamily: "var(--font-quran)" }}
+                      className="font-quran text-2xl md:text-3xl leading-relaxed text-gray-800 dark:text-gray-200"
                     >
                       {currentQuestion.partialText}
                     </p>
@@ -1153,8 +1152,7 @@ export default function Test() {
                             {language === 'ar' ? 'تلميح' : 'Hint'} {formatNumber(currentQuestion.questionType === 'normal' ? 3 : 4)}: {t('fullAyah')}
                           </p>
                           <p
-                            className="text-xl md:text-2xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 text-right"
-                            style={{ fontFamily: "var(--font-quran)" }}
+                            className="font-quran text-xl md:text-2xl leading-relaxed text-gray-800 dark:text-gray-200 text-right"
                           >
                             {currentQuestion.questionAyah.text}
                           </p>
@@ -1185,8 +1183,7 @@ export default function Test() {
                         )}
                       </div>
 
-                      <div className="text-2xl md:text-3xl font-amiri text-gray-800 dark:text-gray-200"
-                           style={{ fontFamily: "var(--font-quran)", lineHeight: "2.5" }}>
+                      <div className="font-quran text-2xl md:text-3xl text-gray-800 dark:text-gray-200" style={{ lineHeight: "2.5" }}>
                         {/* Question Ayah */}
                         <span>{currentQuestion.questionAyah.text}</span>
                         <span 
@@ -1254,8 +1251,7 @@ export default function Test() {
                     "text-right"
                   )}>
                     <p
-                      className="text-2xl md:text-3xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 text-center"
-                      style={{ fontFamily: "var(--font-quran)" }}
+                      className="font-quran text-2xl md:text-3xl leading-relaxed text-gray-800 dark:text-gray-200 text-center"
                     >
                       {currentTikrar.phrase}
                     </p>
@@ -1316,8 +1312,7 @@ export default function Test() {
                           </span>
                         </div>
                         <p
-                          className="text-xl md:text-2xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 text-right"
-                          style={{ fontFamily: "var(--font-quran)" }}
+                          className="font-quran text-xl md:text-2xl leading-relaxed text-gray-800 dark:text-gray-200 text-right"
                         >
                           {highlightText(occ.fullText, currentTikrar.phrase)}
                         </p>
