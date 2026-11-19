@@ -54,7 +54,6 @@ const viewVariants = {
 interface ConfigOverlayProps {
   type: ConfigType;
   onClose: () => void;
-  onChangeView: (view: ConfigType) => void;
   currentPage: number;
   currentSurahId: number;
   currentPlayingAyah: { surah: number; ayah: number } | null;
@@ -128,7 +127,6 @@ interface ConfigOverlayProps {
 export default function ConfigOverlay({
   type,
   onClose,
-  onChangeView,
   currentPage,
   currentSurahId,
   currentPlayingAyah,
@@ -192,10 +190,22 @@ export default function ConfigOverlay({
   const { isDarkMode } = useDarkMode();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // The overlay owns the active view while it is open. Switching views
+  // (bottom-bar taps and swipes) only updates this local state, so the
+  // heavy Surah page behind this overlay never re-renders mid-slide —
+  // that full-tree re-render (mushaf Swiper, TopBar, PlayBar...) was the
+  // main cause of the view-switch jank on Android. The `type` prop seeds
+  // this state when the parent opens the overlay; the parent only ever
+  // needs to know whether the overlay is open, not which view shows.
+  const [activeView, setActiveView] = useState<ConfigType>(type);
+  useEffect(() => {
+    setActiveView(type);
+  }, [type]);
+
   // Track the previous view to compute the horizontal slide direction.
   // Moving forward through the bottom bar slides content in from the end
   // side (mirrored in RTL); same/unknown pairs just cross-fade.
-  const prevTypeRef = useRef<ConfigType>(type);
+  const prevTypeRef = useRef<ConfigType>(activeView);
   const computeSlideDirection = (next: ConfigType, prev: ConfigType): number => {
     const nextIdx = VIEW_ORDER.indexOf(next);
     const prevIdx = VIEW_ORDER.indexOf(prev);
@@ -203,8 +213,8 @@ export default function ConfigOverlay({
     const forward = nextIdx > prevIdx ? 1 : -1;
     return isRTL ? -forward : forward;
   };
-  const slideDirection = computeSlideDirection(type, prevTypeRef.current);
-  prevTypeRef.current = type;
+  const slideDirection = computeSlideDirection(activeView, prevTypeRef.current);
+  prevTypeRef.current = activeView;
 
   // Swipe between bottom-bar views (ViewPager gesture).
   // Disabled while a sub-screen is open (settings category, bookmarks
@@ -212,19 +222,19 @@ export default function ConfigOverlay({
   // can never be mistaken for a view switch. Tafseer is excluded too:
   // its ayah cards already own a horizontal drag.
   const hasActiveSubView = (): boolean => {
-    if (type === 'settings' && searchParams.get('category')) return true;
-    if (type === 'navigation' && searchParams.get('type')) return true;
-    if (type === 'bookmarks' && searchParams.get('category')) return true;
+    if (activeView === 'settings' && searchParams.get('category')) return true;
+    if (activeView === 'navigation' && searchParams.get('type')) return true;
+    if (activeView === 'bookmarks' && searchParams.get('category')) return true;
     return false;
   };
   const swipeHandlers = useViewSwipe((dir) => {
-    if (hasActiveSubView() || type === 'tafseer' || !BAR_VIEWS.includes(type)) return;
-    const idx = BAR_VIEWS.indexOf(type);
+    if (hasActiveSubView() || activeView === 'tafseer' || !BAR_VIEWS.includes(activeView)) return;
+    const idx = BAR_VIEWS.indexOf(activeView);
     // Forward = next item in the bar; physical direction mirrors in RTL
     const forward = isRTL ? dir === 'right' : dir === 'left';
     const nextIdx = forward ? idx + 1 : idx - 1;
     if (nextIdx >= 0 && nextIdx < BAR_VIEWS.length) {
-      onChangeView(BAR_VIEWS[nextIdx]);
+      setActiveView(BAR_VIEWS[nextIdx]);
     }
   });
 
@@ -271,15 +281,15 @@ export default function ConfigOverlay({
   
   // Returns true if the current view has an active sub-page, and clears it
   const goBackInView = (): boolean => {
-    if (type === 'settings' && searchParams.get('category')) {
+    if (activeView === 'settings' && searchParams.get('category')) {
       setSearchParams({});
       return true;
     }
-    if (type === 'navigation' && searchParams.get('type')) {
+    if (activeView === 'navigation' && searchParams.get('type')) {
       setSearchParams({});
       return true;
     }
-    if (type === 'bookmarks' && searchParams.get('category')) {
+    if (activeView === 'bookmarks' && searchParams.get('category')) {
       setSearchParams({});
       return true;
     }
@@ -289,13 +299,16 @@ export default function ConfigOverlay({
   // Tapping the bottom-bar button of the view you're already in closes the
   // whole overlay — even from a sub-screen (settings category, navigation
   // type, bookmarks add/update...) — instead of reopening the view's
-  // default page. Sub-params are cleared so the next open starts fresh.
+  // default page. Tapping another bar button switches views locally (no
+  // parent re-render), clearing any sub-screen URL params so the incoming
+  // view never inherits a stale `category`/`type` param.
   const closeIfActive = (view: ConfigType): (() => void) => () => {
-    if (type !== view) {
-      onChangeView(view);
+    const hasStaleParams = !!(searchParams.get('category') || searchParams.get('type'));
+    if (hasStaleParams) setSearchParams({});
+    if (activeView !== view) {
+      setActiveView(view);
       return;
     }
-    if (searchParams.get('category') || searchParams.get('type')) setSearchParams({});
     onClose();
   };
 
@@ -312,7 +325,7 @@ export default function ConfigOverlay({
         handleBackButton.then(listener => listener.remove());
       };
     }
-  }, [onClose, type, searchParams, setSearchParams]);
+  }, [onClose, activeView, searchParams, setSearchParams]);
   
   // Handle ESC key to close
   useEffect(() => {
@@ -326,11 +339,11 @@ export default function ConfigOverlay({
     
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose, type, searchParams, setSearchParams]);
+  }, [onClose, activeView, searchParams, setSearchParams]);
   
   // Get page title based on type
   const getTitle = (): string => {
-    switch (type) {
+    switch (activeView) {
       case 'settings':
         return t('settings');
       case 'bookmarks':
@@ -354,7 +367,7 @@ export default function ConfigOverlay({
   
   // Render appropriate view based on type
   const renderView = () => {
-    switch (type) {
+    switch (activeView) {
       case 'settings':
         return (
           <SettingsView
@@ -533,7 +546,7 @@ export default function ConfigOverlay({
             </button>
             
             <motion.h1
-              key={type}
+              key={activeView}
               initial={slideDirection === 0 ? { opacity: 0 } : { opacity: 0, x: `${-slideDirection * 8}%` }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.25, ease: 'easeOut' }}
@@ -552,7 +565,7 @@ export default function ConfigOverlay({
         <div className="flex-1 min-h-0 overflow-hidden" {...swipeHandlers}>
           <AnimatePresence initial={false} custom={slideDirection} mode="popLayout">
             <motion.div
-              key={type}
+              key={activeView}
               custom={slideDirection}
               variants={viewVariants}
               initial="enter"
@@ -561,7 +574,7 @@ export default function ConfigOverlay({
               transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
               className={cn(
                 "h-full flex flex-col",
-                type === 'reciter' ? 'overflow-hidden min-h-0' : 'overflow-y-auto pb-20'
+                activeView === 'reciter' ? 'overflow-hidden min-h-0' : 'overflow-y-auto pb-20'
               )}
             >
               <div className="flex-1 flex flex-col min-h-0">
@@ -589,11 +602,11 @@ export default function ConfigOverlay({
           isMobile={isMobile}
           viewMode={viewMode}
           activeButton={
-            type === 'navigation' ? 'navigation'
-            : type === 'search' ? 'search'
-            : type === 'bookmarks' ? 'bookmarks'
-            : type === 'settings' ? 'settings'
-            : type === 'tafseer' ? 'tafseer'
+            activeView === 'navigation' ? 'navigation'
+            : activeView === 'search' ? 'search'
+            : activeView === 'bookmarks' ? 'bookmarks'
+            : activeView === 'settings' ? 'settings'
+            : activeView === 'tafseer' ? 'tafseer'
             : null
           }
           onGoToClick={closeIfActive('navigation')}

@@ -1616,7 +1616,6 @@ const Surah = () => {
             setConfigOverlayType(null);
             setInitialBookmarkCategory(null);
           }}
-          onChangeView={(view) => setConfigOverlayType(view)}
           currentPage={currentPageNum}
           currentSurahId={currentSurahId}
           currentPlayingAyah={currentPlayingAyah}
