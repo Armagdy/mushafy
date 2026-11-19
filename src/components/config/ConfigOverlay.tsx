@@ -286,6 +286,19 @@ export default function ConfigOverlay({
     return false;
   };
 
+  // Tapping the bottom-bar button of the view you're already in closes the
+  // whole overlay — even from a sub-screen (settings category, navigation
+  // type, bookmarks add/update...) — instead of reopening the view's
+  // default page. Sub-params are cleared so the next open starts fresh.
+  const closeIfActive = (view: ConfigType): (() => void) => () => {
+    if (type !== view) {
+      onChangeView(view);
+      return;
+    }
+    if (searchParams.get('category') || searchParams.get('type')) setSearchParams({});
+    onClose();
+  };
+
   // Handle Android hardware back button
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -583,22 +596,11 @@ export default function ConfigOverlay({
             : type === 'tafseer' ? 'tafseer'
             : null
           }
-          onGoToClick={() => type === 'navigation' ? (goBackInView() || onClose()) : onChangeView('navigation')}
-          onSearchClick={() => type === 'search' ? (goBackInView() || onClose()) : onChangeView('search')}
-          onBookmarkClick={() => {
-            if (type !== 'bookmarks') {
-              onChangeView('bookmarks');
-              return;
-            }
-            // Already in the bookmarks view: tapping the bookmark button
-            // closes the whole overlay — even from a sub-screen such as
-            // Edit/Add Bookmark — instead of reopening the default list.
-            // Clear any open category so the next open starts fresh.
-            if (searchParams.get('category')) setSearchParams({});
-            onClose();
-          }}
-          onSettingsClick={() => type === 'settings' ? (goBackInView() || onClose()) : onChangeView('settings')}
-          onTafseerClick={() => type === 'tafseer' ? (goBackInView() || onClose()) : onChangeView('tafseer')}
+          onGoToClick={closeIfActive('navigation')}
+          onSearchClick={closeIfActive('search')}
+          onBookmarkClick={closeIfActive('bookmarks')}
+          onSettingsClick={closeIfActive('settings')}
+          onTafseerClick={closeIfActive('tafseer')}
           onViewModeToggle={onViewModeToggle}
         />
       </div>

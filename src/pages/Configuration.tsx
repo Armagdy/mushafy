@@ -297,11 +297,11 @@ export default function Configuration() {
               : configType === 'settings' ? 'settings'
               : null
             }
-            onGoToClick={() => navigate('/config/navigation')}
-            onSearchClick={() => navigate('/config/search')}
+            onGoToClick={() => configType === 'navigation' ? navigate('/') : navigate('/config/navigation')}
+            onSearchClick={() => configType === 'search' ? navigate('/') : navigate('/config/search')}
             onBookmarkClick={() => configType === 'bookmarks' ? navigate('/') : navigate('/config/bookmarks')}
-            onSettingsClick={() => navigate('/config/settings')}
-            onTafseerClick={() => navigate('/config/tafseer')}
+            onSettingsClick={() => configType === 'settings' ? navigate('/') : navigate('/config/settings')}
+            onTafseerClick={() => configType === 'tafseer' ? navigate('/') : navigate('/config/tafseer')}
             onViewModeToggle={() => updateViewMode(viewMode === 'single' ? 'double' : 'single')}
           />
         </div>
