@@ -9,6 +9,15 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { surahs } from "@/data/surahs";
 import { BookOpen, Hash, FileText, Layers, ChevronLeft, ChevronRight, Search } from "lucide-react";
 
+// Input-validation regexes (module level: no per-keystroke allocation).
+// Arabic letters (incl. extended ranges), English letters, digits and spaces
+// are allowed; the strip pattern is the inverse, used for single-pass
+// filtering. Rewriting input.value is NEVER done while the IME is
+// mid-composition — that is what freezes Android keyboards and blocks typing.
+const NAV_VALID_CHARS_RE = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z0-9\s]*$/;
+const NAV_INVALID_CHARS_RE = /[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z0-9\s]/g;
+const NON_DIGITS_RE = /[^0-9٠-٩]/g;
+
 interface NavigationViewProps {
   onNavigate?: (page: number, ayah?: { surah: number; ayah: number }) => void;
   onClose?: () => void;
@@ -764,15 +773,12 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
                   placeholder={isRTL ? 'ابحث عن سورة...' : 'Search for a surah...'}
                   onInput={(e) => {
                     const input = e.target as HTMLInputElement;
-                    // Allow Arabic letters, English letters, numbers, spaces
-                    // Arabic range: U+0600-U+06FF (basic Arabic)
-                    const validPattern = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z0-9\s]*$/;
-                    if (!validPattern.test(input.value)) {
-                      // Filter out invalid characters in real-time
-                      const filtered = input.value.split('').filter((char, i) => 
-                        validPattern.test(input.value.substring(0, i + 1))
-                      ).join('');
-                      input.value = filtered;
+                    // Allow Arabic letters, English letters, numbers, spaces —
+                    // single pass, never mid-IME-composition (see comment at
+                    // NAV_VALID_CHARS_RE above)
+                    const composing = (e.nativeEvent as InputEvent).isComposing === true;
+                    if (!composing && !NAV_VALID_CHARS_RE.test(input.value)) {
+                      input.value = input.value.replace(NAV_INVALID_CHARS_RE, '');
                     }
                     // State is updated by 50ms polling, not here
                   }}
@@ -1030,9 +1036,13 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
               onInput={(e) => {
                 const input = e.target as HTMLInputElement;
                 // Filter out any non-numeric characters (keep only 0-9 and ٠-٩)
-                const filteredValue = input.value.replace(/[^0-9٠-٩]/g, '');
-                if (input.value !== filteredValue) {
-                  input.value = filteredValue;
+                // — never while the IME is composing (see NAV_VALID_CHARS_RE)
+                const composing = (e.nativeEvent as InputEvent).isComposing === true;
+                if (!composing) {
+                  const filteredValue = input.value.replace(NON_DIGITS_RE, '');
+                  if (input.value !== filteredValue) {
+                    input.value = filteredValue;
+                  }
                 }
               }}
               className={cn("w-full px-3 py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 mb-3 flex-shrink-0", isRTL ? "text-right" : "text-left", textSizeClasses.text)}
@@ -1111,14 +1121,12 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
                       placeholder={isRTL ? 'ابحث عن ربع...' : 'Search for a quarter...'}
                       onInput={(e) => {
                         const input = e.target as HTMLInputElement;
-                        // Allow Arabic letters, English letters, numbers, spaces
-                        const validPattern = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z0-9\s]*$/;
-                        if (!validPattern.test(input.value)) {
-                          // Filter out invalid characters in real-time
-                          const filtered = input.value.split('').filter((char, i) => 
-                            validPattern.test(input.value.substring(0, i + 1))
-                          ).join('');
-                          input.value = filtered;
+                        // Allow Arabic letters, English letters, numbers, spaces —
+                        // single pass, never mid-IME-composition (see comment at
+                        // NAV_VALID_CHARS_RE above)
+                        const composing = (e.nativeEvent as InputEvent).isComposing === true;
+                        if (!composing && !NAV_VALID_CHARS_RE.test(input.value)) {
+                          input.value = input.value.replace(NAV_INVALID_CHARS_RE, '');
                         }
                         // State is updated by 50ms polling, not here
                       }}
