@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, BookText, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat, Sun, Moon, PenLine, Layers } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, BookText, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat, Sun, Moon, PenLine, Layers, Loader2 } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { surahs } from '@/data/surahs';
@@ -32,6 +32,7 @@ import { useQuranData } from '@/hooks/useQuranData';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { getPageImageFilename, getPageSurahInfo, getPageJuzNumber, getJuzFirstPage, getSurahFirstPage, getAyahPage } from '@/lib/quran-mapping';
 import { getChromeTextClass } from '@/lib/chrome-theme';
+import { prewarmEditorImage } from '@/lib/asset-cache';
 import { cn } from '@/lib/utils';
 
 const Surah = () => {
@@ -52,6 +53,24 @@ const Surah = () => {
   const annotatedPages = useAnnotatedPages(mushafType);
   // Page annotation editor overlay
   const [isAnnotationEditMode, setIsAnnotationEditMode] = useState(false);
+  // Instant feedback overlay: a tiny spinner over the reader page the moment
+  // the edit button is tapped. It mounts in the same frame as the tap (cheap
+  // DOM, no image work) so the tap always feels acknowledged, while the
+  // heavy editor sheet mounts invisibly underneath and fades in only when
+  // fully ready (its onReady hides this overlay). The overlay itself is
+  // delayed by ~80ms: if the editor is ready that fast, the spinner never
+  // shows at all (the fade-in alone is seamless), only genuinely slow opens
+  // get the visual feedback.
+  const [editorLoading, setEditorLoading] = useState(false);
+  const [editorSpinnerVisible, setEditorSpinnerVisible] = useState(false);
+  useEffect(() => {
+    if (!editorLoading) {
+      setEditorSpinnerVisible(false);
+      return;
+    }
+    const timer = setTimeout(() => setEditorSpinnerVisible(true), 80);
+    return () => clearTimeout(timer);
+  }, [editorLoading]);
   
   // Auto-disable dark mode when switching to Tajweed mushaf
   useEffect(() => {
@@ -517,11 +536,23 @@ const Surah = () => {
         setViewMode('single');
       }
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Entering fullscreen: prewarm the editor's page image (file-URI resolve +
+  // decode). The edit button only exists in fullscreen, so by the time the
+  // user can tap it, the image is ALREADY resolved and decoded — the
+  // annotation editor opens with no transparent wait at all. prewarmEditorImage
+  // caches its promise per URL, so only the first fullscreen entry per page
+  // costs anything (repeat toggles reuse the resolved promise instantly).
+  useEffect(() => {
+    if (isFullscreen && !isTextMushaf) {
+      prewarmEditorImage(`${getMushafPath()}/${getPageImageFilename(currentPageNum)}`).catch(() => {});
+    }
+  }, [isFullscreen, currentPageNum, isTextMushaf, getMushafPath]);
 
   // Tab key handler to toggle fullscreen
   useEffect(() => {
@@ -1180,6 +1211,15 @@ const Surah = () => {
               onClick={(e) => {
                 e.stopPropagation();
                 setShowBookmarkTypeSelector(false);
+                console.error('[EditPerf] tap', performance.now().toFixed(0));
+                // Prewarm the page image (resolve file URI + decode) NOW, at
+                // tap time — the editor mounts immediately after and joins
+                // the same in-flight promise, so it fades in without the
+                // noticeable transparent wait of a cold resolve+decode.
+                if (!isTextMushaf) {
+                  prewarmEditorImage(`${getMushafPath()}/${getPageImageFilename(currentPageNum)}`).catch(() => {});
+                }
+                setEditorLoading(true);
                 setIsAnnotationEditMode(true);
               }}
               className={cn(
@@ -1737,13 +1777,40 @@ const Surah = () => {
           swiper is covered, so page swiping is disabled. Text mushafs
           (tarteel/tajweed) render the page inside the editor via TartelPage;
           image mushafs use the page image. */}
+      {/* Instant loading overlay over the reader page while the edit view
+          prepares itself. z-[190]: UNDER the editor sheet (z-200) which is
+          still transparent at this point, so the overlay shows through.
+          No backdrop-blur on the full screen — blur rasterization is
+          expensive in the Android WebView; a plain dim + small pill is cheap. */}
+      {editorSpinnerVisible && isAnnotationEditMode && (
+        <div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/25 select-none pointer-events-auto">
+          <div className="flex items-center justify-center w-14 h-14 rounded-full bg-emerald-900/85 shadow-lg border border-white/10">
+            <Loader2 className="w-7 h-7 text-[#F2E3BB] animate-spin" />
+          </div>
+        </div>
+      )}
+
+      {/* Hard mount/unmount (no AnimatePresence): the editor reveals and
+          closes in single frames. An animated opacity on this huge sheet
+          forced the GPU to rasterize the whole layer tile-by-tile and the
+          header/footer visibly lagged behind the page. */}
       {isAnnotationEditMode && (
         <AnnotationEditor
           page={currentPageNum}
           imageSrc={isTextMushaf ? undefined : `${getMushafPath()}/${getPageImageFilename(currentPageNum)}`}
           cacheCategory={`mushaf-${mushafType}`}
           theme={chromeTheme}
-          onClose={() => setIsAnnotationEditMode(false)}
+          onReady={() => setEditorLoading(false)}
+          // Reader's MEASURED fullscreen overlay heights — the editor sizes
+          // its Quran page with the exact same formulas, so the page looks
+          // IDENTICAL to the reader's fullscreen view (same size, no extra
+          // surrounding gaps).
+          readerHeaderHeight={fullscreenHeaderHeight}
+          readerFooterHeight={quickBarHeight}
+          onClose={() => {
+            setIsAnnotationEditMode(false);
+            setEditorLoading(false);
+          }}
         />
       )}
     </div>

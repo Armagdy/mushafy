@@ -7,6 +7,7 @@
 
 import { checkNetworkBeforeDownload } from '@/hooks/useNetwork';
 import { NativeStorage, isNativePlatform, getPlatform } from './native-storage';
+import { Capacitor } from '@capacitor/core';
 
 // Hybrid storage instance
 const assetStorage = new NativeStorage('quran-asset-cache');
@@ -147,6 +148,55 @@ export const getCachedAssetUri = async (url: string): Promise<string | null> => 
     console.error('Error getting cached asset URI:', error);
     return null;
   }
+};
+
+/**
+ * Editor image prewarm — resolves the cached file URI AND decodes the image
+ * the moment the user taps the edit button, BEFORE the annotation editor
+ * mounts. Without this, opening the editor serialized a native bridge
+ * roundtrip (getCachedAssetUri) + webp decode after mount, leaving a
+ * noticeable transparent wait before the edit view could fade in.
+ *
+ * Awaiting prewarmEditorImage(url) inside the editor returns the SAME
+ * in-flight promise (no second bridge call); by then the image is typically
+ * already decoded, so <img onLoad> flips imageReady within a frame or two.
+ *
+ * Native only: on web the editor keeps its own async resolution (memory
+ * caches there are fast enough).
+ */
+let prewarmUrl: string | null = null;
+let prewarmPromise: Promise<string | null> | null = null;
+
+export const prewarmEditorImage = (url: string): Promise<string | null> => {
+  if (prewarmUrl === url && prewarmPromise) return prewarmPromise;
+  prewarmUrl = url;
+  prewarmPromise = (async () => {
+    try {
+      if (!isNativePlatform()) return null;
+      console.error('[EditPerf] prewarm cold start', performance.now().toFixed(0));
+      const t0 = performance.now();
+      const fileUri = await getCachedAssetUri(url);
+      console.error('[EditPerf] uri resolved', (performance.now() - t0).toFixed(0) + 'ms after cold start');
+      if (!fileUri) return null;
+      const displaySrc = Capacitor.convertFileSrc(fileUri);
+      // Decode now, off the editor's critical path: the WebView caches the
+      // decoded image, so the editor's <img> with the same src loads within
+      // a frame. decode() is awaited but failures are non-fatal (onload in
+      // the editor still works).
+      const img = new Image();
+      img.src = displaySrc;
+      try {
+        await img.decode();
+      } catch {
+        /* older WebView or decode error — editor's onLoad fallback applies */
+      }
+      console.error('[EditPerf] decode done', (performance.now() - t0).toFixed(0) + 'ms after cold start');
+      return displaySrc;
+    } catch {
+      return null;
+    }
+  })();
+  return prewarmPromise;
 };
 
 /**

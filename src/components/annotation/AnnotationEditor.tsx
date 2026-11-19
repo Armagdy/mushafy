@@ -14,7 +14,7 @@
  *    via annotation-storage (same storage location as page images).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   X, Save, Undo2, Redo2, MousePointer2, Pen, Square, Hand,
   Waves, Diameter, Eraser, Loader2, Maximize2, Check, Type,
@@ -1091,6 +1091,42 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onReady, rea
     return () => window.removeEventListener('keydown', onKey);
   }, [handleClose, undo, redo]);
 
+  // -------------------------------------------------------- toolbar fit ---
+  // The toolbar must ALWAYS stay on one line. Buttons are large by default;
+  // when the (contextual) row would overflow the available width, the whole
+  // row is scaled down just enough to fit — "larger is better, but one line
+  // is the hard limit". A ResizeObserver covers rotation / window resize;
+  // the deps cover the row's content changing (contextual style buttons).
+  const toolbarRowRef = useRef<HTMLDivElement>(null);
+  const toolbarContentRef = useRef<HTMLDivElement>(null);
+  const [toolbarScale, setToolbarScale] = useState(1);
+  const [toolbarHeightComp, setToolbarHeightComp] = useState(0);
+
+  useLayoutEffect(() => {
+    const row = toolbarRowRef.current;
+    const content = toolbarContentRef.current;
+    if (!row || !content) return;
+
+    const measure = () => {
+      // Row has px-2 horizontal padding; the content must fit inside it.
+      const available = row.clientWidth - 16;
+      const natural = content.offsetWidth;
+      const scale = Math.min(1, available / Math.max(1, natural));
+      // A transform doesn't shrink the layout height — compensate with a
+      // negative bottom margin so the bar doesn't keep the unscaled row's
+      // empty space below the (now shorter) scaled buttons.
+      const comp = -content.offsetHeight * (1 - scale);
+      setToolbarScale((s) => (s === scale ? s : scale));
+      setToolbarHeightComp((c) => (c === comp ? c : comp));
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(row);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [tool, selectedShape, showStyleGroup, isLineContext, isRectContext, isTextSelection]);
+
   // --------------------------------------------------------------- render ---
   // Accepts lucide icons AND local custom glyphs like WaveIcon (plain
   // function components taking a className).
@@ -1436,9 +1472,19 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onReady, rea
           </div>
         )}
 
-        {/* Groups wrap to multiple rows on narrow phones so every tool stays visible.
-            Slightly taller row: larger touch targets for the tool buttons. */}
-        <div className="flex flex-wrap items-center justify-center gap-2 px-2 py-1.5">
+        {/* Always ONE line: the row never wraps. If the buttons at their
+            natural (large) size don't fit, toolbarScale shrinks the whole
+            row just enough — larger is preferred, one line is the limit. */}
+        <div ref={toolbarRowRef} className="flex justify-center overflow-hidden px-2 py-1.5">
+          <div
+            ref={toolbarContentRef}
+            className="flex items-center gap-2 w-max"
+            style={{
+              transform: `scale(${toolbarScale})`,
+              transformOrigin: 'top center',
+              marginBottom: `${toolbarHeightComp}px`,
+            }}
+          >
           {/* Navigation: select & pan next to each other */}
           <div className={chromeGroupClass}>
             {toolButton('select', MousePointer2, t('toolSelect'))}
@@ -1522,6 +1568,7 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onReady, rea
           {/* Eraser — own group, last in the row so it sits at the far left in RTL */}
           <div className={chromeGroupClass}>
             {toolButton('erase', Eraser, t('toolErase'))}
+          </div>
           </div>
         </div>
 

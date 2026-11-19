@@ -294,7 +294,7 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
         /* Show category content with back button */
         <div className="h-full overflow-y-auto">
           {/* Sub-screen app bar - back arrow + title */}
-          <div className="sticky top-0 z-10 bg-[#FBF9F4] dark:bg-black border-b border-emerald-100 dark:border-emerald-900">
+          <div className="sticky top-0 z-10 bg-[#FBF9F4] dark:bg-black border-b border-emerald-100 dark:border-emerald-900 pt-2">
             <button
               onClick={() => setSearchParams({})}
               className="w-full flex items-center gap-1 px-2 py-1 min-h-[56px] transition-colors active:bg-emerald-100 dark:active:bg-emerald-900/40"
