@@ -373,6 +373,44 @@ export const getCacheStats = async (): Promise<{
 };
 
 /**
+ * Get reciters that have full-surah audio cached (available offline).
+ * Derives folders/moshaf ids purely from cache keys — no blob I/O.
+ *  - EveryAyah whole surah: `${reciterFolder}-${surahNum}`
+ *  - MP3Quran whole surah:  `mp3quran-${moshafId}-${surahNum}`
+ * Single-ayah entries (`ayah-...`) and timing entries are ignored.
+ */
+export const getCachedReciterFolders = async (): Promise<{
+  everyayahFolders: string[];
+  mp3quranMoshafIds: number[];
+}> => {
+  const everyayahFolders = new Set<string>();
+  const mp3quranMoshafIds = new Set<number>();
+
+  try {
+    await audioStorage.init();
+    const keys = await audioStorage.keys();
+
+    for (const key of keys) {
+      if (key.startsWith('mp3quran-')) {
+        const match = key.match(/^mp3quran-(\d+)-\d+$/);
+        if (match) mp3quranMoshafIds.add(parseInt(match[1], 10));
+      } else if (!key.startsWith('ayah-') && !key.startsWith('timing-')) {
+        // Whole-surah EveryAyah entry: `${reciterFolder}-${surahNum}`
+        const match = key.match(/^(.+)-\d{1,3}$/);
+        if (match) everyayahFolders.add(match[1]);
+      }
+    }
+  } catch (error) {
+    console.error('Error getting cached reciter folders:', error);
+  }
+
+  return {
+    everyayahFolders: Array.from(everyayahFolders),
+    mp3quranMoshafIds: Array.from(mp3quranMoshafIds),
+  };
+};
+
+/**
  * Store MP3Quran audio in cache with timing data
  * Uses moshaf ID as the identifier instead of reciter folder
  */

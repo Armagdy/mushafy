@@ -244,6 +244,61 @@ export const clearAllAssetCache = async (): Promise<void> => {
 };
 
 /**
+ * Get downloaded audio reciters from the asset cache (download manager).
+ * Scans only audio entries (cached from .mp3 URLs) and groups them by category:
+ *   audio-everyayah-${reciterFolder}  → everyayahFolders
+ *   audio-mp3quran-${moshafId}       → mp3quranMoshafIds
+ */
+export const getDownloadedAudioCategories = async (): Promise<{
+  everyayahFolders: string[];
+  mp3quranMoshafIds: number[];
+}> => {
+  const everyayahFolders = new Set<string>();
+  const mp3quranMoshafIds = new Set<number>();
+
+  try {
+    await assetStorage.init();
+
+    const allKeys = await assetStorage.keys();
+    // Audio assets are cached from URLs ending in ".mp3" — their cache keys
+    // end with "_mp3". Filtering first skips page images/fonts entirely.
+    const audioKeys = allKeys.filter(key => key.endsWith('_mp3'));
+
+    for (const key of audioKeys) {
+      try {
+        let category: string | undefined;
+        if (isNativePlatform()) {
+          // Native: read only the small .meta.json (no blob I/O)
+          const metadata = await assetStorage.getMetadata(key);
+          category = metadata?.category;
+        } else {
+          // Web: metadata lives in the same IndexedDB record as the blob
+          const item = await assetStorage.getItem(key);
+          category = item?.metadata?.category;
+        }
+        if (!category) continue;
+
+        if (category.startsWith('audio-everyayah-')) {
+          everyayahFolders.add(category.slice('audio-everyayah-'.length));
+        } else if (category.startsWith('audio-mp3quran-')) {
+          const moshafId = parseInt(category.slice('audio-mp3quran-'.length), 10);
+          if (!isNaN(moshafId)) mp3quranMoshafIds.add(moshafId);
+        }
+      } catch (err) {
+        console.warn(`Failed to check asset ${key}:`, err);
+      }
+    }
+  } catch (error) {
+    console.error('Error scanning downloaded audio categories:', error);
+  }
+
+  return {
+    everyayahFolders: Array.from(everyayahFolders),
+    mp3quranMoshafIds: Array.from(mp3quranMoshafIds),
+  };
+};
+
+/**
  * Get cache statistics
  * Uses native filesystem on Android/iOS, IndexedDB on web
  */

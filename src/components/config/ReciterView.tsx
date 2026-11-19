@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Search, ChevronLeft, ChevronRight, Loader2, CheckCircle2, XCircle, Pencil, Star } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Loader2, CheckCircle2, XCircle, Pencil, Star, ArrowDownCircle } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -8,7 +8,9 @@ import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTe
 import { cn } from "@/lib/utils";
 import type { Mp3QuranReciter, Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { checkAyahTiming } from "@/lib/mp3quran-service";
-import { getCachedAyahTiming, cacheAyahTiming, getCachedIndividualAyah, isMp3QuranAudioCached, getCachedMp3QuranAudio } from "@/lib/audio-cache";
+import { getCachedAyahTiming, cacheAyahTiming, getCachedIndividualAyah, isMp3QuranAudioCached, getCachedMp3QuranAudio, getCachedReciterFolders } from "@/lib/audio-cache";
+import { getDownloadedAudioCategories } from "@/lib/asset-cache";
+import { getAudioData } from "@/lib/quran-data-service";
 import { surahs } from "@/data/surahs";
 
 interface UnifiedReciter {
@@ -100,6 +102,15 @@ const loadFavoriteReciterIds = (): string[] => {
   }
 };
 
+// Strip the style suffix from an Arabic reciter name to get the base name.
+// Must match the base-name extraction used to build uniqueReciterNames
+// (see extractBaseNameAr in useAudioPlayer).
+const extractBaseNameArLocal = (nameAr: string): string => {
+  return nameAr
+    .replace(/\s*-\s*(مجود|مرتل)\s*/g, '')
+    .trim();
+};
+
 export default function ReciterView({
   audioSource,
   onAudioSourceChange,
@@ -143,6 +154,9 @@ export default function ReciterView({
 
   // Favorite reciters (persisted in localStorage)
   const [favoriteIds, setFavoriteIds] = useState<string[]>(loadFavoriteReciterIds);
+
+  // Downloaded reciters (audio available offline), detected from the caches
+  const [downloadedIds, setDownloadedIds] = useState<Set<string>>(() => new Set());
 
   const toggleFavorite = (reciterId: string) => {
     setFavoriteIds(prev => {
@@ -224,6 +238,65 @@ export default function ReciterView({
       };
     }),
   ], [uniqueReciterNames, mp3QuranReciters, mp3QuranRecitersAr]);
+
+  // Detect downloaded reciters (offline audio) — runs in the background.
+  // Sources: the asset cache (download manager) and the audio cache
+  // (full-surah playback cache). Re-runs when the picker is re-opened
+  // so fresh downloads are reflected.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [downloadedAudio, cachedAudio] = await Promise.all([
+          getDownloadedAudioCategories(),
+          getCachedReciterFolders(),
+        ]);
+        if (cancelled) return;
+
+        const everyayahFolders = new Set([
+          ...downloadedAudio.everyayahFolders,
+          ...cachedAudio.everyayahFolders,
+        ]);
+        const mp3quranMoshafIds = new Set<number>([
+          ...downloadedAudio.mp3quranMoshafIds,
+          ...cachedAudio.mp3quranMoshafIds,
+        ]);
+
+        const ids = new Set<string>();
+
+        // EveryAyah: map cached folders to unified ids (everyayah-${baseNameAr})
+        try {
+          const data = await getAudioData();
+          if (Array.isArray(data)) {
+            const folderToBase = new Map<string, string>();
+            for (const reciter of data) {
+              if (reciter?.folder && reciter?.nameAr) {
+                folderToBase.set(reciter.folder, extractBaseNameArLocal(reciter.nameAr));
+              }
+            }
+            for (const folder of everyayahFolders) {
+              const base = folderToBase.get(folder);
+              if (base) ids.add(`everyayah-${base}`);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to map EveryAyah folders to reciters:', err);
+        }
+
+        // MP3Quran: downloaded when any of its moshafs has cached audio
+        for (const reciter of unifiedReciters) {
+          if (reciter.source === 'mp3quran' && reciter.moshaf?.some(m => mp3quranMoshafIds.has(m.id))) {
+            ids.add(reciter.id);
+          }
+        }
+
+        if (!cancelled) setDownloadedIds(ids);
+      } catch (error) {
+        console.error('Failed to detect downloaded reciters:', error);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [unifiedReciters, showReciterScroll]);
 
   // Update selected surah/ayah when current changes
   useEffect(() => {
@@ -428,17 +501,18 @@ export default function ReciterView({
     }
   };
 
-  // Filtered + sorted reciter list, favorites first (memoized)
+  // Filtered + sorted reciter list, favorites first, then downloaded (memoized)
   const filteredAndSortedReciters = useMemo(() => unifiedReciters
     .filter(r => {
       const name = language === 'ar' ? r.nameAr : r.name;
       return matchesSearch(name, search);
     })
     .sort((a, b) => {
-      // Favorites always first
-      const aFav = favoriteIds.includes(a.id) ? 0 : 1;
-      const bFav = favoriteIds.includes(b.id) ? 0 : 1;
-      if (aFav !== bFav) return aFav - bFav;
+      // Favorites first, then downloaded, then the rest
+      const rank = (r: UnifiedReciter) => favoriteIds.includes(r.id) ? 0 : downloadedIds.has(r.id) ? 1 : 2;
+      const aRank = rank(a);
+      const bRank = rank(b);
+      if (aRank !== bRank) return aRank - bRank;
       // MP3Quran always before EveryAyah
       if (a.source !== b.source) {
         return a.source === 'mp3quran' ? -1 : 1;
@@ -446,12 +520,21 @@ export default function ReciterView({
       const nameA = language === 'ar' ? a.nameAr : a.name;
       const nameB = language === 'ar' ? b.nameAr : b.name;
       return nameA.localeCompare(nameB, language);
-    }), [unifiedReciters, search, language, favoriteIds]);
+    }), [unifiedReciters, search, language, favoriteIds, downloadedIds]);
 
-  const { favoriteReciters, otherReciters } = useMemo(() => ({
-    favoriteReciters: filteredAndSortedReciters.filter(r => favoriteIds.includes(r.id)),
-    otherReciters: filteredAndSortedReciters.filter(r => !favoriteIds.includes(r.id)),
-  }), [filteredAndSortedReciters, favoriteIds]);
+  // Three-way partition — a reciter that is both bookmarked and downloaded
+  // appears only once (in favorites), showing both icons
+  const { favoriteReciters, downloadedReciters, otherReciters } = useMemo(() => {
+    const favoriteReciters: UnifiedReciter[] = [];
+    const downloadedReciters: UnifiedReciter[] = [];
+    const otherReciters: UnifiedReciter[] = [];
+    for (const r of filteredAndSortedReciters) {
+      if (favoriteIds.includes(r.id)) favoriteReciters.push(r);
+      else if (downloadedIds.has(r.id)) downloadedReciters.push(r);
+      else otherReciters.push(r);
+    }
+    return { favoriteReciters, downloadedReciters, otherReciters };
+  }, [filteredAndSortedReciters, favoriteIds, downloadedIds]);
 
   // ── Column 1: reading type data ───────────────────────────────────────────────
   const mp3Readings = useMemo(() => {
@@ -532,9 +615,10 @@ export default function ReciterView({
     textSizeClasses.text
   );
 
-  // Reciter row renderer (shared by favorites & all-reciters sections)
+  // Reciter row renderer (shared by favorites, downloaded & all-reciters sections)
   const renderReciterRow = (reciter: UnifiedReciter, index: number) => {
     const isFavorite = favoriteIds.includes(reciter.id);
+    const isDownloaded = downloadedIds.has(reciter.id);
     const favoriteLabel = isFavorite ? t('removeFromFavorites') : t('addToFavorites');
     return (
       <div
@@ -571,6 +655,15 @@ export default function ReciterView({
           )}>
             {reciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
           </span>
+          {isDownloaded && (
+            <span
+              className="shrink-0 p-1"
+              title={t('downloaded')}
+              aria-label={t('downloaded')}
+            >
+              <ArrowDownCircle className="w-4 h-4 fill-emerald-700/20 text-emerald-700 dark:fill-emerald-400/20 dark:text-emerald-400" />
+            </span>
+          )}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); toggleFavorite(reciter.id); }}
@@ -635,19 +728,38 @@ export default function ReciterView({
             {favoriteReciters.length > 0 && (
               <>
                 {favoriteReciters.map((reciter, index) => renderReciterRow(reciter, index))}
-                {/* Separator between favorites and the rest */}
-                <div
-                  role="separator"
-                  className="flex items-center gap-2 my-1 px-3"
-                >
-                  <div className="flex-1 border-t-2 border-emerald-700 dark:border-emerald-600 rounded" />
-                  <Star className="w-3 h-3 shrink-0 fill-emerald-700 text-emerald-700 dark:fill-emerald-500 dark:text-emerald-500" />
-                  <div className="flex-1 border-t-2 border-emerald-700 dark:border-emerald-600 rounded" />
-                </div>
+                {/* Separator between favorites and the sections below */}
+                {(downloadedReciters.length > 0 || otherReciters.length > 0) && (
+                  <div
+                    role="separator"
+                    className="flex items-center gap-2 my-1 px-3"
+                  >
+                    <div className="flex-1 border-t-2 border-emerald-700 dark:border-emerald-600 rounded" />
+                    <Star className="w-3 h-3 shrink-0 fill-emerald-700 text-emerald-700 dark:fill-emerald-500 dark:text-emerald-500" />
+                    <div className="flex-1 border-t-2 border-emerald-700 dark:border-emerald-600 rounded" />
+                  </div>
+                )}
+              </>
+            )}
+            {/* Downloaded (not bookmarked) below favorites */}
+            {downloadedReciters.length > 0 && (
+              <>
+                {downloadedReciters.map((reciter, index) => renderReciterRow(reciter, favoriteReciters.length + index))}
+                {/* Separator between downloaded and the rest */}
+                {otherReciters.length > 0 && (
+                  <div
+                    role="separator"
+                    className="flex items-center gap-2 my-1 px-3"
+                  >
+                    <div className="flex-1 border-t-2 border-emerald-700 dark:border-emerald-600 rounded" />
+                    <ArrowDownCircle className="w-3 h-3 shrink-0 fill-emerald-700/20 text-emerald-700 dark:fill-emerald-400/20 dark:text-emerald-400" />
+                    <div className="flex-1 border-t-2 border-emerald-700 dark:border-emerald-600 rounded" />
+                  </div>
+                )}
               </>
             )}
             {/* Rest of reciters */}
-            {otherReciters.map((reciter, index) => renderReciterRow(reciter, favoriteReciters.length + index))}
+            {otherReciters.map((reciter, index) => renderReciterRow(reciter, favoriteReciters.length + downloadedReciters.length + index))}
           </div>
         </>
       ) : selectedUnifiedReciter ? (
