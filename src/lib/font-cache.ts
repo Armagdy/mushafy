@@ -6,7 +6,6 @@
 
 import { IMAGES_BASE_URL } from '@/config/assets';
 import { NativeStorage, isNativePlatform, getPlatform } from './native-storage';
-import { Capacitor } from '@capacitor/core';
 import { checkNetworkBeforeDownload } from '@/hooks/useNetwork';
 
 // Hybrid storage instance for fonts
@@ -192,63 +191,41 @@ export const loadCachedFont = async (
   
   try {
     // Get font URL (from cache or download)
+    // IMPORTANT: Blob URLs are used on ALL platforms, including native.
+    // Fonts are stored on native as "*.blob" files; Capacitor's local file
+    // server (convertFileSrc) cannot determine a font MIME type for that
+    // extension, so the WebView silently refuses to load the font in
+    // @font-face and the page falls back to the plain Arabic UI font.
+    // Blob URLs carry the stored font/woff MIME type and load reliably.
     let fontUrl: string;
     let needsCleanup = false;
     
-    if (isNativePlatform()) {
-      // On native, try to get file URI first (much faster - direct disk access)
-      const fileUri = await getCachedFontUri(pageNumber, mushafType);
-      if (fileUri) {
-        fontUrl = Capacitor.convertFileSrc(fileUri);
-        console.log(`✅ Using cached font URI: ${fontName}`);
-      } else {
-        // Not cached - check if online before downloading
-        if (!navigator.onLine) {
-          console.error(`[FontCache] 🔴 OFFLINE and font not cached: p${pageNumber} (${mushafType})`);
-          throw new Error('FONT_NOT_CACHED_OFFLINE');
-        }
-        
-        // Online - download and cache it
-        console.log(`📥 Font not cached, downloading: ${fontName}`);
-        await cacheFont(pageNumber, mushafType, signal);
-        
-        // Get the URI after caching
-        const newFileUri = await getCachedFontUri(pageNumber, mushafType);
-        if (newFileUri) {
-          fontUrl = Capacitor.convertFileSrc(newFileUri);
-        } else {
-          // Fallback to network URL
-          fontUrl = getFontUrl(pageNumber, mushafType);
-        }
-      }
+    // Try to get blob from cache (IndexedDB on web, native filesystem on Android/iOS)
+    const cachedBlob = await getCachedFont(pageNumber, mushafType);
+    
+    if (cachedBlob) {
+      fontUrl = URL.createObjectURL(cachedBlob);
+      needsCleanup = true;
+      console.log(`✅ Using cached font blob: ${fontName}`);
     } else {
-      // On web, try to get blob from cache
-      const cachedBlob = await getCachedFont(pageNumber, mushafType);
+      // Not cached - check if online before downloading
+      if (!navigator.onLine) {
+        console.error(`[FontCache] 🔴 OFFLINE and font not cached: p${pageNumber} (${mushafType})`);
+        throw new Error('FONT_NOT_CACHED_OFFLINE');
+      }
       
-      if (cachedBlob) {
-        fontUrl = URL.createObjectURL(cachedBlob);
+      // Online - download, cache, and use it
+      console.log(`📥 Font not cached, downloading: ${fontName}`);
+      await cacheFont(pageNumber, mushafType, signal);
+      
+      // Get the blob after caching
+      const newBlob = await getCachedFont(pageNumber, mushafType);
+      if (newBlob) {
+        fontUrl = URL.createObjectURL(newBlob);
         needsCleanup = true;
-        console.log(`✅ Using cached font blob: ${fontName}`);
       } else {
-        // Not cached - check if online before downloading
-        if (!navigator.onLine) {
-          console.error(`[FontCache] 🔴 OFFLINE and font not cached: p${pageNumber} (${mushafType})`);
-          throw new Error('FONT_NOT_CACHED_OFFLINE');
-        }
-        
-        // Online - download, cache, and use it
-        console.log(`📥 Font not cached, downloading: ${fontName}`);
-        await cacheFont(pageNumber, mushafType, signal);
-        
-        // Get the blob after caching
-        const newBlob = await getCachedFont(pageNumber, mushafType);
-        if (newBlob) {
-          fontUrl = URL.createObjectURL(newBlob);
-          needsCleanup = true;
-        } else {
-          // Fallback to network URL
-          fontUrl = getFontUrl(pageNumber, mushafType);
-        }
+        // Fallback to network URL
+        fontUrl = getFontUrl(pageNumber, mushafType);
       }
     }
 
@@ -428,6 +405,84 @@ export const getFontCacheStats = async (): Promise<{
 };
 
 // ============================================
+// Bundled Static Fonts (packaged in the app/web build — fully offline)
+// ============================================
+
+/**
+ * Load a font that is packaged inside the app bundle (public/assets/fonts/...).
+ *
+ * The font file is fetched as a blob and re-typed with an explicit font MIME
+ * type before being injected as a CSS @font-face blob URL. This matters on
+ * Android, where the local file server may serve bundled fonts without a
+ * usable content type — the WebView then silently refuses to use them in
+ * @font-face. Blob URLs with an explicit font MIME type work reliably on
+ * every platform (web, Android, iOS) and need no network.
+ */
+export const loadBundledFontFace = async (
+  fontName: string,
+  assetPath: string,
+  mimeType: string = 'font/woff2'
+): Promise<boolean> => {
+  const styleId = `bundled-font-${fontName.replace(/[^a-zA-Z0-9-]/g, '-')}`;
+  
+  try {
+    // Already injected in this session
+    if (document.getElementById(styleId)) {
+      return true;
+    }
+    
+    const base = import.meta.env.BASE_URL || '/';
+    const url = `${base}${assetPath}`.replace(/\/{2,}/g, '/');
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+    
+    // Re-type the blob explicitly with a font MIME type
+    const buf = await response.arrayBuffer();
+    const blob = new Blob([buf], { type: mimeType });
+    const fontUrl = URL.createObjectURL(blob);
+    
+    const styleElement = document.createElement('style');
+    styleElement.id = styleId;
+    styleElement.textContent = `
+      @font-face {
+        font-family: '${fontName}';
+        src: url('${fontUrl}') format('woff2');
+        font-display: swap;
+      }
+    `;
+    document.head.appendChild(styleElement);
+    console.log(`✅ Bundled font ${fontName} injected into CSS (offline)`);
+    
+    // Wait for the font to be ready for rendering
+    if ('fonts' in document) {
+      try {
+        await document.fonts.load(`16px "${fontName}"`);
+        console.log(`✅ Bundled font ${fontName} loaded and ready`);
+      } catch (e) {
+        console.warn(`⚠️ Font preload for bundled ${fontName} failed:`, e);
+      }
+    }
+    
+    // Do NOT revoke the blob URL — the font face must stay usable all session
+    return true;
+  } catch (error) {
+    console.warn(`⚠️ Failed to load bundled font ${fontName}:`, error);
+    return false;
+  }
+};
+
+/**
+ * Path (relative to the web app base) of an icon font bundled in the app build
+ */
+const getBundledIconFontPath = (fontType: IconFontType): string => {
+  const fontFiles: Record<IconFontType, string> = {
+    'quran-icon': 'assets/fonts/quran-icon/quran-common.woff2',
+    'surah-name-v4': 'assets/fonts/surah-name-v4/surah-name-v2.woff2',
+  };
+  return fontFiles[fontType];
+};
+
+// ============================================
 // Icon Font Loading (quran-icon, surah-name-v4)
 // ============================================
 
@@ -589,14 +644,30 @@ export const loadIconFont = async (
   loadingIconFonts.add(fontType);
   
   try {
+    // Prefer the bundled font (packaged in the app/web build) — fully
+    // offline, no download or cache needed
+    const bundledLoaded = await loadBundledFontFace(
+      fontType,
+      getBundledIconFontPath(fontType),
+      'font/woff2'
+    );
+    if (bundledLoaded) {
+      loadedIconFonts.add(fontType);
+      console.log(`✅ Icon font ${fontType} loaded from app bundle (offline)`);
+      return fontType;
+    }
+    
+    // Fallback: cached blob / CDN strategy
     let fontUrl: string;
     
     if (isNativePlatform()) {
-      // Native: Try cached file URI first
-      const fileUri = await getCachedIconFontUri(fontType);
-      if (fileUri) {
-        fontUrl = Capacitor.convertFileSrc(fileUri);
-        console.log(`✅ Using cached icon font URI: ${fontType}`);
+      // Native: load from the cached blob (Blob URLs carry the correct font
+      // MIME type; convertFileSrc() serves ".blob" files without a font
+      // content type, which the WebView silently refuses to load in @font-face)
+      const cachedBlob = await getCachedIconFont(fontType);
+      if (cachedBlob) {
+        fontUrl = URL.createObjectURL(cachedBlob);
+        console.log(`✅ Using cached icon font blob: ${fontType}`);
       } else {
         // Not cached - download if online
         if (!navigator.onLine) {
@@ -607,9 +678,9 @@ export const loadIconFont = async (
         console.log(`📥 Icon font not cached, downloading: ${fontType}`);
         await cacheIconFont(fontType, signal);
         
-        const newFileUri = await getCachedIconFontUri(fontType);
-        if (newFileUri) {
-          fontUrl = Capacitor.convertFileSrc(newFileUri);
+        const newBlob = await getCachedIconFont(fontType);
+        if (newBlob) {
+          fontUrl = URL.createObjectURL(newBlob);
         } else {
           fontUrl = getIconFontUrl(fontType);
         }
@@ -697,4 +768,17 @@ export const preloadIconFonts = async (): Promise<void> => {
       console.log(`📦 Preloaded icon font: ${fontType}`);
     }
   }
+};
+
+/**
+ * Load all static bundled fonts at app startup:
+ * - 'KFGQPC HAFS' — Quran text font used by .font-quran (tafseer, search, surah reader)
+ * - Icon fonts via loadIconFont (bundled first, cached/CDN fallback)
+ *
+ * All of these are packaged in the app/web build, so they work fully offline.
+ */
+export const loadStaticFonts = async (): Promise<void> => {
+  await loadBundledFontFace('KFGQPC HAFS', 'assets/fonts/quran-hafs/kfgqpc-hafs.woff2');
+  await loadAllIconFonts();
+  console.log('✅ All static bundled fonts loaded');
 };

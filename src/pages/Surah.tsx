@@ -31,6 +31,7 @@ import { useBookmarks } from '@/hooks/useBookmarks';
 import { useQuranData } from '@/hooks/useQuranData';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { getPageImageFilename, getPageSurahInfo, getPageJuzNumber, getJuzFirstPage, getSurahFirstPage, getAyahPage } from '@/lib/quran-mapping';
+import { getChromeTextClass } from '@/lib/chrome-theme';
 import { cn } from '@/lib/utils';
 
 const Surah = () => {
@@ -116,6 +117,11 @@ const Surah = () => {
   const [initialNavTab, setInitialNavTab] = useState<'surah' | 'juz' | 'page'>('surah');
   
   const [currentSurahId, setCurrentSurahId] = useState(1);
+  // Whether the header info (surah name/id) reflects the CURRENT page yet.
+  // currentSurahId starts at 1 (Al-Fatiha) and is only corrected by the
+  // async loadPageInfo() — until then the header shows a placeholder
+  // instead of flashing the first surah's name on cold start.
+  const [isHeaderInfoLoaded, setIsHeaderInfoLoaded] = useState(false);
   const [currentJuz, setCurrentJuz] = useState(1);
   const [currentPageAyah, setCurrentPageAyah] = useState<number | null>(null);
   const [showTafseerDialog, setShowTafseerDialog] = useState(false);
@@ -212,8 +218,28 @@ const Surah = () => {
   const ayahListRef = useRef<HTMLDivElement>(null);
   const wasPlayingBeforeDrag = useRef(false);
 
-  // Current page number (default to 1 if not specified)
-  const currentPageNum = parseInt(page || '1');
+  // Current page number: use the URL param when present (clamped to 1-604).
+  // When no page is in the URL (app cold start at '/'), resolve the saved
+  // last-read page DURING the first render instead of redirecting after
+  // mount. This avoids flashing page 1 (first surah) before navigating to
+  // the real page, and avoids the mount-time effect writing '1' to
+  // localStorage where it could overwrite the real last-read page.
+  const savedLastPage = (): number => {
+    try {
+      const saved = parseInt(localStorage.getItem('quran-last-page') || '');
+      return saved >= 1 && saved <= 604 ? saved : 1;
+    } catch {
+      return 1;
+    }
+  };
+  const currentPageNum = (() => {
+    const parsed = parseInt(page || '');
+    if (!isNaN(parsed)) {
+      return Math.min(Math.max(parsed, 1), 604);
+    }
+    // No valid page in the URL — start where the user left off
+    return savedLastPage();
+  })();
   
   // Initialize audio player hook (after all state it depends on is declared)
   const {
@@ -309,18 +335,17 @@ const Surah = () => {
     }
   });
   
-  // Redirect to last page if no page is specified in URL
+  // Sync the URL when the app opens without a page parameter.
+  // The first render already shows the saved last-read page, so this is an
+  // invisible replace (no flash of the first surah). Guarded with a ref so
+  // it runs at most once per mount and never re-triggers once a page param
+  // exists.
+  const hasSyncedInitialUrl = useRef(false);
   useEffect(() => {
-    if (!page) {
-      const lastPage = localStorage.getItem('quran-last-page');
-      if (lastPage) {
-        const pageNum = parseInt(lastPage);
-        if (pageNum >= 1 && pageNum <= 604) {
-          navigate(`/page/${pageNum}`, { replace: true });
-        }
-      }
-    }
-  }, [page, navigate]);
+    if (page || hasSyncedInitialUrl.current) return;
+    hasSyncedInitialUrl.current = true;
+    navigate(`/page/${currentPageNum}`, { replace: true });
+  }, [page, currentPageNum, navigate]);
   
   // Listen for setting changes from SettingsView
   useEffect(() => {
@@ -424,8 +449,8 @@ const Surah = () => {
       const quarterNum = Math.ceil((currentPageNum * 240) / 604);
       setCurrentQuarter(quarterNum);
       
-      // Persist current page to localStorage
-      localStorage.setItem('quran-last-page', currentPageNum.toString());
+      // Header can now display the real surah/juz for this page
+      setIsHeaderInfoLoaded(true);
       
       // Stop audio playback when page changes ONLY if it's a manual navigation
       // Don't stop if it's automatic navigation (following the recitation)
@@ -444,6 +469,41 @@ const Surah = () => {
     
     loadPageInfo();
   }, [currentPageNum, audioSource]);
+
+  // Persist the current page synchronously, the moment it changes.
+  // This used to happen at the end of the async loadPageInfo(), meaning the
+  // write only landed after metadata fetches resolved — and a cold start at
+  // '/' would briefly write page '1', racing (and sometimes overwriting)
+  // the real last-read page. Writing here is immediate and race-free.
+  useEffect(() => {
+    if (currentPageNum >= 1 && currentPageNum <= 604) {
+      localStorage.setItem('quran-last-page', currentPageNum.toString());
+    }
+  }, [currentPageNum]);
+
+  // Mobile safety net: when the app is backgrounded or hidden, re-assert the
+  // current page in storage. Android frequently kills backgrounded Capacitor
+  // processes; this guarantees the freshest value is in localStorage at the
+  // moment the OS pauses the WebView (which is when it commits DOM storage
+  // to disk), so the next cold start restores the correct page.
+  useEffect(() => {
+    const persistCurrentPage = () => {
+      if (currentPageNum >= 1 && currentPageNum <= 604) {
+        localStorage.setItem('quran-last-page', currentPageNum.toString());
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        persistCurrentPage();
+      }
+    };
+    window.addEventListener('pagehide', persistCurrentPage);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', persistCurrentPage);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentPageNum]);
 
   // Detect mobile screen and auto-switch to single page
   useEffect(() => {
@@ -696,6 +756,7 @@ const Surah = () => {
         currentHezb={currentHezb}
         currentQuarter={currentQuarter}
         currentAyah={currentPlayingAyah?.ayah || currentPageAyah}
+        isInfoLoaded={isHeaderInfoLoaded}
         formatNumber={formatNumber}
         onSurahClick={() => {
           setInitialNavigationType('surah');
@@ -724,12 +785,12 @@ const Surah = () => {
       {/* Main Content Area - Single instance with animated container for smooth fullscreen transition */}
       
       {/* Fullscreen Overlay Header — CSS-class driven (NOT framer-motion).
-          Plain bold text (normal color, NO drop-shadow shading): surah name
-          + page, pinned to the top edge with safe-area insets (all mushafs).
-          Its height is measured (fullscreenHeaderHeight) and the page
-          container's top padding for text mushafs (tarteel/tajweed) is set
-          from it, so the page text starts right below the header — no dead
-          band above or below it. */}
+          Plain bold themed text (chrome-text color, NO drop-shadow shading):
+          surah name + page, pinned to the top edge with safe-area insets
+          (all mushafs). Its height is measured (fullscreenHeaderHeight) and
+          the page container's top padding for text mushafs (tarteel/tajweed)
+          is set from it, so the page text starts right below the header — no
+          dead band above or below it. */}
       <div
         ref={fullscreenHeaderRef}
         className={cn(
@@ -741,22 +802,20 @@ const Surah = () => {
         )}
         style={{ paddingTop: 'calc(env(safe-area-inset-top) + 10px)' }}
       >
-        {/* Surah Name */}
+        {/* Surah Name — themed chrome text (matches the fullscreen quick bar) */}
         <div className={cn(
           "text-lg md:text-2xl font-bold",
-          isDarkMode
-            ? "text-white"
-            : "text-gray-900 dark:text-gray-100"
+          getChromeTextClass(isDarkMode)
         )}>
-          {language === 'ar' ? currentSurah.name : currentSurah.englishName}
+          {isHeaderInfoLoaded
+            ? (language === 'ar' ? currentSurah.name : currentSurah.englishName)
+            : '…'}
         </div>
 
         {/* Page */}
         <div className={cn(
           "text-lg md:text-2xl font-bold",
-          isDarkMode
-            ? "text-white"
-            : "text-gray-900 dark:text-gray-100"
+          getChromeTextClass(isDarkMode)
         )}>
           {t('page')} {formatNumber(currentPageNum)}
         </div>

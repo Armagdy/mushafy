@@ -27,13 +27,15 @@ function excludeMushafImagesPlugin() {
         }
       });
       
-      // Remove font directories (fonts are too large ~604 files each)
-      const fontDirs = ['fonts'];
+      // Remove only the huge on-demand page font sets (604 files each, ~172MB total).
+      // The small static fonts (quran-hafs, quran-icon, surah-name-v4, surah-header,
+      // ~474KB total) stay bundled so they work fully offline on Android/web.
+      const fontDirs = ['fonts/qpc_v2_font', 'fonts/qpc_v4_font'];
       fontDirs.forEach(dir => {
         const dirPath = path.join(distAssetsPath, dir);
         if (fs.existsSync(dirPath)) {
           fs.rmSync(dirPath, { recursive: true, force: true });
-          console.log(`✓ Excluded ${dir} from build (fonts will be downloaded on-demand)`);
+          console.log(`✓ Excluded ${dir} from build (downloaded on-demand per page)`);
         }
       });
       

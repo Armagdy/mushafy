@@ -5,7 +5,7 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/virtual';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { Bookmark, BookMarked, BookOpen } from 'lucide-react';
+import { Bookmark, BookMarked, BookOpen, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useMushaf } from '@/contexts/MushafContext';
 import { getPageImageFilename } from '@/lib/quran-mapping';
@@ -119,6 +119,86 @@ export function SwiperPageDisplay({
   
   // Track if we're currently transitioning between slides
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Loading gate: the Swiper's Virtual module skips positioning at the
+  // initial slide during init (swiper bug/quirk: `beforeInit && initialSlide
+  // > 0 → return`), so the first rendered frame comes from the window at
+  // slide 0 (page 1). The index is only corrected post-paint. Until then the
+  // stage shows an opaque loading overlay instead of flashing page 1.
+  //
+  // IMPORTANT: swiper/react initializes in a useLayoutEffect — BEFORE the
+  // browser paints — so readiness must NOT be set in onSwiper (the overlay
+  // would be removed before a single paint, making the loading invisible).
+  // It is set from a post-paint useEffect timer instead, with a minimum
+  // visible duration so the loading state is actually perceptible.
+  const MIN_LOADING_MS = 400;
+  // Safety cap for the loading gate — see the readiness effect below.
+  const MAX_LOADING_MS = 3000;
+  const swiperKey = `swiper-${isFullscreenDarkMode}`;
+  const [initializedSwiperKey, setInitializedSwiperKey] = useState<string | null>(null);
+  // Latest mount key (read via ref from the timer callback).
+  const swiperKeyRef = useRef(swiperKey);
+  swiperKeyRef.current = swiperKey;
+  const isSwiperReady = initializedSwiperKey === swiperKey;
+  // Swiper instance kept in STATE (not just the ref): setting it from
+  // onSwiper triggers the re-render that lets the post-paint effect below
+  // schedule the readiness timer.
+  const [swiperInstance, setSwiperInstance] = useState<SwiperType | null>(null);
+  // When the current Swiper instance initialized — used to enforce the
+  // minimum visible duration of the loading overlay.
+  const swiperMountedAtRef = useRef(Date.now());
+
+  // Declare the swiper "ready" (hide the loading overlay) only once it is
+  // VERIFIED to be showing the requested page — and at least MIN_LOADING_MS
+  // after the instance initialized (so the loading state is perceptible).
+  //
+  // A fixed delay is NOT enough on Android: the Virtual module skips
+  // positioning at `initialSlide` on init, and the WebView's layout/resize
+  // timing means the library's own self-correction can land well after the
+  // first paints. So we poll every 100ms, force-correct the position
+  // ourselves (slideTo / virtual.update), and lift the overlay only when
+  // BOTH the active index and the rendered virtual window match the target
+  // page. The MAX_LOADING_MS cap guarantees the overlay never gets stuck.
+  useEffect(() => {
+    if (isSwiperReady || !swiperInstance) return;
+    const targetIndex = initialPage - 1;
+    const verifyShowingTargetPage = () => {
+      if (!swiperInstance.initialized) return false;
+      if (swiperInstance.realIndex !== targetIndex) {
+        // Force the swiper onto the requested page — never trust
+        // initialSlide + virtual to have done it (they don't, on init).
+        swiperInstance.slideTo(targetIndex, 0);
+        return false;
+      }
+      const virtual = swiperInstance.virtual;
+      if (
+        virtual &&
+        typeof virtual.from === 'number' &&
+        typeof virtual.to === 'number' &&
+        !(virtual.from <= targetIndex && targetIndex <= virtual.to)
+      ) {
+        // Active index is right but the rendered window isn't showing it —
+        // recompute the virtual window.
+        virtual.update(true);
+        return false;
+      }
+      return true;
+    };
+    const poll = setInterval(() => {
+      const elapsed = Date.now() - swiperMountedAtRef.current;
+      // Safety cap: never trap the user on the loading screen.
+      if (elapsed >= MAX_LOADING_MS) {
+        clearInterval(poll);
+        setInitializedSwiperKey(swiperKeyRef.current);
+        return;
+      }
+      if (!verifyShowingTargetPage()) return;
+      if (elapsed < MIN_LOADING_MS) return;
+      clearInterval(poll);
+      setInitializedSwiperKey(swiperKeyRef.current);
+    }, 100);
+    return () => clearInterval(poll);
+  }, [isSwiperReady, swiperInstance, initialPage]);
   
   // Track which pages are loaded (for virtual slides optimization)
   const [loadedPages, setLoadedPages] = useState<Set<number>>(() => {
@@ -267,6 +347,13 @@ export function SwiperPageDisplay({
   // Handle swiper initialization
   const handleSwiperInit = useCallback((swiper: SwiperType) => {
     swiperRef.current = swiper;
+    // Do NOT declare readiness here: this callback fires from Swiper's
+    // useLayoutEffect, i.e. BEFORE the browser paints — the overlay would
+    // never be visible. Storing the instance in state re-renders this
+    // component so the post-patch readiness effect can schedule the timer
+    // that eventually hides the loading overlay (after MIN_LOADING_MS).
+    swiperMountedAtRef.current = Date.now();
+    setSwiperInstance(swiper);
     
     // Call onSwiperReady once and only once
     if (onSwiperReady && !hasCalledSwiperReadyRef.current) {
@@ -466,11 +553,11 @@ export function SwiperPageDisplay({
   
   return (
     <main className={cn(
-      "flex-1 flex items-center justify-center overflow-hidden min-h-0",
+      "relative flex-1 flex items-center justify-center overflow-hidden min-h-0",
       isFullscreenDarkMode ? "bg-black" : "bg-[#FBF9F4]"
     )}>
       <Swiper
-        key={`swiper-${isFullscreenDarkMode}`}
+        key={swiperKey}
         modules={[Navigation, Virtual, Keyboard, A11y]}
         onSwiper={handleSwiperInit}
         onSlideChange={handleSlideChange}
@@ -526,6 +613,26 @@ export function SwiperPageDisplay({
           </SwiperSlide>
         ))}
       </Swiper>
+      {/* Loading gate: until the Swiper has initialized and applied the
+          translate for the saved page, its DOM shows slide 0 (page 1). Cover
+          the stage with an opaque loading overlay so the user never sees the
+          wrong page — they see a brief loading state instead. */}
+      {!isSwiperReady && (
+        <div
+          className={cn(
+            "absolute inset-0 z-20 flex flex-col items-center justify-center gap-3",
+            isFullscreenDarkMode ? "bg-black" : "bg-[#FBF9F4]"
+          )}
+        >
+          <Loader2 className="w-10 h-10 animate-spin text-emerald-700" />
+          <span className={cn(
+            "text-sm select-none",
+            isFullscreenDarkMode ? "text-neutral-300" : "text-emerald-900/70"
+          )}>
+            {t('loading')}
+          </span>
+        </div>
+      )}
     </main>
   );
 }

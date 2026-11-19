@@ -1,23 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Changa:wght@200;300;400;500;600;700;800&display=swap');
 
-@font-face {
-  font-family: 'Khat e Sulas';
-  src: url('/alfont_com_ArbFONTS-Khat-e-Sulas-Shipped.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'KFGQPC HAFS';
-  src: url('/assets/fonts/quran-hafs/kfgqpc-hafs.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
-/* Note: quran-icon and surah-name-v4 fonts are loaded dynamically via font-cache.ts */
-/* They are downloaded from CDN and cached in native storage for offline use */
+/* Static fonts ('KFGQPC HAFS', quran-icon, surah-name-v4) are loaded dynamically */
+/* at app startup via font-cache.ts (loadStaticFonts). They are bundled in the app */
+/* and injected as blob URLs with an explicit font MIME type, which works offline */
+/* and avoids WebView MIME-type issues when serving font files directly. */
 
 @tailwind base;
 @tailwind components;

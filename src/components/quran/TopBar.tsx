@@ -13,6 +13,12 @@ interface TopBarProps {
   currentHezb: number;
   currentQuarter: number;
   currentAyah: number | null;
+  /**
+   * Whether the surah/juz info reflects the current page yet. On cold start
+   * the surah is only resolved asynchronously — while false, the header
+   * shows a placeholder instead of flashing the first surah's name.
+   */
+  isInfoLoaded?: boolean;
   formatNumber: (num: number | string) => string;
   onSurahClick: () => void;
   onPageClick: () => void;
@@ -25,6 +31,7 @@ export function TopBar({
   currentPageNum,
   currentJuz,
   currentAyah,
+  isInfoLoaded = true,
   formatNumber,
   onSurahClick,
   onPageClick,
@@ -88,14 +95,17 @@ export function TopBar({
             >
               <div className="flex items-center gap-2">
                 <span className={cn("text-base", mutedText, "leading-none")}>﴾</span>
-                <span 
+                <span
                   className={cn("text-xl md:text-2xl font-bold", primaryText, "leading-none")}
                   style={{ fontFamily: "'Changa', sans-serif" }}
                 >
-                  {language === 'ar' ? currentSurah.name : currentSurah.englishName}
+                  {isInfoLoaded
+                    ? (language === 'ar' ? currentSurah.name : currentSurah.englishName)
+                    : '…'}
                 </span>
                 <span className={cn("text-base", mutedText, "leading-none")}>﴿</span>
               </div>
+              {isInfoLoaded && (
               <div className="flex items-center gap-2 mt-0.5">
                 {currentAyah && (
                   <>
@@ -115,6 +125,7 @@ export function TopBar({
                   {t('surah')} {formatNumber(currentSurah.id)}
                 </span>
               </div>
+              )}
             </button>
 
             {/* Separator */}
