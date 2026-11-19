@@ -391,6 +391,30 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
 
     return (
       <div className="space-y-4 pb-12">
+        {/* Plan management */}
+        <section className="grid grid-cols-2 gap-2">
+          <button
+            onClick={handleEditClick}
+            className={cn(
+              "flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900 transition-colors",
+              textSizeClasses.button
+            )}
+          >
+            <Pencil className="w-4 h-4" />
+            {t('memorizeEdit')}
+          </button>
+          <button
+            onClick={handleDeletePlan}
+            className={cn(
+              "flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors",
+              textSizeClasses.button
+            )}
+          >
+            <Trash2 className="w-4 h-4" />
+            {t('delete')}
+          </button>
+        </section>
+
         {/* Header: progress + management */}
         <section className="space-y-2">
           <div className="flex items-center justify-between">
@@ -439,29 +463,6 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
           </div>
         )}
 
-        {/* Plan management */}
-        <section className="grid grid-cols-2 gap-2">
-          <button
-            onClick={handleEditClick}
-            className={cn(
-              "flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900 transition-colors",
-              textSizeClasses.button
-            )}
-          >
-            <Pencil className="w-4 h-4" />
-            {t('memorizeEdit')}
-          </button>
-          <button
-            onClick={handleDeletePlan}
-            className={cn(
-              "flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors",
-              textSizeClasses.button
-            )}
-          >
-            <Trash2 className="w-4 h-4" />
-            {t('delete')}
-          </button>
-        </section>
       </div>
     );
   };
