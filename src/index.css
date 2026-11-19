@@ -433,3 +433,35 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
+
+/* ========================================
+   Glass chrome theme — lighter frosted-green buttons
+   ======================================== */
+/* When the Glass bar theme is selected, ConfigOverlay's root carries
+   data-chrome-theme="glass". The solid emerald-700/600 buttons of the
+   settings + bottom-bar pages then render a step lighter and slightly
+   translucent (airy emerald-500) so they sit softer on the frosted glass
+   chrome instead of solid dark green. Hover/border shades follow.
+   The default 'green' theme is untouched — nothing matches without the
+   data-chrome-theme="glass" attribute. */
+
+/* Light: airy emerald-500 (buttons, selected pills, icon badges) */
+[data-chrome-theme='glass'] :is(.bg-emerald-700, .bg-emerald-600) { background-color: rgb(16 185 129 / 0.85); }
+[data-chrome-theme='glass'] .bg-emerald-700\/80 { background-color: rgb(16 185 129 / 0.8); }
+[data-chrome-theme='glass'] .bg-emerald-600\/70 { background-color: rgb(16 185 129 / 0.7); }
+[data-chrome-theme='glass'] :is(.hover\:bg-emerald-800:hover, .hover\:bg-emerald-600:hover) { background-color: rgb(5 150 105 / 0.95); }
+[data-chrome-theme='glass'] :is(.border-emerald-600, .border-emerald-700) { border-color: rgb(6 95 70 / 0.45); }
+
+/* Settings category icon badges: lighter green gradient */
+[data-chrome-theme='glass'] .from-emerald-800 {
+  --tw-gradient-from: #059669 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(5 150 105 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+[data-chrome-theme='glass'] .to-emerald-600 { --tw-gradient-to: #34d399 var(--tw-gradient-to-position); }
+
+/* Dark: frosted translucent green on the dark glass */
+.dark [data-chrome-theme='glass'] :is(.bg-emerald-700, .bg-emerald-600, .dark\:bg-emerald-500) { background-color: rgb(16 185 129 / 0.4); }
+.dark [data-chrome-theme='glass'] :is(.bg-emerald-700\/80, .bg-emerald-600\/70) { background-color: rgb(16 185 129 / 0.35); }
+.dark [data-chrome-theme='glass'] :is(.hover\:bg-emerald-800:hover, .hover\:bg-emerald-600:hover) { background-color: rgb(16 185 129 / 0.55); }
+.dark [data-chrome-theme='glass'] :is(.border-emerald-600, .border-emerald-700, .dark\:border-emerald-600, .dark\:border-emerald-700) { border-color: rgb(16 185 129 / 0.35); }

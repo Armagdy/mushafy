@@ -196,6 +196,7 @@ User-selectable skin for ALL header/footer chrome (main bars + fullscreen overla
 - **`green` (default):** classic look — TopBar/bottom-stack emerald gradients (`from-emerald-800 to-emerald-600`, `bg-emerald-950` dark); fullscreen cards get emerald-tinted glass (`bg-emerald-600/10` + `border-emerald-800/15`).
 - **`glass`:** frosted translucent bars — TopBar `bg-[#E7E6E2]/60 backdrop-blur-md` (light) / `bg-black/40 backdrop-blur-xl` (dark) with hairline borders; text flips cream→`emerald-800` in light mode (BottomBar icons/labels likewise); fullscreen cards use pale-gray glass (`bg-[#E7E6E2]/30` + `border-[#8A8578]/25`).
 - **Frosted-card layer:** `.liquid-glass-backdrop` (src/index.css) — absolutely-positioned blur+tint child (green OR glass cards both use it); cards need `relative isolate` + `-z-10` on the layer. (`.liquid-glass-edge` / `.liquid-glass-glow` were removed — edge thickness 0, no glow.)
+- **Glass button skin:** `ConfigOverlay` sets `data-chrome-theme="glass"` on its root when glass is active; scoped rules in `src/index.css` ("Glass chrome theme" section) recolor the solid emerald-700/600 buttons of the settings/bottom-bar pages to a lighter translucent emerald-500. Green theme never matches those rules.
 
 ---
 

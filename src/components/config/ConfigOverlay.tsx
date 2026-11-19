@@ -476,6 +476,10 @@ export default function ConfigOverlay({
   
   return (
     <motion.div
+      /* Active chrome theme on the overlay root — scoped CSS (index.css,
+         "Glass chrome theme" section) lightens the solid green buttons when
+         the 'glass' bar theme is selected. Green theme is unaffected. */
+      data-chrome-theme={chromeTheme}
       className="fixed inset-0 z-[100] flex flex-col bg-[#FBF9F4] dark:bg-black"
       /* Open/close: the whole sheet slides up from the bottom */
       initial={{ y: '100%' }}
@@ -581,7 +585,18 @@ export default function ConfigOverlay({
           }
           onGoToClick={() => type === 'navigation' ? (goBackInView() || onClose()) : onChangeView('navigation')}
           onSearchClick={() => type === 'search' ? (goBackInView() || onClose()) : onChangeView('search')}
-          onBookmarkClick={() => type === 'bookmarks' ? (goBackInView() || onClose()) : onChangeView('bookmarks')}
+          onBookmarkClick={() => {
+            if (type !== 'bookmarks') {
+              onChangeView('bookmarks');
+              return;
+            }
+            // Already in the bookmarks view: tapping the bookmark button
+            // closes the whole overlay — even from a sub-screen such as
+            // Edit/Add Bookmark — instead of reopening the default list.
+            // Clear any open category so the next open starts fresh.
+            if (searchParams.get('category')) setSearchParams({});
+            onClose();
+          }}
           onSettingsClick={() => type === 'settings' ? (goBackInView() || onClose()) : onChangeView('settings')}
           onTafseerClick={() => type === 'tafseer' ? (goBackInView() || onClose()) : onChangeView('tafseer')}
           onViewModeToggle={onViewModeToggle}
