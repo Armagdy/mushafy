@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses, getQuranTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
-import { arabicTextMatches, findArabicMatch } from "@/lib/arabic-search";
+import { findArabicMatch } from "@/lib/arabic-search";
+import { quranSearch } from "@/lib/quran-search";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { surahs } from "@/data/surahs";
@@ -84,6 +85,7 @@ export function NavigationDialog({
   // Word search state
   const [searchWord, setSearchWord] = useState('');
   const [wordSearchResults, setWordSearchResults] = useState<any[]>([]);
+  const [matchCount, setMatchCount] = useState(0);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
 
   // Persist navigation dialog values
@@ -263,47 +265,24 @@ export function NavigationDialog({
     );
   };
 
-  // Word search functionality
+  // Word search functionality — runs in the Web Worker so the UI thread
+  // (and typing) is never blocked by the full-Quran scan
   const performWordSearch = () => {
     const query = searchWord.trim();
-    const queryLower = query.toLowerCase();
 
     if (query.length >= 2 && ayahData.length > 0) {
       setIsSearchLoading(true);
 
-      // Use setTimeout to allow UI to update with loading state
-      setTimeout(() => {
-        const results: any[] = [];
-
-        ayahData.forEach(surahData => {
-          surahData.verses?.forEach((verse: any) => {
-            const arabicText = verse.text?.ar || '';
-            const englishText = (verse.text?.en || '').toLowerCase();
-
-            // Uthmani-aware Arabic match (hamza words like اولئك, يسالونك, ...)
-            const matchesArabic = arabicTextMatches(arabicText, query);
-            const matchesEnglish = englishText.includes(queryLower);
-
-            if (matchesArabic || matchesEnglish) {
-              results.push({
-                surahNumber: surahData.number,
-                surahName: surahData.name?.ar,
-                surahNameEn: surahData.name?.en,
-                ayahNumber: verse.number,
-                arabicText: verse.text?.ar,
-                englishText: verse.text?.en,
-                page: verse.page,
-                juz: verse.juz
-              });
-            }
-          });
-        });
-
-        setWordSearchResults(results);
+      quranSearch.search(query, { includeEnglish: true }).then(outcome => {
+        setWordSearchResults(outcome.results);
+        setMatchCount(outcome.count);
         setIsSearchLoading(false);
-      }, 100);
+      }).catch(() => {
+        setIsSearchLoading(false);
+      });
     } else {
       setWordSearchResults([]);
+      setMatchCount(0);
       setIsSearchLoading(false);
     }
   };
@@ -443,6 +422,7 @@ export function NavigationDialog({
                 onChange={(e) => {
                   setSearchWord(e.target.value);
                   setWordSearchResults([]); // Clear results when user types
+                  setMatchCount(0);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -471,7 +451,7 @@ export function NavigationDialog({
             {!isSearchLoading && wordSearchResults.length > 0 && (
               <div className="max-h-[500px] sm:max-h-[550px] md:max-h-[600px] overflow-y-auto space-y-2">
                 <div className={cn("font-medium text-emerald-800 dark:text-emerald-300 mb-2", textSizeClasses.text)}>
-                  {t('foundIn')} {wordSearchResults.length} {t('ayahs')}
+                  {t('foundIn')} {matchCount} {t('ayahs')}
                 </div>
                 {wordSearchResults.map((result, index) => (
                   <motion.button

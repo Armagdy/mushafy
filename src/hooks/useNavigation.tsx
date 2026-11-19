@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSurahFirstPage, getJuzFirstPage } from '@/lib/quran-mapping';
-import { arabicTextMatches, findArabicMatch } from '@/lib/arabic-search';
+import { findArabicMatch } from '@/lib/arabic-search';
+import { quranSearch } from '@/lib/quran-search';
 
 interface NavigationHookProps {
   isAyahNavigation: React.MutableRefObject<boolean>;
@@ -78,64 +79,36 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
     return regex.test(text);
   }, []);
 
-  // Word search functionality - manual search only, supports multiple words
+  // Word search functionality - manual search only, supports multiple words.
+  // Runs in the Web Worker so the UI thread (and typing) is never blocked.
   const performWordSearch = useCallback((
     searchWord: string,
-    ayahData: any[],
+    _ayahData: any[],
     setWordSearchResults: (results: any[]) => void,
     setIsSearchLoading: (loading: boolean) => void
   ) => {
-    if (searchWord.trim().length >= 2 && ayahData.length > 0) {
+    const query = searchWord.trim();
+
+    if (query.length >= 2) {
       setIsSearchLoading(true);
 
       // Detect if user wants exact word matching (search ends with space)
-      const exactWordMatch = searchWord.endsWith(' ') && searchWord.trim().length > 0;
+      const exactWordMatch = searchWord.endsWith(' ') && query.length > 0;
 
-      // Use setTimeout to allow UI to update with loading state
-      setTimeout(() => {
-        // Search for the full text phrase
-        const searchFullTrimmed = searchWord.trim();
-        const searchFullLower = searchFullTrimmed.toLowerCase();
-        const results: any[] = [];
-
-        ayahData.forEach(surahData => {
-          surahData.verses?.forEach((verse: any) => {
-            const arabicText = verse.text?.ar || '';
-            const englishText = (verse.text?.en || '').toLowerCase();
-
-            // Uthmani-aware Arabic match (hamza words like اولئك, يسالونك, ...)
-            const matchesArabic = arabicTextMatches(arabicText, searchFullTrimmed, {
-              wholeWord: exactWordMatch
-            });
-
-            // Use whole word matching when search ends with space
-            const matchesEnglish = exactWordMatch
-              ? matchesWholeWord(englishText, searchFullLower)
-              : englishText.includes(searchFullLower);
-
-            if (matchesArabic || matchesEnglish) {
-              results.push({
-                surahNumber: surahData.number,
-                surahName: typeof surahData.name === 'object' ? surahData.name.ar : surahData.name,
-                surahNameEn: typeof surahData.name === 'object' ? surahData.name.en : (surahData.englishName || surahData.name),
-                ayahNumber: verse.number,
-                arabicText: verse.text?.ar,
-                englishText: verse.text?.en,
-                page: verse.page,
-                juz: verse.juz
-              });
-            }
-          });
+      quranSearch.search(query, { wholeWord: exactWordMatch, includeEnglish: true })
+        .then(outcome => {
+          setWordSearchResults(outcome.results);
+          setIsSearchLoading(false);
+        })
+        .catch(() => {
+          setWordSearchResults([]);
+          setIsSearchLoading(false);
         });
-
-        setWordSearchResults(results);
-        setIsSearchLoading(false);
-      }, 100);
     } else {
       setWordSearchResults([]);
       setIsSearchLoading(false);
     }
-  }, [matchesWholeWord]);
+  }, []);
 
   // Navigate to surah and optionally to a specific ayah
   const handleGoToSurah = useCallback(async (

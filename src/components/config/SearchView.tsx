@@ -2,11 +2,17 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses, getQuranTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { useQuranData } from "@/hooks/useQuranData";
 import { cn } from "@/lib/utils";
-import { arabicTextMatches, findArabicMatch } from "@/lib/arabic-search";
+import { findArabicMatch } from "@/lib/arabic-search";
+import { quranSearch } from "@/lib/quran-search";
 import { motion } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, X } from "lucide-react";
+
+// Arabic letters (incl. extended ranges) and whitespace only.
+// Module-level regexes: no per-keystroke allocation, single-pass filtering.
+const ARABIC_INPUT_RE = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\s]*$/;
+const NON_ARABIC_RE = /[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\s]/g;
 
 interface SearchViewProps {
   onNavigate?: (page: number, ayah?: { surah: number; ayah: number }) => void;
@@ -17,73 +23,75 @@ interface SearchViewProps {
  * Search View - Word search in Quran text
  * Self-contained view that loads its own data and handles navigation
  * Route: /config/search
+ *
+ * Typing is NEVER blocked: the auto-search runs in a Web Worker off the UI
+ * thread, the input filter is a single-pass regex that never rewrites the
+ * value mid-IME-composition, and result rendering is capped.
  */
 export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
   const navigate = useNavigate();
-  
+
   // Load Quran data
   const { ayahData, isAyahDataLoading } = useQuranData();
   const { t, isRTL, language } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   const quranTextClasses = getQuranTextSizeClasses(dialogTextSize);
-  
+
   const [searchWord, setSearchWord] = useState('');
   const [searchedWord, setSearchedWord] = useState('');
   const [wordSearchResults, setWordSearchResults] = useState<any[]>([]);
+  const [matchCount, setMatchCount] = useState(0);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null); // Direct DOM access for Android IME
+  const searchWordRef = useRef(''); // Latest input value, without re-render churn
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Pending debounced auto-search
+  const searchSeqRef = useRef(0); // Latest search request (stale-response guard)
 
-  // Validate that text contains only Arabic characters
-  const isArabicText = (text: string): boolean => {
-    // Allow Arabic letters (U+0600-U+06FF), Arabic numerals, spaces, and common punctuation
-    const arabicPattern = /^[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\s]+$/;
-    return arabicPattern.test(text) || text === '';
+  // Warm up the search service as soon as this view opens (idempotent, and
+  // cached data means no extra fetch) so the first search pays no setup cost
+  useEffect(() => {
+    quranSearch.init().catch(err => console.error('Failed to init search service:', err));
+  }, []);
+
+  // Sync any input change into React state cheaply. Called from onInput and
+  // from a low-frequency safety-net poll below.
+  const handleInputValueChanged = (value: string) => {
+    searchWordRef.current = value;
+    setSearchWord(value);
+    // Clear stale results immediately; the new search is debounced/pending
+    setWordSearchResults(prev => (prev.length > 0 ? [] : prev));
+    setMatchCount(prev => (prev > 0 ? 0 : prev));
+    setHasSearched(prev => (prev ? false : prev));
   };
 
-  // Polling approach: Update search word from DOM every 50ms (Android IME fix)
+  // Safety-net poll for Android IMEs that don't dispatch input events
+  // reliably: reads the DOM input and syncs state ONLY when it actually
+  // changed. Mounted once — never torn down/recreated on typing, so it adds
+  // no re-render churn (the old 50ms poll re-created its interval on every
+  // keystroke).
   useEffect(() => {
-    const checkSearchInput = () => {
+    const intervalId = setInterval(() => {
       const inputEl = searchInputRef.current;
-      if (!inputEl) {
-        return;
+      if (inputEl && inputEl.value !== searchWordRef.current) {
+        handleInputValueChanged(inputEl.value);
       }
-
-      const value = inputEl.value;
-      
-      // Only update state if value changed (avoid unnecessary re-renders)
-      if (value !== searchWord) {
-        setSearchWord(value);
-        // Clear results when typing (search not performed yet)
-        if (wordSearchResults.length > 0) {
-          setWordSearchResults([]);
-        }
-        // Reset search state when input changes
-        if (hasSearched && value !== searchWord) {
-          setHasSearched(false);
-        }
-      }
-    };
-
-    // Check immediately
-    checkSearchInput();
-
-    // Then poll every 50ms
-    const intervalId = setInterval(checkSearchInput, 50);
-
+    }, 200);
     return () => clearInterval(intervalId);
-  }, [searchWord, wordSearchResults.length, hasSearched]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Clear the search input and all results
   const clearSearch = () => {
     if (searchInputRef.current) {
       searchInputRef.current.value = '';
     }
+    searchWordRef.current = '';
     setSearchWord('');
     setSearchedWord('');
     setWordSearchResults([]);
+    setMatchCount(0);
     setHasSearched(false);
   };
 
@@ -115,8 +123,9 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
     );
   };
 
-  // Word search functionality - runs automatically while typing (debounced)
-  // or immediately on Enter
+  // Word search — runs in the Web Worker (debounced while typing, immediate
+  // on Enter). The main thread only sends the query and paints the results,
+  // so typing stays perfectly smooth even while a search is running.
   const performWordSearch = (queryArg?: string) => {
     // Cancel any pending debounced search (e.g. Enter pressed first)
     if (debounceTimeoutRef.current) {
@@ -124,52 +133,34 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
       debounceTimeoutRef.current = null;
     }
 
-    // Read directly from the input to avoid stale state (Android IME polling)
+    // Read directly from the input to avoid stale state (Android IME)
     const query = (queryArg ?? searchInputRef.current?.value ?? searchWord).trim();
 
-    if (query.length >= 2 && ayahData.length > 0) {
-      setIsSearchLoading(true);
-      setHasSearched(true);
-      setSearchedWord(query);
-
-      // Use setTimeout to allow UI to update with loading state
-      setTimeout(() => {
-        const results: any[] = [];
-
-        ayahData.forEach(surahData => {
-          surahData.verses?.forEach((verse: any) => {
-            const arabicText = verse.text?.ar || '';
-
-            // Uthmani-aware Arabic match (hamza words like اولئك, يسالونك, ...)
-            if (arabicTextMatches(arabicText, query)) {
-              results.push({
-                surahNumber: surahData.number,
-                surahName: typeof surahData.name === 'object' ? surahData.name.ar : surahData.name,
-                surahNameEn: typeof surahData.name === 'object' ? surahData.name.en : (surahData.englishName || surahData.name),
-                ayahNumber: verse.number,
-                arabicText: verse.text?.ar,
-                englishText: verse.text?.en,
-                page: verse.page,
-                juz: verse.juz
-              });
-            }
-          });
-        });
-
-        // Skip stale results if the input was cleared/changed while searching
-        if ((searchInputRef.current?.value ?? '').trim() !== query) {
-          return;
-        }
-
-        setWordSearchResults(results);
-        setIsSearchLoading(false);
-      }, 100);
-    } else {
+    if (query.length < 2) {
       setWordSearchResults([]);
+      setMatchCount(0);
       setIsSearchLoading(false);
       setHasSearched(false);
       setSearchedWord('');
+      return;
     }
+
+    setIsSearchLoading(true);
+    setHasSearched(true);
+    setSearchedWord(query);
+
+    const seq = ++searchSeqRef.current;
+    quranSearch.search(query).then(outcome => {
+      // Skip stale results if a newer search was requested meanwhile
+      if (seq !== searchSeqRef.current) return;
+      setWordSearchResults(outcome.results);
+      setMatchCount(outcome.count);
+      setSearchedWord(outcome.query);
+      setIsSearchLoading(false);
+    }).catch(() => {
+      if (seq !== searchSeqRef.current) return;
+      setIsSearchLoading(false);
+    });
   };
 
   // Auto-search: search automatically as the user types (debounced, no button needed)
@@ -186,12 +177,8 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
       return;
     }
 
-    // Show loading state while the user is still typing
-    setIsSearchLoading(true);
-    setHasSearched(true);
-    setSearchedWord(query);
-
-    // Run the search shortly after typing stops
+    // Run the search shortly after typing stops. The scan itself happens in
+    // the worker, so this never blocks further typing.
     debounceTimeoutRef.current = setTimeout(() => {
       debounceTimeoutRef.current = null;
       performWordSearch(query);
@@ -204,6 +191,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
         debounceTimeoutRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchWord, ayahData.length]);
 
   const handleResultClick = (page: number, surahNumber: number, ayahNumber: number) => {
@@ -240,18 +228,20 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
             placeholder={t('searchWordPlaceholder')}
             onInput={(e) => {
               const input = e.target as HTMLInputElement;
-              // Filter: keep only Arabic characters in real-time
-              if (!isArabicText(input.value)) {
-                // Find last valid Arabic substring
-                const filtered = input.value.split('').filter((char, i) =>
-                  isArabicText(input.value.substring(0, i + 1))
-                ).join('');
-                input.value = filtered;
+              // Keep only Arabic characters — single pass, and NEVER rewrite
+              // the value while the IME is mid-composition: rewriting
+              // input.value during composition is what freezes Android
+              // keyboards and blocks typing.
+              const composing = (e.nativeEvent as InputEvent).isComposing === true;
+              if (!composing && !ARABIC_INPUT_RE.test(input.value)) {
+                input.value = input.value.replace(NON_ARABIC_RE, '');
               }
-              // State is updated by 50ms polling, not here
+              // Keep React state in sync directly (no polling churn)
+              handleInputValueChanged(input.value);
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              // Ignore Enter while the IME is still composing
+              if (e.key === 'Enter' && !(e.nativeEvent as KeyboardEvent).isComposing) {
                 performWordSearch();
               }
             }}
@@ -303,8 +293,15 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
         {!isSearchLoading && wordSearchResults.length > 0 && (
           <>
             <div className={cn("px-1 py-2 font-semibold text-emerald-800 dark:text-emerald-300", textSizeClasses.text)}>
-              {t('foundIn')} {formatNumber(wordSearchResults.length)} {t('ayahs')}
+              {t('foundIn')} {formatNumber(matchCount)} {t('ayahs')}
             </div>
+            {matchCount > wordSearchResults.length && (
+              <div className={cn("px-1 pb-2 text-sm text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
+                {isRTL
+                  ? `عرض أول ${formatNumber(wordSearchResults.length)} من ${formatNumber(matchCount)} نتيجة`
+                  : `Showing first ${wordSearchResults.length} of ${matchCount} results`}
+              </div>
+            )}
             {wordSearchResults.map((result, index) => (
               <motion.button
                 key={`${result.surahNumber}-${result.ayahNumber}-${index}`}
