@@ -2,6 +2,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { useQuranData } from "@/hooks/useQuranData";
 import { cn } from "@/lib/utils";
+import { arabicTextMatches, findArabicMatch } from "@/lib/arabic-search";
 import { motion } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -27,6 +28,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   
   const [searchWord, setSearchWord] = useState('');
+  const [searchedWord, setSearchedWord] = useState('');
   const [wordSearchResults, setWordSearchResults] = useState<any[]>([]);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -72,23 +74,13 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
     return () => clearInterval(intervalId);
   }, [searchWord, wordSearchResults.length, hasSearched]);
 
-  // Live search (Material SearchView pattern): run the search automatically
-  // a short moment after typing stops. Enter still triggers it immediately.
-  useEffect(() => {
-    const word = searchWord.trim();
-    if (word.length < 2) return;
-    const timer = setTimeout(() => {
-      performWordSearch();
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchWord]);
-
   // Clear the search input and all results
   const clearSearch = () => {
     if (searchInputRef.current) {
       searchInputRef.current.value = '';
     }
     setSearchWord('');
+    setSearchedWord('');
     setWordSearchResults([]);
     setHasSearched(false);
   };
@@ -103,108 +95,45 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
     return numStr;
   };
 
-  // Normalize Arabic text by removing diacritics and normalizing character variations
-  const normalizeArabic = (text: string) => {
-    const normalized = text
-      .replace(/\u0640\u0670/g, '') // Remove tatweel+superscript-alif combo FIRST (e.g. هَـٰٓؤُلَآء, أُوْلَـٰٓئِكَ) — decorative elongation, NOT a real alif
-      .replace(/\u0670/g, '\u0627') // Remaining standalone superscript alif → regular alif (e.g. إِبْرَٰهِيمَ has a real alif here)
-      .replace(/\u0640/g, '') // Remove any remaining tatweel/kashida
-      .replace(/[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g, '') // Remove diacritics
-      .replace(/[ٱأإآٲٳٵ]/g, 'ا') // Normalize alef variations
-      .replace(/[ىي]/g, 'ي') // Normalize yaa
-      .replace(/ة/g, 'ه') // Normalize taa marboota
-      .replace(/ؤ/g, 'و') // Normalize waw with hamza
-      .replace(/ئ/g, 'ي') // Normalize yaa with hamza (ئ → ي, e.g. خطيئة matches خطيـٔته in Uthmani)
-      .replace(/([\u0600-\u06ff])\1+/g, '$1') // Collapse consecutive identical Arabic letters (e.g. خطيي→خطي after ئ→ي)
-      .toLowerCase();
-    
-    // Debug: Show before and after for first few characters
-    if (text.includes('و') && text.length < 50) {
-      console.log('Normalize:', text.substring(0, 20), '→', normalized.substring(0, 20));
-    }
-    
-    return normalized;
-  };
+  // Highlight the searched word in Arabic text (Uthmani-script aware:
+  // the match range maps exactly onto the original text)
+  const renderHighlightedArabic = (text?: string) => {
+    if (!text || !searchedWord) return text;
+    const match = findArabicMatch(text, searchedWord);
+    if (!match) return text;
 
-  // Highlight exact phrase match in text
-  const highlightText = (text: string, searchWord: string, isArabic: boolean) => {
-    if (!searchWord || !text) return text;
-    
-    const normalizedSearch = isArabic ? normalizeArabic(searchWord) : searchWord.toLowerCase();
-    const normalizedText = isArabic ? normalizeArabic(text) : text.toLowerCase();
-    
-    // Find the position of the exact match in normalized text
-    const matchIndex = normalizedText.indexOf(normalizedSearch);
-    
-    if (matchIndex === -1) {
-      return text; // No match found
-    }
-    
-    // Calculate the actual position in the original text
-    // We need to map back from normalized to original text
-    let charCount = 0;
-    let actualStartIndex = 0;
-    let actualEndIndex = text.length;
-    
-    // Find start position
-    for (let i = 0; i < text.length && charCount < matchIndex; i++) {
-      const normalized = isArabic ? normalizeArabic(text[i]) : text[i].toLowerCase();
-      if (normalized) charCount += normalized.length;
-      actualStartIndex = i + 1;
-    }
-    
-    // Find end position
-    charCount = 0;
-    for (let i = actualStartIndex; i < text.length && charCount < normalizedSearch.length; i++) {
-      const normalized = isArabic ? normalizeArabic(text[i]) : text[i].toLowerCase();
-      if (normalized) charCount += normalized.length;
-      actualEndIndex = i + 1;
-    }
-    
-    // Split text into before, match, and after
-    const before = text.substring(0, actualStartIndex);
-    const match = text.substring(actualStartIndex, actualEndIndex);
-    const after = text.substring(actualEndIndex);
-    
     return (
       <>
-        {before}
+        {text.slice(0, match.start)}
         <span className="bg-yellow-200 dark:bg-yellow-600 font-semibold rounded px-0.5">
-          {match}
+          {text.slice(match.start, match.end)}
         </span>
-        {after}
+        {text.slice(match.end)}
       </>
     );
   };
 
-  // Word search functionality
+  // Word search functionality - runs only when the user triggers it
+  // (search button or Enter), never automatically while typing
   const performWordSearch = () => {
-    if (searchWord.trim().length >= 2 && ayahData.length > 0) {
+    // Read directly from the input to avoid stale state (Android IME polling)
+    const query = (searchInputRef.current?.value ?? searchWord).trim();
+
+    if (query.length >= 2 && ayahData.length > 0) {
       setIsSearchLoading(true);
       setHasSearched(true);
-      
-      console.log('=== WORD SEARCH DEBUG ===');
-      console.log('Search Word:', searchWord);
-      console.log('Ayah Data Length:', ayahData.length);
-      console.log('Normalized Search:', normalizeArabic(searchWord));
-      
+      setSearchedWord(query);
+
       // Use setTimeout to allow UI to update with loading state
       setTimeout(() => {
-        // Search for the full text phrase in Arabic only
-        const normalizedSearchFull = normalizeArabic(searchWord);
         const results: any[] = [];
-        
+
         ayahData.forEach(surahData => {
           surahData.verses?.forEach((verse: any) => {
             const arabicText = verse.text?.ar || '';
-            const normalizedArabic = normalizeArabic(arabicText);
-            
-            // Check if the full phrase matches in Arabic
-            const matchesArabic = normalizedArabic.includes(normalizedSearchFull);
-            
-            if (matchesArabic) {
-              console.log('Found match in Surah', surahData.number, 'Ayah', verse.number);
-              console.log('Arabic Text:', arabicText);
+
+            // Uthmani-aware Arabic match (hamza words like اولئك, يسالونك, ...)
+            if (arabicTextMatches(arabicText, query)) {
               results.push({
                 surahNumber: surahData.number,
                 surahName: typeof surahData.name === 'object' ? surahData.name.ar : surahData.name,
@@ -218,17 +147,15 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
             }
           });
         });
-        
-        console.log('Total Results:', results.length);
-        console.log('========================');
-        
+
         setWordSearchResults(results);
         setIsSearchLoading(false);
       }, 100);
     } else {
-      console.log('Search too short or no data. Length:', searchWord.trim().length, 'Data:', ayahData.length);
       setWordSearchResults([]);
       setIsSearchLoading(false);
+      setHasSearched(false);
+      setSearchedWord('');
     }
   };
 
@@ -286,6 +213,15 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
               textSizeClasses.text
             )}
           />
+          <button
+            type="button"
+            onClick={performWordSearch}
+            className="flex items-center justify-center gap-1.5 px-4 h-11 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 text-[#F2E3BB] font-medium shadow-md shrink-0 transition-colors"
+            aria-label={isRTL ? 'بحث' : 'Search'}
+          >
+            <Search className="w-4 h-4" />
+            <span className="hidden sm:inline">{isRTL ? 'بحث' : 'Search'}</span>
+          </button>
           {searchWord && (
             <button
               onClick={clearSearch}
@@ -368,7 +304,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
                       "text-right text-emerald-900 dark:text-emerald-100 leading-[2.2] font-quran"
                     )}
                   >
-                    {highlightText(result.arabicText, searchWord, true)}
+                    {renderHighlightedArabic(result.arabicText)}
                   </span>
                 </span>
               </motion.button>
@@ -377,7 +313,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
         )}
 
         {/* No Results */}
-        {!isSearchLoading && hasSearched && wordSearchResults.length === 0 && searchWord.trim().length >= 2 && (
+        {!isSearchLoading && hasSearched && wordSearchResults.length === 0 && searchedWord.trim().length >= 2 && (
           <div className={cn(
             "text-center py-10 px-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-900/20",
             textSizeClasses.text

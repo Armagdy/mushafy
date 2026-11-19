@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
+import { arabicTextMatches, findArabicMatch } from "@/lib/arabic-search";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { surahs } from "@/data/surahs";
@@ -225,108 +226,64 @@ export function NavigationDialog({
     }
   }, [open, currentSurahId, currentAyah, currentJuz, currentHezb, currentQuarter, currentPage]);
 
-  // Normalize Arabic text by removing diacritics and normalizing character variations
-  const normalizeArabic = (text: string) => {
-    const normalized = text
-      .replace(/ٰ/g, 'ا') // IMPORTANT: Normalize superscript alif (U+0670) to regular alif FIRST, before removing diacritics
-      .replace(/[\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E8\u06EA-\u06ED]/g, '') // Remove diacritics
-      .replace(/[ٱأإآٲٳٵ]/g, 'ا') // Normalize alef variations
-      .replace(/[ىي]/g, 'ي') // Normalize yaa
-      .replace(/ة/g, 'ه') // Normalize taa marboota
-      .replace(/ؤ/g, 'و') // Normalize waw with hamza
-      .replace(/ئ/g, 'ي') // Normalize yaa with hamza
-      // .replace(/\s+/g, '') // Remove spaces
-      .toLowerCase();
-    
-    // Debug: Show before and after for first few characters
-    if (text.includes('و') && text.length < 50) {
-      console.log('Normalize:', text.substring(0, 20), '→', normalized.substring(0, 20));
-    }
-    
-    return normalized;
-  };
+  // Highlight the searched word in Arabic text (Uthmani-script aware:
+  // the match range maps exactly onto the original text)
+  const renderHighlightedArabic = (text?: string) => {
+    if (!text || !searchWord.trim()) return text;
+    const match = findArabicMatch(text, searchWord.trim());
+    if (!match) return text;
 
-  // Highlight exact phrase match in text
-  const highlightText = (text: string, searchWord: string, isArabic: boolean) => {
-    if (!searchWord || !text) return text;
-    
-    const normalizedSearch = isArabic ? normalizeArabic(searchWord) : searchWord.toLowerCase();
-    const normalizedText = isArabic ? normalizeArabic(text) : text.toLowerCase();
-    
-    // Find the position of the exact match in normalized text
-    const matchIndex = normalizedText.indexOf(normalizedSearch);
-    
-    if (matchIndex === -1) {
-      return text; // No match found
-    }
-    
-    // Calculate the actual position in the original text
-    // We need to map back from normalized to original text
-    let charCount = 0;
-    let actualStartIndex = 0;
-    let actualEndIndex = text.length;
-    
-    // Find start position
-    for (let i = 0; i < text.length && charCount < matchIndex; i++) {
-      const normalized = isArabic ? normalizeArabic(text[i]) : text[i].toLowerCase();
-      if (normalized) charCount += normalized.length;
-      actualStartIndex = i + 1;
-    }
-    
-    // Find end position
-    charCount = 0;
-    for (let i = actualStartIndex; i < text.length && charCount < normalizedSearch.length; i++) {
-      const normalized = isArabic ? normalizeArabic(text[i]) : text[i].toLowerCase();
-      if (normalized) charCount += normalized.length;
-      actualEndIndex = i + 1;
-    }
-    
-    // Split text into before, match, and after
-    const before = text.substring(0, actualStartIndex);
-    const match = text.substring(actualStartIndex, actualEndIndex);
-    const after = text.substring(actualEndIndex);
-    
     return (
       <>
-        {before}
+        {text.slice(0, match.start)}
         <span className="bg-yellow-200 dark:bg-yellow-600 font-semibold rounded px-0.5">
-          {match}
+          {text.slice(match.start, match.end)}
         </span>
-        {after}
+        {text.slice(match.end)}
+      </>
+    );
+  };
+
+  // Highlight the searched word in English text
+  const renderHighlightedEnglish = (text?: string) => {
+    if (!text) return text;
+    const query = searchWord.trim().toLowerCase();
+    const matchIndex = query ? text.toLowerCase().indexOf(query) : -1;
+    if (matchIndex === -1) return text;
+
+    return (
+      <>
+        {text.slice(0, matchIndex)}
+        <span className="bg-yellow-200 dark:bg-yellow-600 font-semibold rounded px-0.5">
+          {text.slice(matchIndex, matchIndex + query.length)}
+        </span>
+        {text.slice(matchIndex + query.length)}
       </>
     );
   };
 
   // Word search functionality
   const performWordSearch = () => {
-    if (searchWord.trim().length >= 2 && ayahData.length > 0) {
+    const query = searchWord.trim();
+    const queryLower = query.toLowerCase();
+
+    if (query.length >= 2 && ayahData.length > 0) {
       setIsSearchLoading(true);
-      
-      console.log('=== WORD SEARCH DEBUG ===');
-      console.log('Search Word:', searchWord);
-      console.log('Ayah Data Length:', ayahData.length);
-      console.log('Normalized Search:', normalizeArabic(searchWord));
-      
+
       // Use setTimeout to allow UI to update with loading state
       setTimeout(() => {
-        // Search for the full text phrase
-        const normalizedSearchFull = normalizeArabic(searchWord);
-        const searchFullLower = searchWord.toLowerCase();
         const results: any[] = [];
-        
+
         ayahData.forEach(surahData => {
           surahData.verses?.forEach((verse: any) => {
             const arabicText = verse.text?.ar || '';
-            const normalizedArabic = normalizeArabic(arabicText);
             const englishText = (verse.text?.en || '').toLowerCase();
-            
-            // Check if the full phrase matches
-            const matchesArabic = normalizedArabic.includes(normalizedSearchFull);
-            const matchesEnglish = englishText.includes(searchFullLower);
-            
+
+            // Uthmani-aware Arabic match (hamza words like اولئك, يسالونك, ...)
+            const matchesArabic = arabicTextMatches(arabicText, query);
+            const matchesEnglish = englishText.includes(queryLower);
+
             if (matchesArabic || matchesEnglish) {
-              console.log('Found match in Surah', surahData.number, 'Ayah', verse.number);
-              console.log('Arabic Text:', arabicText);
               results.push({
                 surahNumber: surahData.number,
                 surahName: surahData.name?.ar,
@@ -340,15 +297,11 @@ export function NavigationDialog({
             }
           });
         });
-        
-        console.log('Total Results:', results.length);
-        console.log('========================');
-        
+
         setWordSearchResults(results);
         setIsSearchLoading(false);
       }, 100);
     } else {
-      console.log('Search too short or no data. Length:', searchWord.trim().length, 'Data:', ayahData.length);
       setWordSearchResults([]);
       setIsSearchLoading(false);
     }
@@ -546,9 +499,9 @@ export function NavigationDialog({
                       )}
                       style={isRTL ? { fontFamily: "'Changa', sans-serif" } : undefined}
                     >
-                      {isRTL 
-                        ? highlightText(result.arabicText, searchWord, true)
-                        : highlightText(result.englishText, searchWord, false)
+                      {isRTL
+                        ? renderHighlightedArabic(result.arabicText)
+                        : renderHighlightedEnglish(result.englishText)
                       }
                     </div>
                   </motion.button>

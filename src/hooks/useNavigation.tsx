@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSurahFirstPage, getJuzFirstPage } from '@/lib/quran-mapping';
+import { arabicTextMatches, findArabicMatch } from '@/lib/arabic-search';
 
 interface NavigationHookProps {
   isAyahNavigation: React.MutableRefObject<boolean>;
@@ -24,56 +25,38 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
       .toLowerCase();
   }, []);
 
-  // Highlight exact phrase match in text
+  // Highlight the searched word in text (Arabic match is Uthmani-script aware
+  // and maps exactly onto the original text)
   const highlightText = useCallback((text: string, searchWord: string, isArabic: boolean) => {
-    if (!searchWord || !text) return text;
-    
-    const normalizedSearch = isArabic ? normalizeArabic(searchWord.trim()) : searchWord.trim().toLowerCase();
-    const normalizedText = isArabic ? normalizeArabic(text) : text.toLowerCase();
-    
-    // Find the position of the exact match in normalized text
-    const matchIndex = normalizedText.indexOf(normalizedSearch);
-    
-    if (matchIndex === -1) {
-      return text; // No match found
+    const query = searchWord.trim();
+    if (!query || !text) return text;
+
+    if (isArabic) {
+      const match = findArabicMatch(text, query);
+      if (!match) return text;
+      return (
+        <>
+          {text.slice(0, match.start)}
+          <span className="bg-yellow-200 dark:bg-yellow-600 font-semibold rounded px-0.5">
+            {text.slice(match.start, match.end)}
+          </span>
+          {text.slice(match.end)}
+        </>
+      );
     }
-    
-    // Calculate the actual position in the original text
-    // We need to map back from normalized to original text
-    let charCount = 0;
-    let actualStartIndex = 0;
-    let actualEndIndex = text.length;
-    
-    // Find start position
-    for (let i = 0; i < text.length && charCount < matchIndex; i++) {
-      const normalized = isArabic ? normalizeArabic(text[i]) : text[i].toLowerCase();
-      if (normalized) charCount += normalized.length;
-      actualStartIndex = i + 1;
-    }
-    
-    // Find end position
-    charCount = 0;
-    for (let i = actualStartIndex; i < text.length && charCount < normalizedSearch.length; i++) {
-      const normalized = isArabic ? normalizeArabic(text[i]) : text[i].toLowerCase();
-      if (normalized) charCount += normalized.length;
-      actualEndIndex = i + 1;
-    }
-    
-    // Split text into before, match, and after
-    const before = text.substring(0, actualStartIndex);
-    const match = text.substring(actualStartIndex, actualEndIndex);
-    const after = text.substring(actualEndIndex);
-    
+
+    const matchIndex = text.toLowerCase().indexOf(query.toLowerCase());
+    if (matchIndex === -1) return text;
     return (
       <>
-        {before}
+        {text.slice(0, matchIndex)}
         <span className="bg-yellow-200 dark:bg-yellow-600 font-semibold rounded px-0.5">
-          {match}
+          {text.slice(matchIndex, matchIndex + query.length)}
         </span>
-        {after}
+        {text.slice(matchIndex + query.length)}
       </>
     );
-  }, [normalizeArabic]);
+  }, []);
 
   // Helper function to check if search term matches as a complete word
   const matchesWholeWord = useCallback((text: string, searchTerm: string): boolean => {
@@ -104,37 +87,32 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
   ) => {
     if (searchWord.trim().length >= 2 && ayahData.length > 0) {
       setIsSearchLoading(true);
-      
+
       // Detect if user wants exact word matching (search ends with space)
       const exactWordMatch = searchWord.endsWith(' ') && searchWord.trim().length > 0;
-      
+
       // Use setTimeout to allow UI to update with loading state
       setTimeout(() => {
         // Search for the full text phrase
-        const normalizedSearchFull = normalizeArabic(searchWord.trim());
-        const searchFullLower = searchWord.trim().toLowerCase();
+        const searchFullTrimmed = searchWord.trim();
+        const searchFullLower = searchFullTrimmed.toLowerCase();
         const results: any[] = [];
-        
+
         ayahData.forEach(surahData => {
           surahData.verses?.forEach((verse: any) => {
             const arabicText = verse.text?.ar || '';
-            const normalizedArabic = normalizeArabic(arabicText);
             const englishText = (verse.text?.en || '').toLowerCase();
-            
-            // Check if the full phrase matches
-            let matchesArabic: boolean;
-            let matchesEnglish: boolean;
-            
-            if (exactWordMatch) {
-              // Use whole word matching when search ends with space
-              matchesArabic = matchesWholeWord(normalizedArabic, normalizedSearchFull);
-              matchesEnglish = matchesWholeWord(englishText, searchFullLower);
-            } else {
-              // Use substring matching for partial searches
-              matchesArabic = normalizedArabic.includes(normalizedSearchFull);
-              matchesEnglish = englishText.includes(searchFullLower);
-            }
-            
+
+            // Uthmani-aware Arabic match (hamza words like اولئك, يسالونك, ...)
+            const matchesArabic = arabicTextMatches(arabicText, searchFullTrimmed, {
+              wholeWord: exactWordMatch
+            });
+
+            // Use whole word matching when search ends with space
+            const matchesEnglish = exactWordMatch
+              ? matchesWholeWord(englishText, searchFullLower)
+              : englishText.includes(searchFullLower);
+
             if (matchesArabic || matchesEnglish) {
               results.push({
                 surahNumber: surahData.number,
@@ -149,7 +127,7 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
             }
           });
         });
-        
+
         setWordSearchResults(results);
         setIsSearchLoading(false);
       }, 100);
@@ -157,7 +135,7 @@ export function useNavigation({ isAyahNavigation, setCurrentPlayingAyah }: Navig
       setWordSearchResults([]);
       setIsSearchLoading(false);
     }
-  }, [normalizeArabic, matchesWholeWord]);
+  }, [matchesWholeWord]);
 
   // Navigate to surah and optionally to a specific ayah
   const handleGoToSurah = useCallback(async (
