@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
+import { useDialogTextSize, getDialogTextSizeClasses, getQuranTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
 import { arabicTextMatches, findArabicMatch } from "@/lib/arabic-search";
 import { motion } from "framer-motion";
@@ -45,6 +45,7 @@ export function NavigationDialog({
   const { t, isRTL } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+  const quranTextClasses = getQuranTextSizeClasses(dialogTextSize);
   
   // Navigation tab state
   const [searchTab, setSearchTab] = useState<'surah' | 'juz' | 'page' | 'word'>(() => {
@@ -485,19 +486,21 @@ export function NavigationDialog({
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                     <div className={cn("font-semibold text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
-                      {isRTL ? result.surahName : result.surahNameEn} - {isRTL ? 'الآية' : 'Ayah'} {result.ayahNumber}
+                      {isRTL
+                        ? `${result.surahName} - آية ${formatNumber(result.ayahNumber)}`
+                        : `${result.surahNameEn} - Ayah ${result.ayahNumber}`}
                     </div>
                     <div className={cn("text-emerald-600 dark:text-emerald-400 whitespace-nowrap", textSizeClasses.text)}>
-                        {isRTL ? 'صفحة' : 'Page'} {result.page}
+                        {isRTL ? 'صفحة' : 'Page'} {formatNumber(result.page)}
                       </div>
                     </div>
-                    <div 
+                    <div
                       className={cn(
                         "p-3 border border-emerald-300 dark:border-emerald-600 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20",
-                        textSizeClasses.text,
-                        isRTL ? "text-right text-emerald-900 dark:text-emerald-100 leading-[2.2]" : "text-left text-emerald-900 dark:text-emerald-100 leading-relaxed"
+                        isRTL
+                          ? cn(quranTextClasses, "text-right text-emerald-900 dark:text-emerald-100 leading-[2.2] font-quran")
+                          : cn(textSizeClasses.text, "text-left text-emerald-900 dark:text-emerald-100 leading-relaxed")
                       )}
-                      style={isRTL ? { fontFamily: "'Changa', sans-serif" } : undefined}
                     >
                       {isRTL
                         ? renderHighlightedArabic(result.arabicText)

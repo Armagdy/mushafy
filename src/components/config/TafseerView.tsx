@@ -1,7 +1,7 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, ChevronLeft, ChevronRight, Search, Pencil } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
+import { useDialogTextSize, getDialogTextSizeClasses, getQuranTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
 import { useTafseer } from "@/hooks/useTafseer";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -18,6 +18,7 @@ export default function TafseerView() {
   const { t, isRTL, language } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+  const quranTextClasses = getQuranTextSizeClasses(dialogTextSize);
   const {
     tafseers,
     selectedTafseerId,
@@ -452,7 +453,7 @@ export default function TafseerView() {
                     initial="enter"
                     animate={{ ...slideVariants.center, x: dragOffset }}
                     exit="exit"
-                    className={cn("font-quran leading-[2.2] text-right text-emerald-900 dark:text-emerald-50", textSizeClasses.text)}
+                    className={cn("font-quran leading-[2.2] text-right text-emerald-900 dark:text-emerald-50", quranTextClasses)}
                   >
                     {ayahText}
                   </motion.div>

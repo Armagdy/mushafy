@@ -1,5 +1,5 @@
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
+import { useDialogTextSize, getDialogTextSizeClasses, getQuranTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { useQuranData } from "@/hooks/useQuranData";
 import { cn } from "@/lib/utils";
 import { arabicTextMatches, findArabicMatch } from "@/lib/arabic-search";
@@ -26,6 +26,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
   const { t, isRTL, language } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+  const quranTextClasses = getQuranTextSizeClasses(dialogTextSize);
   
   const [searchWord, setSearchWord] = useState('');
   const [searchedWord, setSearchedWord] = useState('');
@@ -274,20 +275,15 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(index * 0.03, 0.3) }}
                 onClick={() => handleResultClick(result.page, result.surahNumber, result.ayahNumber)}
-                className="w-full flex items-start gap-4 px-3 py-3 rounded-2xl active:bg-emerald-100 dark:active:bg-emerald-900/40 transition-colors"
+                className="w-full px-3 py-3 rounded-2xl active:bg-emerald-100 dark:active:bg-emerald-900/40 transition-colors"
               >
-                {/* Leading themed container showing the ayah number */}
-                <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
-                  <span className={cn("font-bold text-[#F2E3BB]", textSizeClasses.text)}>
-                    {formatNumber(result.ayahNumber)}
-                  </span>
-                </span>
-
-                <span className="flex-1 min-w-0 space-y-1.5">
-                  {/* Row header: surah name + page chip */}
+                <span className="block space-y-1.5">
+                  {/* Row header: "Surah name - آية N" (matches the reader / audio style) */}
                   <span className="flex items-center justify-between gap-2">
                     <span className={cn("font-medium text-emerald-800 dark:text-emerald-200 truncate", textSizeClasses.label)}>
-                      {isRTL ? result.surahName : result.surahNameEn}
+                      {isRTL
+                        ? `${result.surahName} - آية ${formatNumber(result.ayahNumber)}`
+                        : `${result.surahNameEn} - Ayah ${result.ayahNumber}`}
                     </span>
                     <span className={cn(
                       "shrink-0 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300",
@@ -300,7 +296,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
                   <span
                     className={cn(
                       "block p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-900/20",
-                      textSizeClasses.text,
+                      quranTextClasses,
                       "text-right text-emerald-900 dark:text-emerald-100 leading-[2.2] font-quran"
                     )}
                   >

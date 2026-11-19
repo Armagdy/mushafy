@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
+import { useDialogTextSize, getDialogTextSizeClasses, getQuranTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { cn } from "@/lib/utils";
 import { useTafseer } from "@/hooks/useTafseer";
 import { useState, useEffect } from "react";
@@ -27,6 +27,7 @@ export function TafseerDialog({
   const { t, isRTL, language } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+  const quranTextClasses = getQuranTextSizeClasses(dialogTextSize);
   const {
     tafseers,
     selectedTafseerId,
@@ -260,7 +261,7 @@ export function TafseerDialog({
             </div>
           ) : ayahText ? (
             <ScrollArea className="max-h-[120px] sm:max-h-[150px] md:max-h-[180px] lg:max-h-[200px] p-4 border border-emerald-300 dark:border-emerald-600 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20">
-              <div className={cn("font-quran leading-[2.2] text-right text-emerald-900 dark:text-emerald-50", textSizeClasses.text)}>
+              <div className={cn("font-quran leading-[2.2] text-right text-emerald-900 dark:text-emerald-50", quranTextClasses)}>
                 {ayahText}
               </div>
             </ScrollArea>
