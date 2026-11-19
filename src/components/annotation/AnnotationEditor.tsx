@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  X, Save, Undo2, Redo2, MousePointer2, Pen, Minus, Square, Hand,
+  X, Save, Undo2, Redo2, MousePointer2, Pen, Square, Hand,
   Waves, Diameter, Eraser, Loader2, Maximize2, Check, Type,
 } from 'lucide-react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -28,7 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import TartelPage from '@/components/quran/TartelPage';
 import { getChromeTextClass, type ChromeTheme } from '@/lib/chrome-theme';
 import { isNativePlatform } from '@/lib/native-storage';
-import { getCachedAsset, getCachedAssetUri } from '@/lib/asset-cache';
+import { getCachedAsset, getCachedAssetUri, prewarmEditorImage } from '@/lib/asset-cache';
 import {
   generateShapeId,
   LINE_STYLES,
@@ -57,6 +57,20 @@ interface AnnotationEditorProps {
   cacheCategory?: string;
   /** Reader chrome theme ('green' | 'glass') so the editor bars match. */
   theme?: ChromeTheme;
+  /**
+   * Fired once the edit view is fully ready to reveal (page image decoded /
+   * text stage laid out / image error state). Surah.tsx uses this to hide
+   * the instant loading overlay shown over the reader page on tap.
+   */
+  onReady?: () => void;
+  /**
+   * MEASURED heights of the reader's fullscreen overlay header and quick
+   * bar. Passed so the editor can size its Quran page with the EXACT same
+   * formulas the reader uses (SwiperPageDisplay's fullscreen sizing), making
+   * the page look identical in both views instead of smaller-with-gaps.
+   */
+  readerHeaderHeight?: number;
+  readerFooterHeight?: number;
   onClose: (saved: boolean) => void;
 }
 
@@ -86,6 +100,22 @@ const HIT_TOLERANCE_PX = 14;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
+/** Lucide-style wave icon for the line tool (lucide has no single-wave glyph). */
+const WaveIcon = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M2 12q2.5 -6 5 0t5 0t5 0t5 0" />
+  </svg>
+);
+
 /** Small SVG preview for each line style option. */
 const LineStylePreview = ({ style }: { style: LineStyle }) => {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 2.5, strokeLinecap: 'round' as const };
@@ -100,7 +130,8 @@ const LineStylePreview = ({ style }: { style: LineStyle }) => {
   );
 };
 
-export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: AnnotationEditorProps) {
+export function AnnotationEditor({ page, imageSrc, theme = 'green', onReady, readerHeaderHeight, readerFooterHeight, onClose }: AnnotationEditorProps) {
+  console.error('[EditPerf] editor render (first mount subtree)', performance.now().toFixed(0));
   const { t } = useLanguage();
   const { mushafType } = useMushaf();
   const { isDarkMode } = useDarkMode();
@@ -190,23 +221,38 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  // Text mushafs: fill the ENTIRE stage (between this editor's header and
-  // toolbar) — same "expand to all available space" behavior as the reader's
-  // fullscreen. TartelPage sizes its fill from viewport reserves
-  // (innerHeight - header - footer), so pass reserves that SUM to
-  // (innerHeight - measured stage height); the individual split is
-  // irrelevant. Memoized: TartelPage is memo-wrapped and compares the object
-  // identity. Drawings stay aligned: annotations are stored normalized
-  // (0..1 of the page) and every line shares one dynamic line-height, so
-  // relative line positions don't move when the fill height changes.
+  // Text mushafs: fill the stage the SAME way the reader's fullscreen does.
+  // The reader passes {header: fullscreenHeaderHeight + 6, footer: quickBar
+  // + 2} (see SwiperPageDisplay's fillReserves) — using the same MEASURED
+  // values here makes the text page render at the exact same size in both
+  // views. Fallback (no measurements passed): keep the classic
+  // expand-to-fit against the editor's own chrome.
   const editorFillReserves = useMemo(() => {
-    if (!isTextMushaf || !availableHeight || availableHeight <= 120) return undefined;
+    if (!isTextMushaf) return undefined;
+    if (readerHeaderHeight != null && readerFooterHeight != null) {
+      return {
+        header: readerHeaderHeight + 6,
+        footer: readerFooterHeight + 2,
+      };
+    }
+    if (!availableHeight || availableHeight <= 120) return undefined;
     const sum = Math.max(0, window.innerHeight - availableHeight);
     const header = Math.round(sum / 2);
     return { header, footer: sum - header };
-  }, [isTextMushaf, availableHeight]);
+  }, [isTextMushaf, availableHeight, readerHeaderHeight, readerFooterHeight]);
   const [annotationsLoaded, setAnnotationsLoaded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Notify Surah.tsx the moment the edit view can reveal itself, so the
+  // instant loading overlay (shown over the reader page on tap) can hide.
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
+  useEffect(() => {
+    if (imageReady || imgError) {
+      console.error('[EditPerf] onReady fired (sheet reveals instantly)', performance.now().toFixed(0));
+      onReadyRef.current?.();
+    }
+  }, [imageReady, imgError]);
 
   // ------------------------------------------------------------- constants ---
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -267,6 +313,18 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
     if (!isTextMushaf && imageSrc) {
       (async () => {
         try {
+          // The edit button already kicked off prewarmEditorImage at tap
+          // time — awaiting it here joins that SAME in-flight promise (no
+          // second bridge roundtrip). With the image pre-decoded, the
+          // editor fades in almost immediately after mount.
+          console.error('[EditPerf] prewarm await start', performance.now().toFixed(0));
+          const prewarmed = await prewarmEditorImage(imageSrc);
+          if (cancelled) return;
+          console.error('[EditPerf] prewarm resolved:', prewarmed ? 'HIT' : 'MISS', performance.now().toFixed(0));
+          if (prewarmed) {
+            setDisplaySrc(prewarmed);
+            return;
+          }
           if (isNativePlatform()) {
             const uri = await getCachedAssetUri(imageSrc);
             if (cancelled) return;
@@ -360,6 +418,7 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
     const img = imgRef.current;
     const canvas = canvasRef.current;
     if (!img || !canvas) return;
+    console.error('[EditPerf] img onLoad -> imageReady flip', performance.now().toFixed(0));
 
     // Backing store: natural image size (capped) for crisp strokes
     const W = Math.min(img.naturalWidth || 1024, 1800);
@@ -1033,19 +1092,23 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
   }, [handleClose, undo, redo]);
 
   // --------------------------------------------------------------- render ---
-  const toolButton = (key: Tool, Icon: typeof Pen, label: string) => (
+  // Accepts lucide icons AND local custom glyphs like WaveIcon (plain
+  // function components taking a className).
+  const toolButton = (key: Tool, Icon: React.ComponentType<{ className?: string }>, label: string) => (
     <button
       key={key}
       onClick={() => { setTool(key); setSelectedId(null); setPopover(null); }}
       title={label}
       className={cn(
-        'p-2 sm:p-2.5 rounded-lg transition-colors',
+        // Larger touch targets (p-2.5, w-6 icons): easier to hit on phones
+        // while keeping the toolbar a single row.
+        'p-2.5 rounded-lg transition-colors',
         tool === key
           ? 'bg-emerald-600 text-white shadow'
           : cn(chromeTextClass, 'hover:bg-black/5 dark:hover:bg-white/10')
       )}
     >
-      <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+      <Icon className="w-6 h-6" />
     </button>
   );
 
@@ -1062,43 +1125,51 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
         // Respect notches / status bar; the bottom inset is handled by the
         // toolbar itself so the border line runs edge-to-edge
         paddingTop: 'env(safe-area-inset-top)',
+        // Hidden (and click-through) until the whole edit view is ready,
+        // then revealed INSTANTLY in a single frame — deliberately NO fade:
+        // animating opacity on this huge sheet (canvas backing store +
+        // full-page image + toolbar) promotes it to one giant compositing
+        // layer that the GPU rasterizes tile-by-tile, and the header/footer
+        // visibly lagged behind the stage during the animation. An instant
+        // visibility flip reveals everything at once, crisp and immediate.
+        visibility: imageReady || imgError ? 'visible' : 'hidden',
+        pointerEvents: imageReady || imgError ? 'auto' : 'none',
       }}
     >
       {/* ---------------------------------------------------------- header */}
       {/* No background: the page shows through; a thin themed border line
-          separates the header from the page (same as the toolbar below). */}
-      <div className={cn('flex items-center gap-1 sm:gap-2 px-2 py-1.5 sm:py-2 z-10', chromeHeaderDividerClass)}>
+          separates the header from the page (same as the toolbar below).
+          Single-line row (~52px) with larger touch targets. */}
+      <div className={cn('flex items-center gap-1.5 px-3 py-2.5 z-10', chromeHeaderDividerClass)}>
           <button
             onClick={handleClose}
-            className={cn('p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors', chromeTextClass)}
+            className={cn('p-2 rounded-lg hover:bg-white/10 transition-colors', chromeTextClass)}
             title={t('close')}
           >
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+            <X className="w-7 h-7" />
           </button>
-          <div className="flex-1 min-w-0">
-            <div className={cn('text-sm sm:text-base font-bold truncate', chromeTitleClass)}>{t('editPage')}</div>
-            <div className={cn('text-[10px] sm:text-xs opacity-70', chromeTitleClass)}>
-              {t('page')} {page} · {shapes.length} {t('annotationsCount')}
-            </div>
+          <div className={cn('flex-1 min-w-0 text-base font-bold truncate', chromeTitleClass)}>
+            {t('editPage')}
+            <span className="opacity-70 font-normal"> · {t('page')} {page} · {shapes.length} {t('annotationsCount')}</span>
           </div>
 
           <button onClick={undo} disabled={disabledUndo} title={t('undo')}
-            className={cn('p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors', chromeTextClass, disabledUndo && 'opacity-40 cursor-not-allowed')}>
-            <Undo2 className="w-4 h-4 sm:w-5 sm:h-5" />
+            className={cn('p-2 rounded-lg hover:bg-white/10 transition-colors', chromeTextClass, disabledUndo && 'opacity-40 cursor-not-allowed')}>
+            <Undo2 className="w-5 h-5" />
           </button>
           <button onClick={redo} disabled={disabledRedo} title={t('redo')}
-            className={cn('p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors', chromeTextClass, disabledRedo && 'opacity-40 cursor-not-allowed')}>
-            <Redo2 className="w-4 h-4 sm:w-5 sm:h-5" />
+            className={cn('p-2 rounded-lg hover:bg-white/10 transition-colors', chromeTextClass, disabledRedo && 'opacity-40 cursor-not-allowed')}>
+            <Redo2 className="w-5 h-5" />
           </button>
           <button onClick={resetZoom} title={t('resetZoom')}
-            className={cn('px-1.5 sm:px-2 py-1 sm:py-1.5 rounded-lg hover:bg-white/10 transition-colors text-xs sm:text-sm font-semibold tabular-nums', chromeTextClass)}>
-            {Math.round(zoom * 100)}% <Maximize2 className="inline w-3.5 h-3.5 sm:w-4 sm:h-4 -mt-0.5" />
+            className={cn('px-2.5 py-2 rounded-lg hover:bg-white/10 transition-colors text-xs font-semibold tabular-nums', chromeTextClass)}>
+            {Math.round(zoom * 100)}% <Maximize2 className="inline w-4 h-4 -mt-0.5" />
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving || !annotationsLoaded}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-bold transition-colors',
+              'flex items-center gap-1.5 px-3 py-2 rounded-lg font-bold transition-colors',
               'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white shadow',
               (isSaving || !annotationsLoaded) && 'opacity-60 cursor-not-allowed'
             )}
@@ -1118,12 +1189,6 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
         onPointerCancel={onPointerCancel}
         onContextMenu={(e) => e.preventDefault()}
       >
-        {!imageReady && !imgError && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
-          </div>
-        )}
-
         {imgError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8 text-center">
             <Eraser className="w-12 h-12 text-emerald-600" />
@@ -1183,7 +1248,11 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
         <div className="absolute inset-0 flex items-center justify-center">
           <div
             ref={stageRef}
-            className="relative shadow-xl bg-white"
+            // Ring instead of shadow-xl: a large box-shadow blur is one of
+            // the most expensive things to raster on the Android WebView —
+            // it made the reveal frame heavy. A 1px ring looks almost
+            // identical here and rasterizes free.
+            className="relative bg-white ring-1 ring-black/10"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: 'center center',
@@ -1200,7 +1269,18 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
               className="block max-w-full object-contain"
               style={{
                 WebkitUserDrag: 'none',
-                maxHeight: availableHeight && availableHeight > 120 ? availableHeight - 12 : 'calc(100dvh - 190px)',
+                // Match the READER's fullscreen page EXACTLY: same formula as
+                // SwiperPageDisplay's fullscreenImageReservePx (measured
+                // header + 4, footer + 8, slide padding 8, slack 12 = +32).
+                // min() with the editor's own band (measured stage - 4)
+                // guarantees the page never overflows behind the editor
+                // chrome if it is ever taller than the reader's overlays.
+                maxHeight:
+                  readerHeaderHeight != null && readerFooterHeight != null
+                    ? `min(calc(100dvh - ${Math.round(readerHeaderHeight + readerFooterHeight + 32)}px), ${(availableHeight && availableHeight > 120 ? availableHeight - 4 : 9999)}px)`
+                    : availableHeight && availableHeight > 120
+                      ? availableHeight - 12
+                      : 'calc(100dvh - 190px)',
               } as React.CSSProperties}
             />
             <canvas
@@ -1356,8 +1436,9 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
           </div>
         )}
 
-        {/* Groups wrap to multiple rows on narrow phones so every tool stays visible */}
-        <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5 px-1.5 sm:px-2 py-1.5 sm:py-2">
+        {/* Groups wrap to multiple rows on narrow phones so every tool stays visible.
+            Slightly taller row: larger touch targets for the tool buttons. */}
+        <div className="flex flex-wrap items-center justify-center gap-2 px-2 py-1.5">
           {/* Navigation: select & pan next to each other */}
           <div className={chromeGroupClass}>
             {toolButton('select', MousePointer2, t('toolSelect'))}
@@ -1372,7 +1453,7 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
 
           {/* Shapes: line & rectangle */}
           <div className={chromeGroupClass}>
-            {toolButton('line', Minus, t('toolLine'))}
+            {toolButton('line', WaveIcon, t('toolLine'))}
             {toolButton('rect', Square, t('toolRect'))}
           </div>
 
@@ -1383,10 +1464,10 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
             <button
               onClick={() => setPopover(popover === 'color' ? null : 'color')}
               title={t('color')}
-              className={cn('p-2 sm:p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'color' && 'bg-black/10 dark:bg-white/15')}
+              className={cn('p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'color' && 'bg-black/10 dark:bg-white/15')}
             >
               <span
-                className="block w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-black/10 shadow-inner"
+                className="block w-6 h-6 rounded-full border-2 border-black/10 shadow-inner"
                 style={{ backgroundColor: color }}
               />
             </button>
@@ -1394,18 +1475,18 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
             <button
               onClick={() => setPopover(popover === 'thickness' ? null : 'thickness')}
               title={isTextSizing ? t('fontSize') : t('thickness')}
-              className={cn(chromeTextClass, 'p-2 sm:p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'thickness' && 'bg-black/10 dark:bg-white/15')}
+              className={cn(chromeTextClass, 'p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'thickness' && 'bg-black/10 dark:bg-white/15')}
             >
-              <Diameter className="w-5 h-5 sm:w-6 sm:h-6" />
+              <Diameter className="w-6 h-6" />
             </button>
             {/* line pattern — Line tool only */}
             {isLineContext && (
               <button
                 onClick={() => setPopover(popover === 'style' ? null : 'style')}
                 title={t('lineStyle')}
-                className={cn(chromeTextClass, 'p-2 sm:p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'style' && 'bg-black/10 dark:bg-white/15')}
+                className={cn(chromeTextClass, 'p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'style' && 'bg-black/10 dark:bg-white/15')}
               >
-                <Waves className="w-5 h-5 sm:w-6 sm:h-6" />
+                <Waves className="w-6 h-6" />
               </button>
             )}
             {/* rect options */}
@@ -1413,10 +1494,10 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
               <button
                 onClick={() => setPopover(popover === 'rect' ? null : 'rect')}
                 title={t('cornerRadius')}
-                className={cn(chromeTextClass, 'p-2 sm:p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'rect' && 'bg-black/10 dark:bg-white/15')}
+                className={cn(chromeTextClass, 'p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors', popover === 'rect' && 'bg-black/10 dark:bg-white/15')}
               >
                 <div
-                  className="w-5 h-5 sm:w-6 sm:h-6 border-[2.5px] border-current"
+                  className="w-6 h-6 border-[2.5px] border-current"
                   style={{ borderRadius: `${rectRadius * 50}%` }}
                 />
               </button>
@@ -1430,9 +1511,9 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
                   setTextDraft({ pos: { x: s.x, y: s.y }, id: s.id });
                 }}
                 title={t('editText')}
-                className={cn(chromeTextClass, 'p-2 sm:p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors')}
+                className={cn(chromeTextClass, 'p-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors')}
               >
-                <Type className="w-5 h-5 sm:w-6 sm:h-6" />
+                <Type className="w-6 h-6" />
               </button>
             )}
           </div>
