@@ -842,31 +842,24 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           -webkit-font-feature-settings: normal;
         }
         
-        /* Smooth fullscreen transition styles */
+        /* Fullscreen transition styles: NO layout-animating transitions.
+           Animating height/flex/padding/justify-content/line-height forces a
+           full re-flow of every ayah line on each animation frame — measured
+           50-125ms/frame on Android WebView. The toggle now switches layout
+           instantly; the chrome overlays (transform/opacity only) provide
+           the perceived motion. */
         .tartel-page-transition {
-          transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                      justify-content 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-          will-change: height, justify-content;
+          transition: none;
         }
         
         .tartel-content-wrapper {
-          transition: flex 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                      justify-content 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                      padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-          will-change: flex, justify-content, padding;
+          transition: none;
           /* Establish a container so the surah header (cqw units below)
              scales with the PAGE width (incl. side padding) instead of the
              viewport — it follows the same width as the ayah lines. */
           container-type: inline-size;
         }
         
-        /* While transitioning, ensure smooth line-height changes */
-        .tartel-transitioning .line-content,
-        .tartel-transitioning .surah-header-container,
-        .tartel-transitioning .bismillah-line {
-          transition: line-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
         .line-container {
           display: block;
           width: 100%;

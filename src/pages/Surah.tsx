@@ -1,7 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, BookText, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat, Sun, Moon, PenLine, Layers } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { surahs } from '@/data/surahs';
 import { Button } from '@/components/ui/button';
 import { TopBar } from '@/components/quran/TopBar';
@@ -387,21 +387,24 @@ const Surah = () => {
     annotatedPages.has(currentPageNum) ||
     (viewMode === 'double' && !isMobile && annotatedPages.has(secondPageNum));
 
-  // Debug logging for images
-  console.log('=== Page Debug Info ===');
-  console.log('Current Page Number:', currentPageNum);
-  console.log('View Mode:', viewMode);
-  console.log('Is RTL:', isRTL);
-  console.log('Is Mobile:', isMobile);
-  
-  // Only show double page info when in double page mode
-  if (viewMode === 'double' && !isMobile) {
-    console.log('Left Page Number:', leftPageNum);
-    console.log('Right Page Number:', rightPageNum);
-    console.log('Left Page Image:', leftPageNum > 0 ? `${getMushafPath()}/${getPageImageFilename(leftPageNum)}` : 'N/A');
-    console.log('Right Page Image:', rightPageNum > 0 ? `${getMushafPath()}/${getPageImageFilename(rightPageNum)}` : 'N/A');
-  } else {
-    console.log('Single Page Mode - Showing:', `${getMushafPath()}/${getPageImageFilename(currentPageNum)}`);
+  // Debug logging for images (dev only — on Android every console.* is
+  // bridged to logcat on the main thread and costs real time mid-animation)
+  if (import.meta.env.DEV) {
+    console.log('=== Page Debug Info ===');
+    console.log('Current Page Number:', currentPageNum);
+    console.log('View Mode:', viewMode);
+    console.log('Is RTL:', isRTL);
+    console.log('Is Mobile:', isMobile);
+
+    // Only show double page info when in double page mode
+    if (viewMode === 'double' && !isMobile) {
+      console.log('Left Page Number:', leftPageNum);
+      console.log('Right Page Number:', rightPageNum);
+      console.log('Left Page Image:', leftPageNum > 0 ? `${getMushafPath()}/${getPageImageFilename(leftPageNum)}` : 'N/A');
+      console.log('Right Page Image:', rightPageNum > 0 ? `${getMushafPath()}/${getPageImageFilename(rightPageNum)}` : 'N/A');
+    } else {
+      console.log('Single Page Mode - Showing:', `${getMushafPath()}/${getPageImageFilename(currentPageNum)}`);
+    }
   }
 
   const currentSurah = surahs.find(s => s.id === currentSurahId) || surahs[0];
@@ -732,21 +735,19 @@ const Surah = () => {
         }
       }}
     >
-      {/* Enhanced Islamic Top Header - smooth slide transition */}
-      <motion.div
-        initial={false}
-        animate={{
-          y: isFullscreen ? '-100%' : '0%',
-          opacity: isFullscreen ? 0 : 1,
-        }}
-        transition={{
-          type: 'spring',
-          stiffness: 280,
-          damping: 28,
-          mass: 0.8,
-          opacity: { duration: 0.2, ease: 'easeOut' },
-        }}
-        className={cn("z-50", isFullscreen && "pointer-events-none")}
+      {/* Enhanced Islamic Top Header - smooth slide transition.
+          CSS-class driven (NOT framer-motion): transform/opacity transitions
+          run on the compositor with zero per-frame JS. Framer springs run a
+          JS requestAnimationFrame loop on the main thread — with several of
+          them animating at once during the fullscreen toggle this was
+          measurable jank on Android. */}
+      <div
+        className={cn(
+          "z-50 transition-[opacity,transform] duration-300 ease-out",
+          isFullscreen
+            ? "opacity-0 -translate-y-full pointer-events-none"
+            : "opacity-100 translate-y-0"
+        )}
       >
       <TopBar
         theme={chromeTheme}
@@ -780,7 +781,7 @@ const Surah = () => {
           setConfigOverlayType('navigation');
         }}
       />
-      </motion.div>
+      </div>
 
       {/* Main Content Area - Single instance with animated container for smooth fullscreen transition */}
       
@@ -821,23 +822,17 @@ const Surah = () => {
         </div>
       </div>
 
-      {/* Page Display Container - Always rendered, animates between normal and fullscreen */}
-      <motion.div
-        initial={false}
-        animate={{
-          scale: 1,
-          opacity: 1,
-        }}
-        transition={{
-          type: 'spring',
-          stiffness: 280,
-          damping: 28,
-          mass: 0.8,
-        }}
+      {/* Page Display Container - Always rendered, switches between normal and
+          fullscreen instantly. Deliberately NO layout-animating CSS transition
+          here: animating padding/position/max-height forces a full relayout of
+          the mushaf image subtree on EVERY animation frame, which measured
+          50-125ms/frame on mid-range Android (WebView) and made the toggle
+          feel heavy. The perceived motion comes from the header/footer chrome
+          overlays, which only animate compositor-friendly transform/opacity. */}
+      <div
         className={cn(
           "flex-1 flex items-center justify-center overflow-hidden",
           isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
-          "fullscreen-container-transition",
           isFullscreen && "absolute inset-0 z-[60]",
           // Reserve space for fullscreen overlay header/footer so pages
           // start AFTER the header, not beneath it. NOTE: vertical padding
@@ -851,8 +846,8 @@ const Surah = () => {
           isFullscreen && "box-border"
         )}
         style={{
-          // Smooth CSS transition for layout properties
-          transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          // No transition: layout properties (position/padding) must switch
+          // in a single frame — see the comment above the container.
           position: isFullscreen ? 'absolute' : 'relative',
           inset: isFullscreen ? 0 : 'auto',
           zIndex: isFullscreen ? 60 : 'auto',
@@ -984,7 +979,7 @@ const Surah = () => {
             hasAyahTimings={hasAyahTimings}
           />
         )}
-      </motion.div>
+      </div>
 
       {/* Fullscreen Footer - Quick Action Buttons — CSS-class driven (NOT framer-motion).
           No background: the page shows through with no separating border. */}
@@ -1267,22 +1262,16 @@ const Surah = () => {
         </div>
       )}
 
-      {/* Audio Progress Bar - between page and controls */}
+      {/* Audio Progress Bar - between page and controls.
+          CSS-class driven (NOT framer-motion) — see the TopBar note above. */}
       {!configOverlayType && (
-      <motion.div
-        initial={false}
-        animate={{
-          y: isFullscreen || !currentPlayingAyah ? '100%' : '0%',
-          opacity: isFullscreen || !currentPlayingAyah ? 0 : 1,
-        }}
-        transition={{
-          type: 'spring',
-          stiffness: 280,
-          damping: 28,
-          mass: 0.8,
-          opacity: { duration: 0.2, ease: 'easeOut' },
-        }}
-        className={cn("z-[100]", (isFullscreen || !currentPlayingAyah) && "pointer-events-none")}
+      <div
+        className={cn(
+          "z-[100] transition-[opacity,transform] duration-300 ease-out",
+          isFullscreen || !currentPlayingAyah
+            ? "opacity-0 translate-y-full pointer-events-none"
+            : "opacity-100 translate-y-0"
+        )}
       >
         <AudioProgressBar
             theme={chromeTheme}
@@ -1359,25 +1348,14 @@ const Surah = () => {
             wasPlayingBeforeDrag.current = false;
           }}
         />
-        </motion.div>
+        </div>
       )}
 
-      {/* Combined Audio & Navigation Bar - smooth slide transition */}
-      <motion.div
-        initial={false}
-        animate={{
-          y: isFullscreen ? '100%' : '0%',
-          opacity: isFullscreen ? 0 : 1,
-        }}
-        transition={{
-          type: 'spring',
-          stiffness: 280,
-          damping: 28,
-          mass: 0.8,
-          opacity: { duration: 0.2, ease: 'easeOut' },
-        }}
+      {/* Combined Audio & Navigation Bar - smooth slide transition.
+          CSS-class driven (NOT framer-motion) — see the TopBar note above. */}
+      <div
         className={cn(
-          "w-full z-50",
+          "w-full z-50 transition-[opacity,transform] duration-300 ease-out",
           chromeTheme === 'glass'
             ? isDarkMode
               ? "bg-black/40 backdrop-blur-xl border-t border-white/10"
@@ -1385,7 +1363,9 @@ const Surah = () => {
             : isDarkMode
               ? "bg-emerald-950"
               : "bg-gradient-to-t from-emerald-800 to-emerald-600",
-          isFullscreen && "pointer-events-none"
+          isFullscreen
+            ? "opacity-0 translate-y-full pointer-events-none"
+            : "opacity-100 translate-y-0"
         )}
       >
         <div className="w-full max-w-[1600px] mx-auto rounded-t-2xl">
@@ -1482,7 +1462,7 @@ const Surah = () => {
         onViewModeToggle={() => setViewMode(viewMode === 'single' ? 'double' : 'single')}
       />
         </div>
-      </motion.div>
+      </div>
 
       {/* Search/Navigation Dialog */}
       <NavigationDialog

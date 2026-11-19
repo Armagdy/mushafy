@@ -64,13 +64,16 @@ export function PlayBar({
   );
   const chipTextClass = isGlassLight ? "text-emerald-800" : "text-[#F2E3BB]";
   
-  // Debug logging for props
-  console.log('[PlayBar] 🎵 PlayBar props:');
-  console.log('[PlayBar]    - audioSource:', audioSource);
-  console.log('[PlayBar]    - hasAyahTimings:', hasAyahTimings);
-  console.log('[PlayBar]    - selectedMp3QuranReciter:', selectedMp3QuranReciter?.name, 'ID:', selectedMp3QuranReciter?.id);
-  console.log('[PlayBar]    - currentSurahName:', currentSurahName);
-  console.log('[PlayBar]    - currentPlayingAyah:', currentPlayingAyah);
+  // Debug logging for props (dev only — see vite.config.ts: console.log is
+  // stripped from production builds, but avoid even building the strings here)
+  if (import.meta.env.DEV) {
+    console.log('[PlayBar] 🎵 PlayBar props:');
+    console.log('[PlayBar]    - audioSource:', audioSource);
+    console.log('[PlayBar]    - hasAyahTimings:', hasAyahTimings);
+    console.log('[PlayBar]    - selectedMp3QuranReciter:', selectedMp3QuranReciter?.name, 'ID:', selectedMp3QuranReciter?.id);
+    console.log('[PlayBar]    - currentSurahName:', currentSurahName);
+    console.log('[PlayBar]    - currentPlayingAyah:', currentPlayingAyah);
+  }
 
   // Clean reciter name by removing style indicators
   const cleanReciterName = (name: string): string => {

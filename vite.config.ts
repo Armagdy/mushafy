@@ -76,6 +76,15 @@ export default defineConfig(({ mode }) => ({
     },
   },
   base: process.env.VITE_BASE_PATH || "/",
+  esbuild: mode === "production" ? {
+    // Production: strip console.log/info/debug (warn/error are kept).
+    // On Android every console.* from the WebView is bridged to logcat on the
+    // main thread — dozens fire during a single fullscreen toggle, and each
+    // one costs real frame time. Pure-annotated calls in statement position
+    // are removed by the minifier.
+    pure: ["console.log", "console.debug", "console.info"],
+    drop: ["debugger"],
+  } : undefined,
   plugins: [
     react(), 
     mode === "development" && componentTagger(),

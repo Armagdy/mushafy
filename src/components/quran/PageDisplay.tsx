@@ -168,7 +168,7 @@ export function PageDisplay({
           currentPlayingAyah={currentPlayingAyah}
           mushafType={mushafType as 'tarteel' | 'tajweed'}
           isFullscreen={isFullscreen}
-          className={`relative max-w-full w-auto h-auto mx-auto cursor-pointer transition-all duration-300 ease-out ${imageMaxHeight}`}
+          className={`relative max-w-full w-auto h-auto mx-auto cursor-pointer ${imageMaxHeight}`}
         />
       );
     }
@@ -184,7 +184,7 @@ export function PageDisplay({
         <CachedImage
           src={`${getMushafPath()}/${getPageImageFilename(pageNum)}`}
           alt={`${t('page')} ${pageNum}`}
-          className={`relative max-w-full w-auto h-auto object-contain mx-auto cursor-pointer transition-all duration-300 ease-out ${imageMaxHeight}`}
+          className={`relative max-w-full w-auto h-auto object-contain mx-auto cursor-pointer ${imageMaxHeight}`}
           loading="lazy"
           cacheCategory={cacheCategory}
           onClick={(e) => {

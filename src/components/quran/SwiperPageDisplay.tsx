@@ -477,7 +477,10 @@ export function SwiperPageDisplay({
               isFullscreenDarkMode={isFullscreenDarkMode}
               fillReserves={fillReserves}
               className={cn(
-                "max-w-full w-auto h-auto mx-auto cursor-pointer transition-all duration-300 ease-out",
+                // NO transition-all: max-height/gutters change instantly on
+                // fullscreen toggle. Animating layout properties re-flows the
+                // whole text page every frame (heavy jank on Android WebView).
+                "max-w-full w-auto h-auto mx-auto cursor-pointer",
                 imageMaxHeight
               )}
             />
@@ -512,7 +515,10 @@ export function SwiperPageDisplay({
               src={`${getMushafPath()}/${getPageImageFilename(pageNum)}`}
               alt={`${t('page')} ${pageNum}`}
               className={cn(
-                "block max-w-full w-auto h-auto object-contain cursor-pointer transition-all duration-300 ease-out",
+                // NO transition-all: max-height changes instantly on fullscreen
+                // toggle — animating it re-layouts/re-rasterizes this large
+                // mushaf image every frame (57-125ms/frame measured on Android).
+                "block max-w-full w-auto h-auto object-contain cursor-pointer",
                 imageMaxHeight,
                 isFullscreenDarkMode && "invert sepia-[0.2] brightness-[0.85]"
               )}

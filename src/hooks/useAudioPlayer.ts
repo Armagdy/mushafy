@@ -3057,17 +3057,14 @@ export const useAudioPlayer = ({
     };
   }, [testMediaSession]);
   
-  // Set up native music controls event listeners (Android MediaSession)
-  useEffect(() => {
-    // Only run on native platforms
-    if (!Capacitor.isNativePlatform()) {
-      console.log('[QuranMediaSession] Skipping setup (not on native platform)');
-      return;
-    }
-    
-    console.log('[QuranMediaSession] Setting up native music controls listeners...');
-    
-    const handleMediaSessionEvent = (event: { action: string; data?: { position?: number } }) => {
+  // Latest media-session event handler, kept in a ref so the native listener
+  // can be registered exactly ONCE. The previous effect dependency array
+  // re-ran teardown + re-register through the Capacitor bridge on every
+  // render — including every fullscreen toggle — adding native bridge
+  // roundtrips in the middle of the transition animation (visible jank on
+  // Android: "[QuranMediaSession] Listeners removed" on every tap).
+  const handleMediaSessionEventRef = useRef<(event: { action: string; data?: { position?: number } }) => void>(() => {});
+  handleMediaSessionEventRef.current = (event: { action: string; data?: { position?: number } }) => {
       try {
         console.log('🎵 [QuranMediaSession] Event received:', JSON.stringify(event));
         
@@ -3162,24 +3159,27 @@ export const useAudioPlayer = ({
         console.error('Event that caused error:', event);
       }
     };
-    
-    // Set up listener
-    console.log('🔧 [QuranMediaSession] Setting up listener...');
-    
-    const listenerPromise = QuranMediaSession.addListener('mediaSessionEvent', handleMediaSessionEvent);
-    
-    listenerPromise.then((handle) => {
-      console.log('✅ [QuranMediaSession] Listener registered successfully');
+
+  // Set up native music controls event listeners (Android MediaSession) —
+  // registered ONCE (empty deps). The handler above always reads the latest
+  // state/callbacks through the ref, so no re-registration is ever needed.
+  useEffect(() => {
+    // Only run on native platforms
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+
+    QuranMediaSession.addListener('mediaSessionEvent', (event: { action: string; data?: { position?: number } }) => {
+      handleMediaSessionEventRef.current(event);
     }).catch((error) => {
       console.error('❌ [QuranMediaSession] Failed to register listener:', error);
     });
-    
+
     return () => {
       // Clean up listeners
       QuranMediaSession.removeAllListeners().catch(console.error);
-      console.log('[QuranMediaSession] Listeners removed');
     };
-  }, [audioElement, currentPlayingAyah, updateMediaSession, updateNativeMusicControls, getNextAyah, playAyah, stopAudio]);
+  }, []);
   
   return {
     // Audio state
