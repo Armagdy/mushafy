@@ -1,143 +1,222 @@
 import React, { useState, useEffect, useRef } from "react";
-import { HardDriveDownload, Search, WifiOff, StopCircle, CheckCircle2, XCircle, Pencil, BookOpen } from "lucide-react";
+import {
+  HardDriveDownload,
+  Search,
+  WifiOff,
+  StopCircle,
+  CheckCircle2,
+  XCircle,
+  Check,
+  X,
+  Image as ImageIcon,
+  Headphones,
+  BookOpen,
+  type LucideIcon,
+} from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { MushafType } from "@/contexts/MushafContext";
 import { useDownload } from "@/contexts/DownloadContext";
 import { cn } from "@/lib/utils";
 import { surahs } from "@/data/surahs";
-import { getAudioData } from "@/lib/quran-data-service";
 import { getMp3QuranReciters, type Mp3QuranReciter, type Mp3QuranMoshaf } from "@/lib/mp3quran-service";
 import { useNetwork } from "@/hooks/useNetwork";
 import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
 import { useTafseer, type TafseerInfo } from "@/hooks/useTafseer";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-interface Reciter {
-  folder: string;
-  name: string;
-  nameAr: string;
-  baseUrl: string;
-  reading: string;
-  readingAr?: string;
-  style: string;
-  quality: string;
+type DownloadTab = 'pages' | 'mp3quran' | 'tafseer';
+
+/**
+ * Uncontrolled search input with 50ms polling.
+ * Polling bypasses a React state desync on Android where IME composition
+ * (especially with Arabic keyboards) does not fire onChange reliably.
+ */
+function SearchField({ placeholder, onValueChange }: { placeholder: string; onValueChange: (value: string) => void }) {
+  const [value, setValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+  const onValueChangeRef = useRef(onValueChange);
+  onValueChangeRef.current = onValueChange;
+
+  useEffect(() => {
+    const check = () => {
+      const el = inputRef.current;
+      if (el && el.value !== value) {
+        setValue(el.value);
+      }
+    };
+    check();
+    const intervalId = setInterval(check, 50);
+    return () => clearInterval(intervalId);
+  }, [value]);
+
+  useEffect(() => {
+    onValueChangeRef.current(value);
+  }, [value]);
+
+  const handleClear = () => {
+    if (inputRef.current) inputRef.current.value = '';
+    setValue('');
+  };
+
+  return (
+    <div className="relative">
+      <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 dark:text-emerald-400 pointer-events-none" />
+      <input
+        ref={inputRef}
+        type="text"
+        placeholder={placeholder}
+        aria-label={placeholder}
+        className={cn(
+          'w-full min-h-[44px] rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950 ps-10 pe-3 text-start text-emerald-900 dark:text-emerald-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
+          textSizeClasses.text
+        )}
+      />
+      {value && (
+        <button
+          onClick={handleClear}
+          aria-label={placeholder}
+          className="absolute end-2 top-1/2 -translate-y-1/2 flex items-center justify-center w-7 h-7 rounded-full text-emerald-500 dark:text-emerald-400 active:bg-emerald-100 dark:active:bg-emerald-900 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
 }
 
-interface UnifiedReciter {
-  id: string;
-  name: string;
-  nameAr: string;
-  source: 'everyayah' | 'mp3quran';
-  // EveryAyah specific
-  folder?: string;
-  quality?: string;
-  style?: string;
-  reading?: string;
-  readingAr?: string;
-  // MP3Quran specific
-  mp3QuranId?: number;
-  moshaf?: Mp3QuranMoshaf[];
+/** Section header: icon + label, matching the Settings/Navigation view pattern. */
+function SectionLabel({ icon: Icon, children }: { icon: LucideIcon; children: React.ReactNode }) {
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+  return (
+    <div className="flex items-center gap-2 sm:gap-3">
+      <Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+      <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
+        {children}
+      </span>
+    </div>
+  );
+}
+
+/** From/To surah dropdowns (44px+ touch targets) shared by the audio and tafseer branches. */
+function SurahRangeSelect({
+  from,
+  to,
+  onFromChange,
+  onToChange,
+}: {
+  from: number;
+  to: number;
+  onFromChange: (surahId: number) => void;
+  onToChange: (surahId: number) => void;
+}) {
+  const { t, isRTL } = useLanguage();
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+
+  const surahLabel = (surah: { id: number; name: string; englishName: string }) =>
+    `${surah.id}. ${isRTL ? surah.name : surah.englishName}`;
+
+  const itemClass = cn(
+    "py-3 focus:bg-emerald-100 dark:focus:bg-emerald-900/40 focus:text-emerald-900 dark:focus:text-emerald-100",
+    textSizeClasses.text
+  );
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <div className="flex flex-col gap-1 min-w-0">
+        <label className={cn("text-emerald-700 dark:text-emerald-300 font-medium", textSizeClasses.label)}>
+          {t('fromSurah')}
+        </label>
+        <Select value={String(from)} onValueChange={(v) => onFromChange(parseInt(v, 10))}>
+          <SelectTrigger
+            aria-label={t('fromSurah')}
+            className={cn(
+              "min-h-[48px] h-auto rounded-lg border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950 focus:ring-emerald-500",
+              textSizeClasses.text
+            )}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="max-h-[60vh] bg-[#FBF9F4] dark:bg-emerald-950">
+            {surahs.map((surah) => (
+              <SelectItem key={surah.id} value={String(surah.id)} className={itemClass}>
+                {surahLabel(surah)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex flex-col gap-1 min-w-0">
+        <label className={cn("text-emerald-700 dark:text-emerald-300 font-medium", textSizeClasses.label)}>
+          {t('toSurah')}
+        </label>
+        <Select value={String(to)} onValueChange={(v) => onToChange(parseInt(v, 10))}>
+          <SelectTrigger
+            aria-label={t('toSurah')}
+            className={cn(
+              "min-h-[48px] h-auto rounded-lg border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950 focus:ring-emerald-500",
+              textSizeClasses.text
+            )}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="max-h-[60vh] bg-[#FBF9F4] dark:bg-emerald-950">
+            {surahs.filter((surah) => surah.id >= from).map((surah) => (
+              <SelectItem key={surah.id} value={String(surah.id)} className={itemClass}>
+                {surahLabel(surah)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
 }
 
 export function Download() {
-  const { t, isRTL, language } = useLanguage();
+  const { t, language } = useLanguage();
   const { isOnline } = useNetwork();
   const { toast } = useToast();
   const { dialogTextSize } = useDialogTextSize();
   const { activeDownload, startDownload, cancelDownload, clearDownload } = useDownload();
   const { tafseers } = useTafseer();
-  
+
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
-  
+
   // Download state
-  const [downloadType, setDownloadType] = useState<'pages' | 'everyayah' | 'mp3quran' | 'tafseer'>('pages');
+  const [downloadType, setDownloadType] = useState<DownloadTab>('pages');
   const [downloadMushafType, setDownloadMushafType] = useState<MushafType>('mwdoa');
   const [downloadFromPage, setDownloadFromPage] = useState(1);
   const [downloadToPage, setDownloadToPage] = useState(604);
   const [downloadFromSurah, setDownloadFromSurah] = useState(1);
   const [downloadToSurah, setDownloadToSurah] = useState(114);
-  const [downloadFromAyah, setDownloadFromAyah] = useState(1);
-  const [downloadToAyah, setDownloadToAyah] = useState(7);
-  
+
   // Use context state for download progress
   const isDownloading = activeDownload?.status === 'downloading';
   const downloadProgress = activeDownload?.progress || { current: 0, total: 0 };
-  
-  // Reciter state for downloads
-  const [everyAyahReciters, setEveryAyahReciters] = useState<Reciter[]>([]);
+  const downloadPercent =
+    downloadProgress.total > 0
+      ? Math.round((downloadProgress.current / downloadProgress.total) * 100)
+      : null;
+
+  // Reciter state (MP3Quran)
   const [mp3QuranReciters, setMp3QuranReciters] = useState<Mp3QuranReciter[]>([]);
   const [mp3QuranRecitersAr, setMp3QuranRecitersAr] = useState<Mp3QuranReciter[]>([]);
-  const [selectedMp3QuranReciter, setSelectedMp3QuranReciter] = useState<number | null>(null);
+  const [selectedReciter, setSelectedReciter] = useState<Mp3QuranReciter | null>(null);
   const [selectedMoshaf, setSelectedMoshaf] = useState<Mp3QuranMoshaf | null>(null);
-  
-  // Tafseer state for downloads
-  const [selectedDownloadTafseer, setSelectedDownloadTafseer] = useState<TafseerInfo | null>(null);
-  const [showTafseerScroll, setShowTafseerScroll] = useState(true);
-  const [tafseerSearch, setTafseerSearch] = useState('');
-  const tafseerSearchInputRef = useRef<HTMLInputElement>(null);
-  const selectedTafseerRef = useRef<HTMLButtonElement>(null);
-  
-  // Unified reciter selection
-  const [selectedUnifiedReciter, setSelectedUnifiedReciter] = useState<UnifiedReciter | null>(null);
-  const [showReciterScroll, setShowReciterScroll] = useState(true);
-  const [showDownloadTypeScroll, setShowDownloadTypeScroll] = useState(false);
-  const [showMushafTypeScroll, setShowMushafTypeScroll] = useState(false);
-  
-  // EveryAyah: Reading, Style, Quality selection
-  const [selectedReading, setSelectedReading] = useState<string>('');
-  const [selectedStyle, setSelectedStyle] = useState<string>('');
-  const [selectedQuality, setSelectedQuality] = useState<string>('');
-  
-  // Unified search state
   const [reciterSearch, setReciterSearch] = useState('');
-  const reciterSearchInputRef = useRef<HTMLInputElement>(null);
-  
-  // Track previous download status to detect transitions
+
+  // Tafseer state
+  const [selectedTafseer, setSelectedTafseer] = useState<TafseerInfo | null>(null);
+  const [tafseerSearch, setTafseerSearch] = useState('');
+
+  // Track previous download status to detect transitions (skip initial mount)
   const prevDownloadStatusRef = useRef<string | null>(null);
-  
-  // 50ms polling for search input (fixes Android Arabic keyboard IME issues)
-  useEffect(() => {
-    const checkSearchInput = () => {
-      const inputEl = reciterSearchInputRef.current;
-      if (!inputEl) return;
-      
-      const currentValue = inputEl.value;
-      if (currentValue !== reciterSearch) {
-        setReciterSearch(currentValue);
-      }
-    };
-    
-    // Check immediately
-    checkSearchInput();
-    
-    // Poll every 50ms
-    const intervalId = setInterval(checkSearchInput, 50);
-    
-    return () => clearInterval(intervalId);
-  }, [reciterSearch]);
-  
-  // 50ms polling for tafseer search input (fixes Android Arabic keyboard IME issues)
-  useEffect(() => {
-    const checkTafseerSearchInput = () => {
-      const inputEl = tafseerSearchInputRef.current;
-      if (!inputEl) return;
-      
-      const currentValue = inputEl.value;
-      if (currentValue !== tafseerSearch) {
-        setTafseerSearch(currentValue);
-      }
-    };
-    
-    // Check immediately
-    checkTafseerSearchInput();
-    
-    // Poll every 50ms
-    const intervalId = setInterval(checkTafseerSearchInput, 50);
-    
-    return () => clearInterval(intervalId);
-  }, [tafseerSearch]);
-  
+
   // Normalize Arabic text for search
   const normalizeArabic = (text: string): string => {
     return text
@@ -148,28 +227,26 @@ export function Download() {
       .replace(/\u0640/g, '')
       .toLowerCase();
   };
-  
+
   // Filter function for Arabic/English text
-  const matchesSearch = (text: string, search: string): boolean => {
+  const matchesSearch = React.useCallback((text: string, search: string): boolean => {
     if (!search.trim()) return true;
-    const normalizedText = normalizeArabic(text);
-    const normalizedSearch = normalizeArabic(search);
-    return normalizedText.includes(normalizedSearch);
-  };
-  
+    return normalizeArabic(text).includes(normalizeArabic(search));
+  }, []);
+
   // Translate common moshaf name patterns to Arabic
   const translateMoshafName = (name: string): string => {
     if (language !== 'ar') return name;
-    
+
     let translated = name;
-    
+
     // Translate reading types
     translated = translated.replace(/Rewayat Hafs A'n Assem/gi, 'رواية حفص عن عاصم');
     translated = translated.replace(/Hafs A'n Assem/gi, 'حفص عن عاصم');
     translated = translated.replace(/Rewayat Warsh/gi, 'رواية ورش');
     translated = translated.replace(/Warsh/gi, 'ورش');
     translated = translated.replace(/Rewayat/gi, 'رواية');
-    
+
     // Translate style types
     translated = translated.replace(/Murattal/gi, 'مرتل');
     translated = translated.replace(/Mujawwad/gi, 'مجود');
@@ -179,170 +256,98 @@ export function Download() {
     translated = translated.replace(/Mo'lim/gi, 'مصحف المعلم');
     translated = translated.replace(/Teacher Edition/gi, 'مصحف المعلم');
     translated = translated.replace(/Teacher/gi, 'معلم');
-    
+
     return translated;
   };
-  
-  // Get Arabic name for MP3Quran reciter
-  const getMp3QuranReciterName = (reciter: Mp3QuranReciter) => {
-    const arReciter = mp3QuranRecitersAr.find(r => r.id === reciter.id);
-    return arReciter ? arReciter.name : reciter.name;
+
+  // Localized reciter name (Arabic names come from the Arabic API response)
+  const getReciterName = React.useCallback(
+    (reciter: Mp3QuranReciter): string => {
+      if (language !== 'ar') return reciter.name;
+      const arReciter = mp3QuranRecitersAr.find((r) => r.id === reciter.id);
+      return arReciter?.name || reciter.name;
+    },
+    [language, mp3QuranRecitersAr]
+  );
+
+  // Localized moshaf name, translated and de-duplicated ("Murattal - Murattal" → "Murattal")
+  const getMoshafDisplayName = (moshaf: Mp3QuranMoshaf): string => {
+    let displayName = moshaf.name;
+    if (language === 'ar' && selectedReciter) {
+      const arReciter = mp3QuranRecitersAr.find((r) => r.id === selectedReciter.id);
+      const arMoshaf = arReciter?.moshaf?.find((m) => m.id === moshaf.id);
+      if (arMoshaf?.name) {
+        displayName = arMoshaf.name;
+      }
+    }
+    displayName = translateMoshafName(displayName);
+    const parts = displayName.split(' - ');
+    if (parts.length === 2 && parts[0].trim() === parts[1].trim()) {
+      displayName = parts[0].trim();
+    }
+    return displayName;
   };
-  
-  // Build unified reciter list (combining EveryAyah and MP3Quran)
-  const unifiedReciters = React.useMemo<UnifiedReciter[]>(() => {
-    const everyAyahUnified = everyAyahReciters.map((r) => ({
-      id: `everyayah-${r.folder}`,
-      name: r.name,
-      nameAr: r.nameAr,
-      source: 'everyayah' as const,
-      folder: r.folder,
-      quality: r.quality,
-      style: r.style,
-      reading: r.reading,
-      readingAr: r.readingAr,
-    }));
-    
-    const mp3QuranUnified = mp3QuranReciters.map((r) => {
-      const arReciter = mp3QuranRecitersAr.find(ar => ar.id === r.id);
-      return {
-        id: `mp3quran-${r.id}`,
-        name: r.name,
-        nameAr: r.nameAr || arReciter?.name || r.name,
-        source: 'mp3quran' as const,
-        mp3QuranId: r.id,
-        moshaf: r.moshaf,
-      };
-    });
-    
-    return [...everyAyahUnified, ...mp3QuranUnified];
-  }, [everyAyahReciters, mp3QuranReciters, mp3QuranRecitersAr]);
-  
-  // Filtered and sorted unified reciters
-  const filteredUnifiedReciters = React.useMemo(() => {
-    return unifiedReciters
-      .filter((reciter) => {
-        const name = language === 'ar' ? reciter.nameAr : reciter.name;
-        return matchesSearch(name, reciterSearch);
-      })
-      .sort((a, b) => {
-        // Sort by source first (MP3Quran before EveryAyah)
-        if (a.source !== b.source) {
-          return a.source === 'mp3quran' ? -1 : 1;
-        }
-        const nameA = language === 'ar' ? a.nameAr : a.name;
-        const nameB = language === 'ar' ? b.nameAr : b.name;
-        return nameA.localeCompare(nameB, language);
-      });
-  }, [unifiedReciters, reciterSearch, language]);
-  
+
+  // Filtered and sorted reciters
+  const filteredReciters = React.useMemo(() => {
+    return mp3QuranReciters
+      .filter((reciter) => matchesSearch(getReciterName(reciter), reciterSearch))
+      .sort((a, b) => getReciterName(a).localeCompare(getReciterName(b), language));
+  }, [mp3QuranReciters, reciterSearch, language, matchesSearch, getReciterName]);
+
+  // Filtered tafseers (name, author or book name)
+  const filteredTafseers = React.useMemo(() => {
+    return tafseers.filter(
+      (tafseer) =>
+        matchesSearch(tafseer.name, tafseerSearch) ||
+        matchesSearch(tafseer.author, tafseerSearch) ||
+        matchesSearch(tafseer.book_name, tafseerSearch)
+    );
+  }, [tafseers, tafseerSearch, matchesSearch]);
+
   // Determine if download button should be enabled
   const isDownloadEnabled = (() => {
     if (isDownloading) return false;
-    
-    if (downloadType === 'pages') {
-      return true; // Pages just need a range
-    } else if (downloadType === 'everyayah') {
-      // Need unified reciter selected, must be EveryAyah source, and must have reading/style/quality selected
-      return selectedUnifiedReciter !== null && 
-             selectedUnifiedReciter.source === 'everyayah' &&
-             selectedReading !== '' &&
-             selectedStyle !== '' &&
-             selectedQuality !== '';
-    } else if (downloadType === 'mp3quran') {
-      // Need unified reciter selected and it must be MP3Quran source
-      return selectedUnifiedReciter !== null && selectedUnifiedReciter.source === 'mp3quran' && selectedMoshaf !== null;
-    } else if (downloadType === 'tafseer') {
-      // Need tafseer selected
-      return selectedDownloadTafseer !== null;
-    }
+    if (downloadType === 'pages') return true;
+    if (downloadType === 'mp3quran') return selectedReciter !== null && selectedMoshaf !== null;
+    if (downloadType === 'tafseer') return selectedTafseer !== null;
     return false;
   })();
-  
-  // Load reciters when component mounts
+
+  // Load reciters on mount (English + Arabic names) and preselect the first one
   useEffect(() => {
-    // Load ALL EveryAyah reciters (including all variations)
-    fetch(`/assets/reciters.json`)
-      .then(response => response.json())
-      .then(data => {
-        // Filter for everyayah reciters only
-        const everyayahReciters = data.reciters.filter((r: any) => r.source === 'everyayah');
-        setEveryAyahReciters(everyayahReciters);
-      });
-    
-    // Load MP3Quran reciters (English and Arabic)
+    let cancelled = false;
+
     getMp3QuranReciters('en').then((data) => {
+      if (cancelled) return;
       setMp3QuranReciters(data);
-      if (data.length > 0 && !selectedMp3QuranReciter) {
-        setSelectedMp3QuranReciter(data[0].id);
-        if (data[0].moshaf && data[0].moshaf.length > 0) {
-          setSelectedMoshaf(data[0].moshaf[0]);
-        }
+      if (data.length > 0) {
+        setSelectedReciter(data[0]);
+        setSelectedMoshaf(data[0].moshaf?.[0] ?? null);
       }
     });
-    
+
     getMp3QuranReciters('ar').then((data) => {
-      setMp3QuranRecitersAr(data);
+      if (!cancelled) setMp3QuranRecitersAr(data);
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
-  
-  // Update moshaf when reciter changes
-  useEffect(() => {
-    if (selectedMp3QuranReciter) {
-      const reciter = mp3QuranReciters.find(r => r.id === selectedMp3QuranReciter);
-      if (reciter && reciter.moshaf && reciter.moshaf.length > 0) {
-        setSelectedMoshaf(reciter.moshaf[0]);
-      }
-    }
-  }, [selectedMp3QuranReciter, mp3QuranReciters]);
-  
-  // Sync unified reciter selection with source-specific state
-  useEffect(() => {
-    if (selectedUnifiedReciter) {
-      if (selectedUnifiedReciter.source === 'mp3quran' && selectedUnifiedReciter.mp3QuranId) {
-        setSelectedMp3QuranReciter(selectedUnifiedReciter.mp3QuranId);
-        // Find the reciter and set the first moshaf
-        const reciter = mp3QuranReciters.find(r => r.id === selectedUnifiedReciter.mp3QuranId);
-        if (reciter && reciter.moshaf && reciter.moshaf.length > 0) {
-          setSelectedMoshaf(reciter.moshaf[0]);
-        }
-      }
-    }
-  }, [selectedUnifiedReciter, mp3QuranReciters]);
-  
-  // Update max ayahs when surah changes
-  useEffect(() => {
-    const surah = surahs.find(s => s.id === downloadFromSurah);
-    if (surah) {
-      setDownloadToAyah(surah.numberOfAyahs);
-    }
-  }, [downloadFromSurah]);
-  
-  // Reset reciter scroll when download type changes
-  useEffect(() => {
-    if (downloadType === 'everyayah' || downloadType === 'mp3quran') {
-      setShowReciterScroll(true);
-    }
-  }, [downloadType]);
-  
-  // Reset reading/style/quality when reciter changes
-  useEffect(() => {
-    setSelectedReading('');
-    setSelectedStyle('');
-    setSelectedQuality('');
-  }, [selectedUnifiedReciter]);
-  
+
   // Initialize the ref on mount with current status (don't show toast for existing state)
   useEffect(() => {
     prevDownloadStatusRef.current = activeDownload?.status || null;
-  }, []); // Run only once on mount
-  
+    // Run only once on mount — activeDownload is read just for initialization
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Show toast when download status transitions to completed/error (not on mount)
   useEffect(() => {
     const currentStatus = activeDownload?.status || null;
     const prevStatus = prevDownloadStatusRef.current;
-    
-    // Only show toast when status CHANGES to completed or error (skip initial mount)
+
     if (prevStatus !== null && currentStatus !== prevStatus) {
       if (currentStatus === 'completed') {
         toast({
@@ -357,15 +362,38 @@ export function Download() {
         });
       }
     }
-    
-    // Update the ref for next comparison
+
     prevDownloadStatusRef.current = currentStatus;
   }, [activeDownload?.status, activeDownload?.error, toast, t]);
-  
-  const handleCancelDownload = () => {
-    cancelDownload();
+
+  // Selecting a reciter resets the moshaf to its first option
+  const handleSelectReciter = (reciter: Mp3QuranReciter) => {
+    setSelectedReciter(reciter);
+    setSelectedMoshaf(reciter.moshaf?.[0] ?? null);
   };
-  
+
+  // Keep the "to" surah within the selected range
+  const handleFromSurahChange = (surahId: number) => {
+    setDownloadFromSurah(surahId);
+    if (downloadToSurah < surahId) {
+      setDownloadToSurah(surahId);
+    }
+  };
+
+  // Keep the "to" page within the selected range
+  const handleFromPageChange = (raw: string) => {
+    const page = Math.min(604, Math.max(1, parseInt(raw, 10) || 1));
+    setDownloadFromPage(page);
+    if (downloadToPage < page) {
+      setDownloadToPage(page);
+    }
+  };
+
+  const handleToPageChange = (raw: string) => {
+    const page = Math.min(604, Math.max(1, parseInt(raw, 10) || 604));
+    setDownloadToPage(page);
+  };
+
   const handleDownload = async () => {
     // Check network connectivity before downloading
     if (!isOnline) {
@@ -376,8 +404,7 @@ export function Download() {
       });
       return;
     }
-    
-    // Prepare download job based on type
+
     if (downloadType === 'pages') {
       await startDownload({
         type: 'pages',
@@ -387,32 +414,8 @@ export function Download() {
           toPage: downloadToPage,
         },
       });
-    } else if (downloadType === 'everyayah') {
-      if (!selectedUnifiedReciter || selectedUnifiedReciter.source !== 'everyayah') return;
-      
-      // Find the exact reciter matching reading/style/quality selection
-      const reciter = everyAyahReciters.find(r => 
-        r.nameAr === selectedUnifiedReciter.nameAr &&
-        r.reading === selectedReading &&
-        r.style === selectedStyle &&
-        r.quality === selectedQuality
-      );
-      if (!reciter) return;
-      
-      await startDownload({
-        type: 'everyayah',
-        params: {
-          reciterFolder: reciter.folder,
-          reciterName: reciter.name,
-          reciterBaseUrl: reciter.baseUrl,
-          surahNum: downloadFromSurah,
-          fromAyah: downloadFromAyah,
-          toAyah: downloadToAyah,
-        },
-      });
     } else if (downloadType === 'mp3quran') {
-      if (!selectedMoshaf || !selectedUnifiedReciter || selectedUnifiedReciter.source !== 'mp3quran') return;
-      
+      if (!selectedMoshaf || !selectedReciter) return;
       await startDownload({
         type: 'mp3quran',
         params: {
@@ -422,13 +425,12 @@ export function Download() {
         },
       });
     } else if (downloadType === 'tafseer') {
-      if (!selectedDownloadTafseer) return;
-      
+      if (!selectedTafseer) return;
       await startDownload({
         type: 'tafseer',
         params: {
-          tafseerId: selectedDownloadTafseer.id,
-          tafseerName: selectedDownloadTafseer.name,
+          tafseerId: selectedTafseer.id,
+          tafseerName: selectedTafseer.name,
           fromSurah: downloadFromSurah,
           toSurah: downloadToSurah,
         },
@@ -436,14 +438,41 @@ export function Download() {
     }
   };
 
+  const downloadTabs: { value: DownloadTab; label: string; icon: LucideIcon }[] = [
+    { value: 'pages', label: t('pages'), icon: ImageIcon },
+    { value: 'mp3quran', label: t('recitations'), icon: Headphones },
+    { value: 'tafseer', label: t('tafseer'), icon: BookOpen },
+  ];
+
+  const mushafOptions: { value: MushafType; label: string; image: string }[] = [
+    { value: 'mwdoa', label: t('mushafMwdoa'), image: '/assets/mushaf_snippets/mwdoaa.jpg' },
+    { value: 'tashel', label: t('mushafTashel'), image: '/assets/mushaf_snippets/tayseer.jpg' },
+    { value: 'madinah', label: t('mushafMadinah'), image: '/assets/mushaf_snippets/madinah.jpg' },
+    { value: 'tarteel', label: t('mushafTarteel'), image: '/assets/mushaf_snippets/tarteel.jpg' },
+    { value: 'tajweed', label: t('mushafTajweed'), image: '/assets/mushaf_snippets/tajweed.jpg' },
+  ];
+
+  const pageInputClass = cn(
+    "w-full min-h-[48px] rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950 px-3 py-2 text-start text-emerald-900 dark:text-emerald-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500",
+    textSizeClasses.text
+  );
+
+  const listClass =
+    "overflow-y-auto border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent max-h-[calc(100vh-30rem)] md:max-h-[calc(100vh-26rem)] min-h-[8rem]";
+
+  const isTerminalStatus =
+    activeDownload?.status === 'completed' ||
+    activeDownload?.status === 'cancelled' ||
+    activeDownload?.status === 'error';
+
   return (
     <div className="space-y-4">
       {/* Network Status Warning */}
       {!isOnline && (
         <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg">
           <WifiOff className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm md:text-base font-medium text-amber-800 dark:text-amber-300">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className={cn("font-medium text-amber-800 dark:text-amber-300", textSizeClasses.label)}>
               {t('networkOffline')}
             </span>
             <span className="text-xs md:text-sm text-amber-700 dark:text-amber-400">
@@ -452,910 +481,268 @@ export function Download() {
           </div>
         </div>
       )}
-      
-      {/* Download Type Selection */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <HardDriveDownload className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-            {t('downloadType')}
-          </span>
-        </div>
-        {showDownloadTypeScroll ? (
-          <div className="flex flex-col gap-1 border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden bg-transparent">
+
+      {/* Download Type — segmented tabs */}
+      <div className="grid grid-cols-3 gap-2" role="tablist" aria-label={t('downloadType')}>
+        {downloadTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = downloadType === tab.value;
+          return (
             <button
-              onClick={() => {
-                setDownloadType('pages');
-                setShowDownloadTypeScroll(false);
-              }}
+              key={tab.value}
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setDownloadType(tab.value)}
+              disabled={isDownloading}
               className={cn(
-                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-right",
-                downloadType === 'pages' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                "flex flex-col items-center justify-center gap-1 min-h-[56px] px-2 py-2 rounded-lg border font-medium transition-all active:scale-[0.97] disabled:opacity-60",
+                isActive
+                  ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
+                  : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900",
                 textSizeClasses.text
               )}
             >
-              <span className="text-emerald-800 dark:text-emerald-200">
-                {t('downloadMushafPages')}
-              </span>
+              <Icon className="w-5 h-5 shrink-0" />
+              <span className="leading-tight text-center">{tab.label}</span>
             </button>
-            {/* Temporarily hidden - EveryAyah download option */}
-            {/*
-            <button
-              onClick={() => {
-                setDownloadType('everyayah');
-                setShowDownloadTypeScroll(false);
-              }}
-              className={cn(
-                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-right",
-                downloadType === 'everyayah' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                textSizeClasses.text
-              )}
-            >
-              <span className="text-emerald-800 dark:text-emerald-200">
-                {t('downloadEveryAyahAudio')}
-              </span>
-            </button>
-            */}
-            <button
-              onClick={() => {
-                setDownloadType('mp3quran');
-                setShowDownloadTypeScroll(false);
-              }}
-              className={cn(
-                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-right",
-                downloadType === 'mp3quran' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                textSizeClasses.text
-              )}
-            >
-              <span className="text-emerald-800 dark:text-emerald-200">
-                {t('downloadMp3QuranAudio')}
-              </span>
-            </button>
-            <button
-              onClick={() => {
-                setDownloadType('tafseer');
-                setShowDownloadTypeScroll(false);
-              }}
-              className={cn(
-                "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-right",
-                downloadType === 'tafseer' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                textSizeClasses.text
-              )}
-            >
-              <span className="text-emerald-800 dark:text-emerald-200">
-                {t('downloadTafseer')}
-              </span>
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowDownloadTypeScroll(true)}
-            className={cn(
-              "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-500/20 dark:bg-emerald-500/20 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors",
-              isRTL ? 'flex-row-reverse' : 'flex-row'
-            )}
-          >
-            <span className={cn("flex-1 text-emerald-800 dark:text-emerald-200 font-semibold text-right", textSizeClasses.text)}>
-              {downloadType === 'pages' && t('downloadMushafPages')}
-              {downloadType === 'everyayah' && t('downloadEveryAyahAudio')}
-              {downloadType === 'mp3quran' && t('downloadMp3QuranAudio')}
-              {downloadType === 'tafseer' && t('downloadTafseer')}
-            </span>
-            <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-          </button>
-        )}
+          );
+        })}
       </div>
-      
+
       {/* Pages Download Options */}
       {downloadType === 'pages' && (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-2">
-            <label className={cn("text-emerald-700 dark:text-emerald-300", textSizeClasses.label)}>{t('mushafType')}</label>
-            {showMushafTypeScroll ? (
-              <div className="flex flex-col gap-1 border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden bg-transparent max-h-72 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <SectionLabel icon={BookOpen}>{t('mushafType')}</SectionLabel>
+
+          {/* Mushaf cards — same picker as the Mushaf settings category */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+            {mushafOptions.map((option) => {
+              const isSelected = downloadMushafType === option.value;
+              return (
                 <button
-                  onClick={() => {
-                    setDownloadMushafType('tarteel');
-                    setShowMushafTypeScroll(false);
-                  }}
+                  key={option.value}
+                  onClick={() => setDownloadMushafType(option.value)}
+                  disabled={isDownloading}
                   className={cn(
-                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
-                    downloadMushafType === 'tarteel' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                    textSizeClasses.text
+                    "relative flex flex-col gap-2 p-2 rounded-lg border-2 transition-all duration-200 hover:shadow-lg active:scale-[0.97] overflow-hidden disabled:opacity-60",
+                    isSelected
+                      ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 shadow-md"
+                      : "border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 hover:border-emerald-400"
                   )}
                 >
-                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
-                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">1.</span>
-                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">
-                      {t('mushafTarteel')}
-                    </span>
+                  <div className="relative w-full aspect-[3/4] rounded overflow-hidden bg-emerald-50 dark:bg-emerald-900/20">
+                    <img
+                      src={option.image}
+                      alt={option.label}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    {isSelected && (
+                      <div className="absolute inset-0 bg-emerald-600/20 dark:bg-emerald-500/30 flex items-center justify-center">
+                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-emerald-600 dark:bg-emerald-500 flex items-center justify-center shadow-lg">
+                          <Check className="w-5 h-5 text-white" />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </button>
-                <button
-                  onClick={() => {
-                    setDownloadMushafType('tajweed');
-                    setShowMushafTypeScroll(false);
-                  }}
-                  className={cn(
-                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
-                    downloadMushafType === 'tajweed' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                  <div className={cn(
+                    "text-center font-medium px-1",
+                    isSelected
+                      ? "text-emerald-800 dark:text-emerald-200 font-semibold"
+                      : "text-emerald-700 dark:text-emerald-300",
                     textSizeClasses.text
-                  )}
-                >
-                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
-                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">2.</span>
-                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">
-                      {t('mushafTajweed')}
-                    </span>
+                  )}>
+                    {option.label}
                   </div>
                 </button>
-                <button
-                  onClick={() => {
-                    setDownloadMushafType('mwdoa');
-                    setShowMushafTypeScroll(false);
-                  }}
-                  className={cn(
-                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
-                    downloadMushafType === 'mwdoa' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                    textSizeClasses.text
-                  )}
-                >
-                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
-                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">3.</span>
-                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">
-                      {t('mushafMwdoa')}
-                    </span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    setDownloadMushafType('tashel');
-                    setShowMushafTypeScroll(false);
-                  }}
-                  className={cn(
-                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
-                    downloadMushafType === 'tashel' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                    textSizeClasses.text
-                  )}
-                >
-                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
-                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">4.</span>
-                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">
-                      {t('mushafTashel')}
-                    </span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => {
-                    setDownloadMushafType('madinah');
-                    setShowMushafTypeScroll(false);
-                  }}
-                  className={cn(
-                    "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
-                    downloadMushafType === 'madinah' && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                    textSizeClasses.text
-                  )}
-                >
-                  <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
-                    <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">5.</span>
-                    <span className="flex-1 text-emerald-800 dark:text-emerald-200">
-                      {t('mushafMadinah')}
-                    </span>
-                  </div>
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowMushafTypeScroll(true)}
-                className={cn(
-                  "w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-500/20 dark:bg-emerald-500/20 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors",
-                  isRTL ? 'flex-row-reverse' : 'flex-row',
-                  textSizeClasses.text
-                )}
-              >
-                <span className="flex-1 text-emerald-800 dark:text-emerald-200 font-semibold text-right">
-                  {downloadMushafType === 'mwdoa' && t('mushafMwdoa')}
-                  {downloadMushafType === 'tashel' && t('mushafTashel')}
-                  {downloadMushafType === 'madinah' && t('mushafMadinah')}
-                  {downloadMushafType === 'tarteel' && t('mushafTarteel')}
-                  {downloadMushafType === 'tajweed' && t('mushafTajweed')}
-                </span>
-                <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              </button>
-            )}
+              );
+            })}
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <label className={cn("text-emerald-700 dark:text-emerald-300 block mb-1", textSizeClasses.label)}>{t('fromPage')}</label>
+
+          {/* Page range */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label htmlFor="download-from-page" className={cn("text-emerald-700 dark:text-emerald-300 font-medium", textSizeClasses.label)}>
+                {t('fromPage')}
+              </label>
               <input
+                id="download-from-page"
                 type="number"
+                inputMode="numeric"
                 min={1}
                 max={604}
                 value={downloadFromPage}
-                onChange={(e) => setDownloadFromPage(Math.min(604, Math.max(1, parseInt(e.target.value) || 1)))}
-                className={cn("w-full px-3 py-2 border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}
+                onChange={(e) => handleFromPageChange(e.target.value)}
+                className={pageInputClass}
               />
             </div>
-            <div className="flex-1">
-              <label className={cn("text-emerald-700 dark:text-emerald-300 block mb-1", textSizeClasses.label)}>{t('toPage')}</label>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="download-to-page" className={cn("text-emerald-700 dark:text-emerald-300 font-medium", textSizeClasses.label)}>
+                {t('toPage')}
+              </label>
               <input
+                id="download-to-page"
                 type="number"
+                inputMode="numeric"
                 min={1}
                 max={604}
                 value={downloadToPage}
-                onChange={(e) => setDownloadToPage(Math.min(604, Math.max(1, parseInt(e.target.value) || 604)))}
-                className={cn("w-full px-3 py-2 border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500", textSizeClasses.text)}
+                onChange={(e) => handleToPageChange(e.target.value)}
+                className={pageInputClass}
               />
             </div>
           </div>
         </div>
       )}
-      
-      {/* EveryAyah Download Options */}
-      {downloadType === 'everyayah' && (
-        <div className="flex flex-col gap-3">
-          {showReciterScroll ? (
-            /* Reciter Selection Phase */
-            <>
-              <div className="flex items-center gap-2">
-                <Search className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('reciter')}</label>
-              </div>
-              {/* Search input */}
-              <div className="relative">
-                <Search className={cn(
-                  'absolute top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 dark:text-emerald-400',
-                  isRTL ? 'right-3' : 'left-3'
-                )} />
-                <input
-                  ref={reciterSearchInputRef}
-                  type="text"
-                  placeholder={t('searchReciter')}
-                  className={cn(
-                    'w-full h-9 rounded-md border border-emerald-300 bg-transparent px-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
-                    isRTL ? 'pr-9 text-right' : 'pl-9 text-left',
-                    textSizeClasses.text
-                  )}
-                />
-              </div>
 
-              {/* Unified Reciter scrollable list */}
-              <div className="overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-48" style={{ WebkitOverflowScrolling: 'touch' }}>
-                {filteredUnifiedReciters.map((reciter, index) => (
+      {/* MP3Quran (audio) Download Options */}
+      {downloadType === 'mp3quran' && (
+        <div className="flex flex-col gap-3">
+          <SectionLabel icon={Headphones}>{t('reciter')}</SectionLabel>
+          <SearchField placeholder={t('searchReciter')} onValueChange={setReciterSearch} />
+
+          {/* Reciter list — radio style, current selection marked with a check */}
+          <div className={cn(listClass, "min-h-[12rem]")} style={{ WebkitOverflowScrolling: 'touch' }}>
+            {filteredReciters.length === 0 ? (
+              <div className={cn("flex items-center justify-center h-full py-8 text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
+                {t('noResults')}
+              </div>
+            ) : (
+              filteredReciters.map((reciter) => {
+                const isSelected = selectedReciter?.id === reciter.id;
+                return (
                   <button
                     key={reciter.id}
-                    onClick={() => {
-                      setSelectedUnifiedReciter(reciter);
-                      setShowReciterScroll(false);
-                    }}
+                    onClick={() => handleSelectReciter(reciter)}
                     className={cn(
-                      'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
-                      'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
-                      selectedUnifiedReciter?.id === reciter.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
-                      textSizeClasses.text,
-                      isRTL ? 'text-right' : 'text-left'
+                      "w-full flex items-center gap-3 min-h-[48px] px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors active:bg-emerald-100 dark:active:bg-emerald-900/40",
+                      isSelected && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                      textSizeClasses.text
                     )}
                   >
-                    <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
-                      <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
-                      <span className="flex-1 text-emerald-800 dark:text-emerald-200">
-                        {language === 'ar' ? reciter.nameAr : reciter.name}
-                      </span>
-                      {/* Source badge only */}
-                      <span className={cn(
-                        'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
-                        reciter.source === 'everyayah'
-                          ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                          : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
-                      )}>
-                        {reciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
-                      </span>
-                    </div>
+                    <span className={cn("flex-1 text-start truncate", isSelected ? "text-emerald-800 dark:text-emerald-200" : "text-emerald-700 dark:text-emerald-300")}>
+                      {getReciterName(reciter)}
+                    </span>
+                    {isSelected && <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />}
                   </button>
-                ))}
-              </div>
-            </>
-          ) : selectedUnifiedReciter ? (
-            /* Reciter Selected - Show only selected item */
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col gap-3"
-            >
-              <div className="flex items-center gap-2">
-                <Search className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('reciter')}</label>
-              </div>
-              <button
-                onClick={() => setShowReciterScroll(true)}
-                title={t('searchReciter')}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-500/20 dark:bg-emerald-500/20 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
-                  isRTL ? 'flex-row-reverse' : 'flex-row'
-                )}
-              >
-                <span className="flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-right">
-                  {language === 'ar' ? selectedUnifiedReciter.nameAr : selectedUnifiedReciter.name}
-                </span>
-                <span className={cn(
-                  'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
-                  selectedUnifiedReciter.source === 'everyayah'
-                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                    : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
-                )}>
-                  {selectedUnifiedReciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
-                </span>
-                <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              </button>
-              
-              {/* Reading/Style/Quality Selection for EveryAyah */}
-              {selectedUnifiedReciter.source === 'everyayah' && (
-                <div className="flex flex-col">
-                  {/* Column Headers */}
-                  <div className="flex gap-2 mb-2">
-                    <div className="flex-1 text-center">
-                      <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
-                        {t('reading')}
-                      </h3>
-                    </div>
-                    <div className="flex-1 text-center">
-                      <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
-                        {t('recitationStyle')}
-                      </h3>
-                    </div>
-                    <div className="flex-1 text-center">
-                      <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
-                        {t('quality')}
-                      </h3>
-                    </div>
-                  </div>
+                );
+              })
+            )}
+          </div>
 
-                  {/* Scrollable Columns */}
-                  <div className="flex gap-2 max-h-32 mb-3">
-                    {/* Reading Column */}
-                    <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
-                      {(() => {
-                        const readings = [...new Set(everyAyahReciters
-                          .filter(r => r.nameAr === selectedUnifiedReciter.nameAr)
-                          .map(r => r.reading)
-                        )];
-                        return readings.map((reading) => (
-                          <button
-                            key={reading}
-                            onClick={() => {
-                              setSelectedReading(reading);
-                              setSelectedStyle('');
-                              setSelectedQuality('');
-                            }}
-                            className={cn(
-                              "w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-center",
-                              selectedReading === reading && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                              textSizeClasses.text
-                            )}
-                          >
-                            <span className="text-emerald-800 dark:text-emerald-200">
-                              {language === 'ar' 
-                                ? (everyAyahReciters.find(r => r.reading === reading)?.readingAr || reading)
-                                : reading.charAt(0).toUpperCase() + reading.slice(1)
-                              }
-                            </span>
-                          </button>
-                        ));
-                      })()}
-                    </div>
-
-                    {/* Style Column */}
-                    <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
-                      {(() => {
-                        const styles = selectedReading
-                          ? [...new Set(everyAyahReciters
-                              .filter(r => r.nameAr === selectedUnifiedReciter.nameAr && r.reading === selectedReading)
-                              .map(r => r.style)
-                            )]
-                          : [];
-                        return styles.map((style) => (
-                          <button
-                            key={style}
-                            onClick={() => {
-                              setSelectedStyle(style);
-                              setSelectedQuality('');
-                            }}
-                            className={cn(
-                              "w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-center",
-                              selectedStyle === style && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                              textSizeClasses.text
-                            )}
-                          >
-                            <span className="text-emerald-800 dark:text-emerald-200">
-                              {t(style as 'murattal' | 'mujawwad' | 'muallim')}
-                            </span>
-                          </button>
-                        ));
-                      })()}
-                    </div>
-
-                    {/* Quality Column */}
-                    <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
-                      {(() => {
-                        const qualities = selectedReading && selectedStyle
-                          ? [...new Set(everyAyahReciters
-                              .filter(r => r.nameAr === selectedUnifiedReciter.nameAr && r.reading === selectedReading && r.style === selectedStyle)
-                              .map(r => r.quality)
-                            )].sort((a, b) => parseInt(a) - parseInt(b))
-                          : [];
-                        return qualities.map((quality) => (
-                          <button
-                            key={quality}
-                            onClick={() => setSelectedQuality(quality)}
-                            className={cn(
-                              "w-full px-3 py-2 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-center",
-                              selectedQuality === quality && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                              textSizeClasses.text
-                            )}
-                          >
-                            <span className="text-emerald-800 dark:text-emerald-200">
-                              {quality}
-                            </span>
-                          </button>
-                        ));
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex flex-col gap-2">
-                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('selectSurah')}</label>
-                <div className="flex flex-col gap-1 border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden bg-transparent max-h-40 overflow-y-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
-                  {surahs.map((surah) => (
+          {/* Moshaf (recitation edition) chips for the selected reciter */}
+          {selectedReciter?.moshaf && selectedReciter.moshaf.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <SectionLabel icon={BookOpen}>{t('mushafType')}</SectionLabel>
+              <div className="flex flex-wrap gap-2">
+                {selectedReciter.moshaf.map((moshaf) => {
+                  const isSelected = selectedMoshaf?.id === moshaf.id;
+                  return (
                     <button
-                      key={surah.id}
-                      onClick={() => setDownloadFromSurah(surah.id)}
+                      key={moshaf.id}
+                      onClick={() => setSelectedMoshaf(moshaf)}
                       className={cn(
-                        "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
-                        downloadFromSurah === surah.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                        "min-h-[44px] rounded-lg border px-3 py-1.5 font-medium transition-all active:scale-[0.97]",
+                        isSelected
+                          ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
+                          : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900",
                         textSizeClasses.text
                       )}
                     >
-                      <span className="text-emerald-800 dark:text-emerald-200">
-                        {surah.id}. {isRTL ? surah.name : surah.englishName}
-                      </span>
+                      {getMoshafDisplayName(moshaf)}
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('fromAyah')}</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={surahs.find(s => s.id === downloadFromSurah)?.numberOfAyahs || 7}
-                    value={downloadFromAyah}
-                    onChange={(e) => setDownloadFromAyah(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 block mb-1">{t('toAyah')}</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={surahs.find(s => s.id === downloadFromSurah)?.numberOfAyahs || 7}
-                    value={downloadToAyah}
-                    onChange={(e) => setDownloadToAyah(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-3 py-2 text-base md:text-lg border border-emerald-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-            </motion.div>
-          ) : null}
+            </div>
+          )}
+
+          {/* Surah range */}
+          <SurahRangeSelect
+            from={downloadFromSurah}
+            to={downloadToSurah}
+            onFromChange={handleFromSurahChange}
+            onToChange={setDownloadToSurah}
+          />
         </div>
       )}
-      
-      {/* MP3Quran Download Options */}
-      {downloadType === 'mp3quran' && (
-        <div className="flex flex-col gap-3">
-          {showReciterScroll ? (
-            /* Reciter Selection Phase */
-            <>
-              <div className="flex items-center gap-2">
-                <Search className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('reciter')}</label>
-              </div>
-              {/* Search input */}
-              <div className="relative">
-                <Search className={cn(
-                  'absolute top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 dark:text-emerald-400',
-                  isRTL ? 'right-3' : 'left-3'
-                )} />
-                <input
-                  ref={reciterSearchInputRef}
-                  type="text"
-                  placeholder={t('searchReciter')}
-                  className={cn(
-                    'w-full h-9 rounded-md border border-emerald-300 bg-transparent px-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
-                    isRTL ? 'pr-9 text-right' : 'pl-9 text-left',
-                    textSizeClasses.text
-                  )}
-                />
-              </div>
 
-              {/* Unified Reciter scrollable list */}
-              <div className="overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-48" style={{ WebkitOverflowScrolling: 'touch' }}>
-                {filteredUnifiedReciters.map((reciter, index) => (
-                  <button
-                    key={reciter.id}
-                    onClick={() => {
-                      setSelectedUnifiedReciter(reciter);
-                      setShowReciterScroll(false);
-                    }}
-                    className={cn(
-                      'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
-                      'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
-                      selectedUnifiedReciter?.id === reciter.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
-                      textSizeClasses.text,
-                      isRTL ? 'text-right' : 'text-left'
-                    )}
-                  >
-                    <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
-                      <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
-                      <span className="flex-1 text-emerald-800 dark:text-emerald-200">
-                        {language === 'ar' ? reciter.nameAr : reciter.name}
-                      </span>
-                      {/* Source badge only */}
-                      <span className={cn(
-                        'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
-                        reciter.source === 'everyayah'
-                          ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                          : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
-                      )}>
-                        {reciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : selectedUnifiedReciter ? (
-            /* Reciter Selected - Show only selected item */
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col gap-3"
-            >
-              <div className="flex items-center gap-2">
-                <Search className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('reciter')}</label>
-              </div>
-              <button
-                onClick={() => setShowReciterScroll(true)}
-                title={t('searchReciter')}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-500/20 dark:bg-emerald-500/20 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
-                  isRTL ? 'flex-row-reverse' : 'flex-row'
-                )}
-              >
-                <span className="flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-right">
-                  {language === 'ar' ? selectedUnifiedReciter.nameAr : selectedUnifiedReciter.name}
-                </span>
-                <span className={cn(
-                  'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
-                  selectedUnifiedReciter.source === 'everyayah'
-                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                    : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
-                )}>
-                  {selectedUnifiedReciter.source === 'everyayah' ? t('everyAyah') : t('mp3Quran')}
-                </span>
-                <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              </button>
-              
-              {/* Moshaf Selection (only for mp3quran) */}
-              {selectedUnifiedReciter.source === 'mp3quran' && selectedUnifiedReciter.moshaf && selectedUnifiedReciter.moshaf.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300">{t('mushafType')}</label>
-                  <div className="flex flex-col gap-1 border border-emerald-200 dark:border-emerald-800 rounded-lg overflow-hidden bg-transparent max-h-32 overflow-y-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
-                    {selectedUnifiedReciter.moshaf.map((moshaf) => {
-                      // Get moshaf name (English or attempt Arabic from API)
-                      let displayName = moshaf.name;
-                      if (language === 'ar' && selectedUnifiedReciter.mp3QuranId) {
-                        const arReciter = mp3QuranRecitersAr.find(r => r.id === selectedUnifiedReciter.mp3QuranId);
-                        const arMoshaf = arReciter?.moshaf?.find(m => m.id === moshaf.id);
-                        if (arMoshaf && arMoshaf.name) {
-                          displayName = arMoshaf.name;
-                        }
-                      }
-                      
-                      // Translate common English patterns to Arabic
-                      displayName = translateMoshafName(displayName);
-                      
-                      // Remove duplicate text pattern like "text - text"
-                      const parts = displayName.split(' - ');
-                      if (parts.length === 2 && parts[0].trim() === parts[1].trim()) {
-                        displayName = parts[0].trim();
-                      }
-                      
-                      return (
-                        <button
-                          key={moshaf.id}
-                          onClick={() => setSelectedMoshaf(moshaf)}
-                          className={cn(
-                            "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors",
-                            selectedMoshaf?.id === moshaf.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                            textSizeClasses.text,
-                            isRTL ? 'text-right' : 'text-left'
-                          )}
-                        >
-                          <span className="text-emerald-800 dark:text-emerald-200">
-                            {displayName}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              
-              {/* From/To Surah - Side by Side Scrollable Columns */}
-              <div className="flex flex-col">
-                {/* Column Headers */}
-                <div className="flex gap-2 mb-2">
-                  <div className="flex-1 text-center">
-                    <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
-                      {t('fromSurah')}
-                    </h3>
-                  </div>
-                  <div className="flex-1 text-center">
-                    <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
-                      {t('toSurah')}
-                    </h3>
-                  </div>
-                </div>
-
-                {/* Scrollable Columns */}
-                <div className="flex gap-2 max-h-40">
-                  {/* From Surah Column */}
-                  <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
-                    {surahs.map((surah) => (
-                      <button
-                        key={surah.id}
-                        onClick={() => {
-                          setDownloadFromSurah(surah.id);
-                          // Auto-adjust toSurah if it's now less than fromSurah
-                          if (downloadToSurah < surah.id) {
-                            setDownloadToSurah(surah.id);
-                          }
-                        }}
-                        className={cn(
-                          "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
-                          downloadFromSurah === surah.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                          textSizeClasses.text
-                        )}
-                      >
-                        <span className="text-emerald-800 dark:text-emerald-200">
-                          {surah.id}. {isRTL ? surah.name : surah.englishName}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* To Surah Column */}
-                  <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
-                    {surahs.filter(surah => surah.id >= downloadFromSurah).map((surah) => (
-                      <button
-                        key={surah.id}
-                        onClick={() => setDownloadToSurah(surah.id)}
-                        className={cn(
-                          "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
-                          downloadToSurah === surah.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                          textSizeClasses.text
-                        )}
-                      >
-                        <span className="text-emerald-800 dark:text-emerald-200">
-                          {surah.id}. {isRTL ? surah.name : surah.englishName}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          ) : null}
-        </div>
-      )}
-      
       {/* Tafseer Download Options */}
       {downloadType === 'tafseer' && (
         <div className="flex flex-col gap-3">
-          {showTafseerScroll ? (
-            /* Tafseer Selection Phase */
-            <>
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('tafseer')}</label>
-              </div>
-              {/* Search input */}
-              <div className="relative">
-                <Search className={cn(
-                  'absolute top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600 dark:text-emerald-400',
-                  isRTL ? 'right-3' : 'left-3'
-                )} />
-                <input
-                  ref={tafseerSearchInputRef}
-                  type="text"
-                  placeholder={t('searchTafseer')}
-                  className={cn(
-                    'w-full h-9 rounded-md border border-emerald-300 bg-transparent px-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500',
-                    isRTL ? 'pr-9 text-right' : 'pl-9 text-left',
-                    textSizeClasses.text
-                  )}
-                />
-              </div>
+          <SectionLabel icon={BookOpen}>{t('tafseer')}</SectionLabel>
+          <SearchField placeholder={t('searchTafseer')} onValueChange={setTafseerSearch} />
 
-              {/* Tafseer scrollable list */}
-              <div className="overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg max-h-48" style={{ WebkitOverflowScrolling: 'touch' }}>
-                {tafseers
-                  .filter(tafseer => {
-                    if (!tafseerSearch) return true;
-                    const searchLower = tafseerSearch.toLowerCase();
-                    return (
-                      tafseer.name.toLowerCase().includes(searchLower) ||
-                      tafseer.author.toLowerCase().includes(searchLower) ||
-                      tafseer.book_name.toLowerCase().includes(searchLower)
-                    );
-                  })
-                  .map((tafseer, index) => (
-                    <button
-                      key={tafseer.id}
-                      ref={selectedDownloadTafseer?.id === tafseer.id ? selectedTafseerRef : null}
-                      onClick={() => {
-                        setSelectedDownloadTafseer(tafseer);
-                        setShowTafseerScroll(false);
-                      }}
-                      className={cn(
-                        'w-full px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors',
-                        'hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10',
-                        selectedDownloadTafseer?.id === tafseer.id && 'bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold',
-                        textSizeClasses.text,
-                        isRTL ? 'text-right' : 'text-left'
-                      )}
-                    >
-                      <div className={cn('flex items-center gap-2 w-full', isRTL && 'flex-row-reverse')}>
-                        <span className="text-emerald-500 dark:text-emerald-500 text-xs shrink-0">{index + 1}.</span>
-                        <span className="flex-1 text-emerald-800 dark:text-emerald-200">
-                          {tafseer.name}
-                        </span>
-                        <span className={cn(
-                          'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
-                          tafseer.language === 'ar'
-                            ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                            : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
-                        )}>
-                          {tafseer.language === 'ar' ? 'عربي' : 'EN'}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+          {/* Tafseer list — radio style, current selection marked with a check */}
+          <div className={cn(listClass, "min-h-[12rem]")} style={{ WebkitOverflowScrolling: 'touch' }}>
+            {filteredTafseers.length === 0 ? (
+              <div className={cn("flex items-center justify-center h-full py-8 text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
+                {t('noResults')}
               </div>
-            </>
-          ) : selectedDownloadTafseer ? (
-            /* Tafseer Selected - Show selected item and surah range */
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col gap-3"
-            >
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <label className="text-sm md:text-base text-emerald-700 dark:text-emerald-300 font-medium">{t('tafseer')}</label>
-              </div>
-              <button
-                onClick={() => setShowTafseerScroll(true)}
-                title={t('searchTafseer')}
-                className={cn(
-                  'w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-emerald-500/20 dark:bg-emerald-500/20 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors',
-                  isRTL ? 'flex-row-reverse' : 'flex-row'
-                )}
-              >
-                <span className="flex-1 font-semibold text-emerald-800 dark:text-emerald-200 text-right">
-                  {selectedDownloadTafseer.name}
-                </span>
-                <span className={cn(
-                  'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
-                  selectedDownloadTafseer.language === 'ar'
-                    ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                    : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
-                )}>
-                  {selectedDownloadTafseer.language === 'ar' ? 'عربي' : 'EN'}
-                </span>
-                <Pencil className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-              </button>
-              
-              {/* From/To Surah - Side by Side Scrollable Columns */}
-              <div className="flex flex-col">
-                {/* Column Headers */}
-                <div className="flex gap-2 mb-2">
-                  <div className="flex-1 text-center">
-                    <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
-                      {t('fromSurah')}
-                    </h3>
-                  </div>
-                  <div className="flex-1 text-center">
-                    <h3 className={cn("font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
-                      {t('toSurah')}
-                    </h3>
-                  </div>
-                </div>
+            ) : (
+              filteredTafseers.map((tafseer) => {
+                const isSelected = selectedTafseer?.id === tafseer.id;
+                return (
+                  <button
+                    key={tafseer.id}
+                    onClick={() => setSelectedTafseer(tafseer)}
+                    className={cn(
+                      "w-full flex items-center gap-3 min-h-[48px] px-3 py-2 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors active:bg-emerald-100 dark:active:bg-emerald-900/40",
+                      isSelected && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
+                      textSizeClasses.text
+                    )}
+                  >
+                    <span className="flex-1 flex flex-col min-w-0 text-start">
+                      <span className={cn("truncate", isSelected ? "text-emerald-800 dark:text-emerald-200" : "text-emerald-700 dark:text-emerald-300")}>
+                        {tafseer.name}
+                      </span>
+                      <span className="truncate text-xs md:text-sm font-normal text-emerald-600 dark:text-emerald-400">
+                        {tafseer.author}
+                      </span>
+                    </span>
+                    <span className={cn(
+                      'shrink-0 px-1.5 py-0.5 rounded text-[0.6rem] font-medium leading-tight',
+                      tafseer.language === 'ar'
+                        ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                        : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-400'
+                    )}>
+                      {tafseer.language === 'ar' ? 'عربي' : 'EN'}
+                    </span>
+                    {isSelected && <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
 
-                {/* Scrollable Columns */}
-                <div className="flex gap-2 max-h-40">
-                  {/* From Surah Column */}
-                  <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
-                    {surahs.map((surah) => (
-                      <button
-                        key={surah.id}
-                        onClick={() => {
-                          setDownloadFromSurah(surah.id);
-                          if (downloadToSurah < surah.id) {
-                            setDownloadToSurah(surah.id);
-                          }
-                        }}
-                        className={cn(
-                          "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
-                          downloadFromSurah === surah.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                          textSizeClasses.text
-                        )}
-                      >
-                        <span className="text-emerald-800 dark:text-emerald-200">
-                          {surah.id}. {isRTL ? surah.name : surah.englishName}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* To Surah Column */}
-                  <div className="flex-1 overflow-y-scroll border border-emerald-200 dark:border-emerald-800 rounded-lg bg-transparent" style={{ WebkitOverflowScrolling: 'touch' }}>
-                    {surahs.filter(surah => surah.id >= downloadFromSurah).map((surah) => (
-                      <button
-                        key={surah.id}
-                        onClick={() => setDownloadToSurah(surah.id)}
-                        className={cn(
-                          "w-full px-3 py-2.5 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/10 border-b border-emerald-100 dark:border-emerald-900 last:border-b-0 transition-colors text-left",
-                          downloadToSurah === surah.id && "bg-emerald-500/20 dark:bg-emerald-500/20 font-semibold",
-                          textSizeClasses.text
-                        )}
-                      >
-                        <span className="text-emerald-800 dark:text-emerald-200">
-                          {surah.id}. {isRTL ? surah.name : surah.englishName}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          ) : null}
+          {/* Surah range */}
+          <SurahRangeSelect
+            from={downloadFromSurah}
+            to={downloadToSurah}
+            onFromChange={handleFromSurahChange}
+            onToChange={setDownloadToSurah}
+          />
         </div>
       )}
-      
+
       {/* Download Progress */}
       {activeDownload && (
         <div className="flex flex-col gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               {activeDownload.status === 'downloading' && (
-                <HardDriveDownload className="w-5 h-5 text-emerald-600 dark:text-emerald-400 animate-pulse" />
+                <HardDriveDownload className="w-5 h-5 text-emerald-600 dark:text-emerald-400 animate-pulse shrink-0" />
               )}
               {activeDownload.status === 'completed' && (
-                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
               )}
               {activeDownload.status === 'error' && (
-                <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0" />
               )}
               {activeDownload.status === 'cancelled' && (
-                <StopCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <StopCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
               )}
-              <span className={cn("font-medium text-emerald-700 dark:text-emerald-300", textSizeClasses.text)}>
+              <span className={cn("font-medium text-emerald-700 dark:text-emerald-300 truncate", textSizeClasses.text)}>
                 {activeDownload.status === 'downloading' && t('downloadProgress')}
                 {activeDownload.status === 'completed' && t('downloadComplete')}
                 {activeDownload.status === 'error' && t('downloadFailed')}
@@ -1363,69 +750,72 @@ export function Download() {
               </span>
             </div>
             {downloadProgress.total > 0 && (
-              <span className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
+              <span className={cn("text-emerald-600 dark:text-emerald-400 shrink-0", textSizeClasses.text)}>
                 {downloadProgress.current} / {downloadProgress.total}
+                {downloadPercent !== null && ` (${downloadPercent}%)`}
               </span>
             )}
           </div>
-          
-          {activeDownload.status === 'downloading' && downloadProgress.total > 0 && (
+
+          {(activeDownload.status === 'downloading' || activeDownload.status === 'completed') && downloadProgress.total > 0 && (
             <div className="w-full h-2 bg-emerald-100 dark:bg-emerald-800 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-emerald-600 dark:bg-emerald-500 transition-all duration-300"
-                style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-300",
+                  activeDownload.status === 'completed'
+                    ? "bg-green-600 dark:bg-green-500 w-full"
+                    : "bg-emerald-600 dark:bg-emerald-500"
+                )}
+                style={activeDownload.status === 'downloading' ? { width: `${downloadPercent}%` } : undefined}
               />
             </div>
           )}
-          
-          {activeDownload.status === 'completed' && (
-            <div className="w-full h-2 bg-emerald-100 dark:bg-emerald-800 rounded-full overflow-hidden">
-              <div className="h-full bg-green-600 dark:bg-green-500 w-full" />
-            </div>
-          )}
-          
-          {(activeDownload.status === 'completed' || activeDownload.status === 'cancelled' || activeDownload.status === 'error') && (
+
+          {isTerminalStatus && (
             <button
               onClick={clearDownload}
               className={cn(
-                "mt-1 text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-100 underline",
-                textSizeClasses.label
+                "w-full flex items-center justify-center gap-2 min-h-[44px] rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors active:scale-[0.98]",
+                textSizeClasses.button
               )}
             >
+              <X className="w-4 h-4" />
               {t('clearDownload')}
             </button>
           )}
         </div>
       )}
-      
-      {/* Download/Cancel Buttons */}
-      <div className="flex gap-2 pt-2">
-        <button
-          onClick={handleDownload}
-          disabled={!isDownloadEnabled || !isOnline || isDownloading}
-          className="flex-1 flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 md:px-4 h-10 md:h-12 border border-emerald-600 shadow-md transition-all"
-        >
-          {!isOnline ? (
-            <WifiOff className="w-5 h-5 text-[#F2E3BB]" />
-          ) : (
-            <HardDriveDownload className="w-5 h-5 text-[#F2E3BB]" />
-          )}
-          <span className={cn("text-[#F2E3BB] font-bold", textSizeClasses.button)}>
-            {!isOnline ? t('networkRequired') : (isDownloading ? t('downloadProgress') : t('startDownload'))}
-          </span>
-        </button>
-        
-        {isDownloading && (
+
+      {/* Sticky action bar — primary action always reachable (Material pattern, matches Navigation/Reciter views) */}
+      <div className="sticky bottom-0 -mx-5 -mb-5 px-5 pt-3 pb-4 border-t border-emerald-100 dark:border-emerald-900 bg-gradient-to-b from-transparent via-[#FBF9F4]/80 to-[#FBF9F4] dark:from-transparent dark:via-black/80 dark:to-black">
+        <div className="flex gap-2">
           <button
-            onClick={handleCancelDownload}
-            className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 rounded-lg px-3 md:px-4 h-10 md:h-12 border border-red-500 shadow-md transition-all"
+            onClick={handleDownload}
+            disabled={!isDownloadEnabled || !isOnline || isDownloading}
+            className="flex-1 flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-emerald-600 shadow-md transition-all active:scale-[0.98] px-3 min-h-[48px] py-2"
           >
-            <StopCircle className="w-5 h-5 text-white" />
-            <span className={cn("text-white font-bold", textSizeClasses.button)}>
-              {t('cancelDownload')}
+            {!isOnline ? (
+              <WifiOff className="w-5 h-5 text-[#F2E3BB] shrink-0" />
+            ) : (
+              <HardDriveDownload className="w-5 h-5 text-[#F2E3BB] shrink-0" />
+            )}
+            <span className={cn("text-[#F2E3BB] font-bold text-center leading-tight", textSizeClasses.button)}>
+              {!isOnline ? t('networkRequired') : (isDownloading ? t('downloadProgress') : t('startDownload'))}
             </span>
           </button>
-        )}
+
+          {isDownloading && (
+            <button
+              onClick={cancelDownload}
+              className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 rounded-lg border border-red-500 shadow-md transition-all active:scale-[0.98] px-3 min-h-[48px] py-2"
+            >
+              <StopCircle className="w-5 h-5 text-white shrink-0" />
+              <span className={cn("text-white font-bold text-center leading-tight", textSizeClasses.button)}>
+                {t('cancelDownload')}
+              </span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

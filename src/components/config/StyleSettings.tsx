@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { Switch } from "@/components/ui/switch";
-import { Book, Menu, Moon, Palette } from "lucide-react";
+import { Book, Menu, Moon, Palette, PenLine, Type, type LucideIcon } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
+import { useDialogTextSize, getDialogTextSizeClasses, type DialogTextSize } from "@/contexts/DialogTextSizeContext";
 import { useDarkMode } from "@/contexts/DarkModeContext";
+import { useAnnotationsVisible } from "@/hooks/useAnnotations";
 import { cn } from "@/lib/utils";
 
 interface StyleSettingsProps {
@@ -14,6 +15,90 @@ interface StyleSettingsProps {
   onShowBottomBarTextChange: (show: boolean) => void;
 }
 
+/** Full-width tappable settings row: icon + label + trailing Switch. Tapping anywhere on the row toggles. */
+export function SettingsToggleRow({
+  icon: Icon,
+  label,
+  checked,
+  onCheckedChange,
+}: {
+  icon: LucideIcon;
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+
+  return (
+    <div
+      onClick={() => onCheckedChange(!checked)}
+      className="w-full flex items-center justify-between gap-3 min-h-[56px] px-3 py-2 rounded-xl transition-colors active:bg-emerald-100 dark:active:bg-emerald-900/40 cursor-pointer"
+    >
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        <span className={cn("font-medium text-emerald-800 dark:text-emerald-300 text-start", textSizeClasses.label)}>
+          {label}
+        </span>
+      </div>
+      {/* Stop propagation so tapping the switch itself doesn't double-toggle via the row */}
+      <div dir="ltr" onClick={(e) => e.stopPropagation()} className="shrink-0">
+        <Switch checked={checked} onCheckedChange={onCheckedChange} />
+      </div>
+    </div>
+  );
+}
+
+/** Settings row: icon + label + trailing segmented pill control (44px+ targets). */
+export function SettingsSegmentRow({
+  icon: Icon,
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  icon: LucideIcon;
+  label: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const { dialogTextSize } = useDialogTextSize();
+  const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
+
+  return (
+    <div className="w-full flex items-center justify-between gap-3 min-h-[56px] px-3 py-2 rounded-xl">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        <span className={cn("font-medium text-emerald-800 dark:text-emerald-300 text-start", textSizeClasses.label)}>
+          {label}
+        </span>
+      </div>
+      <div className="flex gap-2 shrink-0">
+        {options.map((option) => {
+          const isActive = value === option.value;
+          return (
+            <button
+              key={option.value}
+              onClick={() => onChange(option.value)}
+              aria-pressed={isActive}
+              className={cn(
+                "flex items-center justify-center min-h-[44px] rounded-lg border px-3 py-1.5 font-medium transition-all active:scale-[0.97]",
+                isActive
+                  ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
+                  : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900",
+                textSizeClasses.button
+              )}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function StyleSettings({
   isMobile,
   viewMode,
@@ -21,9 +106,10 @@ export function StyleSettings({
   showBottomBarText,
   onShowBottomBarTextChange,
 }: StyleSettingsProps) {
-  const { t, isRTL } = useLanguage();
-  const { dialogTextSize } = useDialogTextSize();
+  const { t } = useLanguage();
+  const { dialogTextSize, setDialogTextSize } = useDialogTextSize();
   const { isDarkMode, setIsDarkMode } = useDarkMode();
+  const { annotationsVisible, setAnnotationsVisible } = useAnnotationsVisible();
 
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
 
@@ -42,95 +128,89 @@ export function StyleSettings({
   };
 
   return (
-    <div className="space-y-4">
-      {/* View Mode Setting - Hide on mobile */}
+    <div className="flex flex-col gap-1">
+      {/* View Mode (desktop only — mobile is always single page) */}
       {!isMobile && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Book className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-              {isRTL ? 'وضع العرض' : 'View Mode'}
-            </span>
-          </div>
-          <button
-            onClick={() => onViewModeChange(viewMode === 'single' ? 'double' : 'single')}
-            className="flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg px-3 md:px-4 h-8 md:h-10 border border-emerald-600 shadow-md transition-all"
-          >
-            <span className={cn("text-[#F2E3BB] font-bold", textSizeClasses.button)}>
-              {viewMode === 'single' ? (isRTL ? 'صفحتين' : '2 Pages') : (isRTL ? 'صفحة' : '1 Page')}
-            </span>
-          </button>
-        </div>
+        <SettingsSegmentRow
+          icon={Book}
+          label={t('viewMode')}
+          value={viewMode}
+          onChange={(value) => onViewModeChange(value as 'single' | 'double')}
+          options={[
+            { value: 'single', label: t('singlePage') },
+            { value: 'double', label: t('doublePage') },
+          ]}
+        />
       )}
 
       {/* Bottom Bar Text Toggle */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Menu className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-            {isRTL ? 'إظهار نص الشريط السفلي' : 'Show Bottom Bar Text'}
-          </span>
-        </div>
-        <div dir="ltr">
-          <Switch
-            checked={showBottomBarText}
-            onCheckedChange={(checked) => {
-              onShowBottomBarTextChange(checked);
-              localStorage.setItem('quran-show-bottom-bar-text', String(checked));
-            }}
-          />
-        </div>
-      </div>
+      <SettingsToggleRow
+        icon={Menu}
+        label={t('showBottomBarText')}
+        checked={showBottomBarText}
+        onCheckedChange={onShowBottomBarTextChange}
+      />
 
       {/* Header/Footer Theme */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Palette className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-            {isRTL ? 'سمة الشريط' : 'Bar Theme'}
-          </span>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => updateChromeTheme('green')}
-            className={cn(
-              "flex items-center justify-center px-3 py-1.5 rounded-lg border transition-all font-medium",
-              textSizeClasses.button,
-              chromeTheme === 'green'
-                ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
-                : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900"
-            )}
-          >
-            {isRTL ? 'أخضر' : 'Green'}
-          </button>
-          <button
-            onClick={() => updateChromeTheme('glass')}
-            className={cn(
-              "flex items-center justify-center px-3 py-1.5 rounded-lg border transition-all font-medium",
-              textSizeClasses.button,
-              chromeTheme === 'glass'
-                ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
-                : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900"
-            )}
-          >
-            {isRTL ? 'زجاجي' : 'Glass'}
-          </button>
-        </div>
-      </div>
+      <SettingsSegmentRow
+        icon={Palette}
+        label={t('barTheme')}
+        value={chromeTheme}
+        onChange={(value) => updateChromeTheme(value as 'green' | 'glass')}
+        options={[
+          { value: 'green', label: t('greenTheme') },
+          { value: 'glass', label: t('glassTheme') },
+        ]}
+      />
 
       {/* Dark Mode Toggle */}
-      <div className="flex items-center justify-between">
+      <SettingsToggleRow
+        icon={Moon}
+        label={t('darkMode')}
+        checked={isDarkMode}
+        onCheckedChange={setIsDarkMode}
+      />
+
+      {/* Show/hide page drawings (annotations) while reading */}
+      <SettingsToggleRow
+        icon={PenLine}
+        label={t('showAnnotations')}
+        checked={annotationsVisible}
+        onCheckedChange={setAnnotationsVisible}
+      />
+
+      {/* Dialog text size */}
+      <div className="flex flex-col gap-2 px-3 pt-3 pb-1">
         <div className="flex items-center gap-2 sm:gap-3">
-          <Moon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          <Type className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-            {t('darkMode')}
+            {t('dialogTextSize')}
           </span>
         </div>
-        <div dir="ltr">
-          <Switch
-            checked={isDarkMode}
-            onCheckedChange={setIsDarkMode}
-          />
+        <div className="grid grid-cols-3 gap-2">
+          {(['small', 'medium', 'large'] as DialogTextSize[]).map((size) => {
+            const isActive = dialogTextSize === size;
+            const label =
+              size === 'small' ? t('textSizeSmall') :
+              size === 'medium' ? t('textSizeMedium') :
+              t('textSizeLarge');
+            return (
+              <button
+                key={size}
+                onClick={() => setDialogTextSize(size)}
+                aria-pressed={isActive}
+                className={cn(
+                  "flex items-center justify-center px-3 min-h-[44px] rounded-lg border transition-all font-medium active:scale-[0.97]",
+                  textSizeClasses.button,
+                  isActive
+                    ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
+                    : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900"
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

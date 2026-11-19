@@ -1,11 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Switch } from "@/components/ui/switch";
-import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Type, ChevronLeft, ChevronRight, Sunrise, BookOpenCheck, PenLine } from "lucide-react";
+import { BookOpen, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, ChevronLeft, ChevronRight, Sunrise, BookOpenCheck } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMushaf, MushafType } from "@/contexts/MushafContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
-import { useAnnotationsVisible } from "@/hooks/useAnnotations";
 import { cn } from "@/lib/utils";
 import { Download } from "./Download";
 import { StyleSettings } from "./StyleSettings";
@@ -26,7 +24,7 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, isRTL, language } = useLanguage();
   const { mushafType, setMushafType } = useMushaf();
-  const { dialogTextSize, setDialogTextSize } = useDialogTextSize();
+  const { dialogTextSize } = useDialogTextSize();
   
   const textSizeClasses = getDialogTextSizeClasses(dialogTextSize);
   
@@ -48,7 +46,6 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
     const saved = localStorage.getItem('quran-show-bottom-bar-text');
     return saved !== null ? saved === 'true' : true;
   });
-  const { annotationsVisible, setAnnotationsVisible } = useAnnotationsVisible();
   // Swiper mode is now always enabled (default)
   
   const handleMushafChange = (mushaf: MushafType) => {
@@ -109,7 +106,7 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
   // Render content for specific category
   const renderCategoryContent = () => {
     switch (activeCategory) {
-      case 'mushaf':
+      case 'mushaf': {
         const mushafOptions: { value: MushafType; label: string; image: string }[] = [
           { value: 'mwdoa', label: t('mushafMwdoa'), image: '/assets/mushaf_snippets/mwdoaa.jpg' },
           { value: 'tashel', label: t('mushafTashel'), image: '/assets/mushaf_snippets/tayseer.jpg' },
@@ -179,86 +176,24 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
             </div>
           </div>
         );
-        
+      }
+
       case 'style':
         return (
-          <div className="space-y-10">
-            <StyleSettings
-              isMobile={isMobile}
-              viewMode={viewMode}
-              onViewModeChange={updateViewMode}
-              showBottomBarText={showBottomBarText}
-              onShowBottomBarTextChange={(checked) => {
-                setShowBottomBarText(checked);
-                localStorage.setItem('quran-show-bottom-bar-text', String(checked));
-                // Notify other components about the setting change
-                window.dispatchEvent(new CustomEvent('quran-setting-changed', {
-                  detail: { key: 'quran-show-bottom-bar-text', value: String(checked) }
-                }));
-              }}
-            />
-
-            {/* Show/hide page drawings (annotations) while reading */}
-            <div className="flex items-center justify-between gap-3 pt-2">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <PenLine className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-                  {t('showAnnotations')}
-                </span>
-              </div>
-              <Switch
-                checked={annotationsVisible}
-                onCheckedChange={setAnnotationsVisible}
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <Type className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                <span className={cn("font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-                  {t('dialogTextSize')}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => setDialogTextSize('small')}
-                  className={cn(
-                    "flex items-center justify-center px-3 min-h-[44px] rounded-lg border transition-all font-medium active:scale-[0.97]",
-                    textSizeClasses.button,
-                    dialogTextSize === 'small'
-                      ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
-                      : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900"
-                  )}
-                >
-                  {t('textSizeSmall')}
-                </button>
-                <button
-                  onClick={() => setDialogTextSize('medium')}
-                  className={cn(
-                    "flex items-center justify-center px-3 min-h-[44px] rounded-lg border transition-all font-medium active:scale-[0.97]",
-                    textSizeClasses.button,
-                    dialogTextSize === 'medium'
-                      ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
-                      : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900"
-                  )}
-                >
-                  {t('textSizeMedium')}
-                </button>
-                <button
-                  onClick={() => setDialogTextSize('large')}
-                  className={cn(
-                    "flex items-center justify-center px-3 min-h-[44px] rounded-lg border transition-all font-medium active:scale-[0.97]",
-                    textSizeClasses.button,
-                    dialogTextSize === 'large'
-                      ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
-                      : "bg-white dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900"
-                  )}
-                >
-                  {t('textSizeLarge')}
-                </button>
-              </div>
-            </div>
-          </div>
+          <StyleSettings
+            isMobile={isMobile}
+            viewMode={viewMode}
+            onViewModeChange={updateViewMode}
+            showBottomBarText={showBottomBarText}
+            onShowBottomBarTextChange={(checked) => {
+              setShowBottomBarText(checked);
+              localStorage.setItem('quran-show-bottom-bar-text', String(checked));
+              // Notify other components about the setting change
+              window.dispatchEvent(new CustomEvent('quran-setting-changed', {
+                detail: { key: 'quran-show-bottom-bar-text', value: String(checked) }
+              }));
+            }}
+          />
         );
         
       case 'download':

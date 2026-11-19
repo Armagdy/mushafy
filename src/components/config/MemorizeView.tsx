@@ -34,7 +34,7 @@ const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'ما
 const PAGE_SIZE = 25;
 
 const selectClass =
-  "w-full px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950 text-emerald-900 dark:text-emerald-100";
+  "w-full min-h-[48px] px-3 py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950 text-emerald-900 dark:text-emerald-100";
 
 export default function MemorizeView({ currentPage = 1, onNavigateToPage }: MemorizeViewProps) {
   const { t, isRTL } = useLanguage();
@@ -170,7 +170,7 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
 
   const chipButtonClass = (active: boolean) =>
     cn(
-      "px-3 py-2 rounded-lg border transition-all font-medium",
+      "px-3 py-2 min-h-[44px] rounded-lg border transition-all font-medium active:scale-[0.97]",
       textSizeClasses.button,
       active
         ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
@@ -204,19 +204,22 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
         <div className="flex items-center justify-center gap-4">
           <button
             onClick={() => setFormAyahsPerDay(v => Math.max(1, v - 1))}
-            className="w-10 h-10 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 text-xl font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900"
+            aria-label="-"
+            className="w-11 h-11 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 text-xl font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900 active:scale-[0.97] transition-all flex items-center justify-center"
           >−</button>
           <input
             type="number"
+            inputMode="numeric"
             min={1}
             max={100}
             value={formAyahsPerDay}
             onChange={e => setFormAyahsPerDay(Math.min(100, Math.max(1, parseInt(e.target.value, 10) || 1)))}
-            className="w-24 text-center py-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950 text-emerald-900 dark:text-emerald-100"
+            className="w-24 min-h-[48px] text-center px-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950 text-emerald-900 dark:text-emerald-100"
           />
           <button
             onClick={() => setFormAyahsPerDay(v => Math.min(100, v + 1))}
-            className="w-10 h-10 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 text-xl font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900"
+            aria-label="+"
+            className="w-11 h-11 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 text-xl font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900 active:scale-[0.97] transition-all flex items-center justify-center"
           >+</button>
         </div>
       )}
@@ -316,7 +319,7 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
           onClick={() => handleToggleTask(index)}
           aria-label={t('memorizeMarkDone')}
           className={cn(
-            "w-7 h-7 flex-shrink-0 rounded-md border-2 flex items-center justify-center transition-colors",
+            "w-10 h-10 flex-shrink-0 rounded-lg border-2 flex items-center justify-center transition-colors active:scale-[0.97]",
             done
               ? "bg-emerald-600 border-emerald-600 text-white"
               : "border-emerald-400 dark:border-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/60"
@@ -361,25 +364,25 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
         </button>
 
         {/* Actions: go to surah + start this portion */}
-        <div className="flex flex-col gap-1 flex-shrink-0">
+        <div className="flex flex-col gap-1.5 flex-shrink-0">
           <button
             onClick={() => onNavigateToPage?.(getSurahFirstPage(boundaries!, info.surahFrom))}
             title={`${t('goToSurah')} — ${surahName(info.surahFrom)}`}
             aria-label={t('goToSurah')}
-            className="w-8 h-8 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/60 flex items-center justify-center transition-colors"
+            className="w-11 h-11 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/60 active:scale-[0.97] flex items-center justify-center transition-all"
           >
-            <BookOpen className="w-4 h-4" />
+            <BookOpen className="w-5 h-5" />
           </button>
           <button
             onClick={() => onNavigateToPage?.(info.pageFrom)}
             title={t('memorizeStartButton')}
             aria-label={t('memorizeStartButton')}
             className={cn(
-              "w-8 h-8 rounded-lg text-[#F2E3BB] flex items-center justify-center shadow-sm transition-colors",
+              "w-11 h-11 rounded-lg text-[#F2E3BB] flex items-center justify-center shadow-sm transition-all active:scale-[0.97]",
               index === nextTaskIndex && !done ? "bg-emerald-700 hover:bg-emerald-600" : "bg-emerald-600/70 hover:bg-emerald-600"
             )}
           >
-            {index === nextTaskIndex && !done ? <Play className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
+            {index === nextTaskIndex && !done ? <Play className="w-5 h-5" /> : <MapPin className="w-5 h-5" />}
           </button>
         </div>
       </div>
@@ -396,7 +399,7 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
           <button
             onClick={handleEditClick}
             className={cn(
-              "flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900 transition-colors",
+              "flex items-center justify-center gap-2 px-3 py-2.5 min-h-[44px] rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900 active:scale-[0.97] transition-all",
               textSizeClasses.button
             )}
           >
@@ -406,7 +409,7 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
           <button
             onClick={handleDeletePlan}
             className={cn(
-              "flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors",
+              "flex items-center justify-center gap-2 px-3 py-2.5 min-h-[44px] rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 active:scale-[0.97] transition-all",
               textSizeClasses.button
             )}
           >
