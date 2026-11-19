@@ -77,23 +77,27 @@ export function SwiperPageDisplay({
   const { getMushafPath, mushafType } = useMushaf();
   const { toast } = useToast();
   const swiperRef = useRef<SwiperType | null>(null);
-  // Text mushafs in fullscreen: real overlay bands — the header's measured
-  // height (+ container padding + slide padding) and the measured quick-bar
-  // height (+ paddings) — so the page text fills the ENTIRE space between
-  // the header and the quick bar. Normal mode uses undefined — TartelPage
-  // falls back to its classic fixed reserves. Memoized: TartelPage is
-  // memo-wrapped, so the object identity must stay stable across renders.
-  // Every swiped slide gets the same values, so all pages render
-  // identically.
+  // Text mushafs in fullscreen: real overlay bands — the measured header
+  // height (+ container pt + slide py) and HALF the measured quick-bar
+  // height (+ container pb + slide py) — so the page text fills the ENTIRE
+  // space down into the quick bar's transparent upper area (the bar floats
+  // OVER the page with no background, so reserving its full height left a
+  // dead band). The slide uses py-0.5 in fullscreen, so these reserves
+  // exactly match where the slide's content box starts/ends. Normal mode
+  // uses undefined — TartelPage falls back to its classic fixed reserves.
+  // Memoized: TartelPage is memo-wrapped, so the object identity must stay
+  // stable across renders. Every swiped slide gets the same values, so all
+  // pages render identically.
   const isTextMushaf = mushafType === 'tarteel' || mushafType === 'tajweed';
   const fillReserves = useMemo(
     () =>
       isFullscreen && isTextMushaf
         ? {
-            // Page top offset: container pt (header + 4) + slide py-1 (4).
-            header: (fullscreenHeaderHeight ?? 40) + 8,
-            // Page bottom offset: container pb (bar + 8) + slide py-1 (4).
-            footer: (fullscreenFooterHeight ?? 120) + 12,
+            // Page top offset: container pt (header + 4) + slide py-0.5 (2).
+            header: (fullscreenHeaderHeight ?? 40) + 6,
+            // Page bottom offset: container pb (half the bar + 8) + slide
+            // py-0.5 (2) — matches Surah.tsx's conditional paddingBottom.
+            footer: Math.round((fullscreenFooterHeight ?? 120) / 2) + 10,
           }
         : undefined,
     [isFullscreen, isTextMushaf, fullscreenHeaderHeight, fullscreenFooterHeight]
@@ -440,7 +444,14 @@ export function SwiperPageDisplay({
       // fillReserves (see above) sizes the text to fill the whole band
       // between the header and the quick bar when the reader is fullscreen.
       return (
-        <div className="relative w-full h-auto min-h-full flex flex-col justify-start px-2 md:px-4 box-border">
+        <div className={cn(
+          "relative w-full h-auto min-h-full flex flex-col justify-start box-border",
+          // Fullscreen: just a slim 4px gutter — the page spans nearly the
+          // full slide width (slide is px-0; TartelPage adds another 4px
+          // internally, ~8px total per side vs 28–64px before).
+          // Normal mode keeps the classic gutters.
+          isFullscreen ? "px-1" : "px-2 md:px-4"
+        )}>
           {renderBookmarkIcons(pageNum, isOddPage ? 'right' : 'left')}
           <div
             aria-hidden="true"
@@ -582,7 +593,11 @@ export function SwiperPageDisplay({
         speed={400}
         watchSlidesProgress={true}
         className={cn(
-          'w-full h-full max-w-7xl',
+          'w-full h-full',
+          // Fullscreen text mushafs: drop the 1280px cap so the page spans
+          // the whole viewport width (edge-to-edge, no side margins on wide
+          // screens). Everything else keeps the classic centered max-width.
+          isFullscreen && isTextMushaf ? 'max-w-none' : 'max-w-7xl',
           isFullscreen && 'swiper-fullscreen',
           isFullscreenDarkMode && 'swiper-fullscreen-dark'
         )}
@@ -593,14 +608,19 @@ export function SwiperPageDisplay({
         {slides.map((pageNum) => (
           <SwiperSlide key={pageNum} virtualIndex={pageNum - 1}>
             <div className={cn(
-              "flex justify-center h-full w-full py-1 overflow-y-auto box-border",
-              // Fullscreen image mushafs: no side padding so the page spans
-              // the FULL viewport width — same as the annotation editor's
-              // stage (which is a full-width absolute inset-0 flex box).
-              // Everything else keeps the classic side padding; text
-              // mushafs keep it in BOTH modes so toggling fullscreen never
-              // changes their page width.
-              isFullscreen && !isTextMushaf ? "px-0" : "px-3 md:px-6",
+              "flex justify-center h-full w-full overflow-y-auto box-border",
+              // Fullscreen (ALL mushaf types): no side padding so the page
+              // spans the FULL viewport width — same as the annotation
+              // editor's stage (a full-width absolute inset-0 flex box).
+              // Text mushafs previously kept their side padding in
+              // fullscreen, which left visible bands left/right of the
+              // page. Normal mode keeps the classic side padding.
+              isFullscreen ? "px-0" : "px-3 md:px-6",
+              // Fullscreen text mushafs: a slim 2px breathing gap instead of
+              // the classic 4px, so the text starts just below the header
+              // overlay and ends just above the quick bar (fillReserves
+              // matches this exactly).
+              isFullscreen && isTextMushaf ? "py-0.5" : "py-1",
               // Text mushafs fill the content box from the top (after the
               // header) instead of centering over the full viewport.
               mushafType === 'tarteel' || mushafType === 'tajweed'

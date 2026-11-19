@@ -1134,16 +1134,18 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onClose }: A
         )}
 
         {isTextMushaf ? (
-          /* Text mushafs: render the page exactly like the reader slide
-             (same max-width + paddings) but FILLED to the editor's whole
-             stage height (editorFillReserves) — the same expand-to-fit the
-             reader's fullscreen uses. Saved drawings stay aligned:
-             annotations are normalized (0..1 of the page) and every line
-             shares one dynamic line-height, so relative positions don't
-             move when the fill height changes. */
+          /* Text mushafs: render the page nearly EDGE-TO-EDGE — full stage
+             width (no max-width cap) with just a slim 4px gutter on each
+             side (matching the reader's fullscreen, which is also ~8px
+             total per side) but FILLED to the editor's whole stage height
+             (editorFillReserves) — the same expand-to-fit the reader's
+             fullscreen uses. Saved drawings stay aligned: annotations are
+             normalized (0..1 of the page) and every line shares one dynamic
+             line-height, so relative positions don't move when the fill
+             height changes. */
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-full max-w-7xl px-3 md:px-6">
-              <div className="w-full px-2 md:px-4">
+            <div className="w-full px-1">
+              <div className="w-full">
                 <div
                   ref={stageRef}
                   className="relative"

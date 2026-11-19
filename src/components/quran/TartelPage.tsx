@@ -763,8 +763,13 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           }}
         />
       ))}
+      {/* fillReserves is passed ONLY by the reader's fullscreen and the
+          annotation editor ("fill exactly between the overlays" mode) —
+          those render nearly edge-to-edge with just a slim 4px gutter on
+          each side (vs the classic px-2/4/6). Normal mode (no fillReserves)
+          keeps the classic gutters. */}
       <div 
-        className={`tartel-content-wrapper w-full flex flex-col px-2 sm:px-4 md:px-6`}
+        className={`tartel-content-wrapper w-full flex flex-col ${fillReserves ? 'px-1' : 'px-2 sm:px-4 md:px-6'}`}
         style={{
           maxHeight: 'none',
           position: 'relative',

@@ -863,7 +863,15 @@ const Surah = () => {
           paddingTop:
             isFullscreen ? `${fullscreenHeaderHeight + 4}px` : undefined,
           paddingBottom:
-            isFullscreen ? `${quickBarHeight + 8}px` : undefined,
+            isFullscreen
+              ? isTextMushaf
+                ? // Text mushafs: the quick bar floats transparently OVER the
+                  // page, so reserve only half its height — the text extends
+                  // down into the bar's upper area instead of leaving a full
+                  // dead band above it.
+                  `${Math.round(quickBarHeight / 2) + 8}px`
+                : `${quickBarHeight + 8}px`
+              : undefined,
         }}
       >
         {useSwiperMode ? (
