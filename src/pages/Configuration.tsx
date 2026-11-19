@@ -299,7 +299,7 @@ export default function Configuration() {
             }
             onGoToClick={() => navigate('/config/navigation')}
             onSearchClick={() => navigate('/config/search')}
-            onBookmarkClick={() => navigate('/config/bookmarks')}
+            onBookmarkClick={() => configType === 'bookmarks' ? navigate('/') : navigate('/config/bookmarks')}
             onSettingsClick={() => navigate('/config/settings')}
             onTafseerClick={() => navigate('/config/tafseer')}
             onViewModeToggle={() => updateViewMode(viewMode === 'single' ? 'double' : 'single')}
