@@ -653,7 +653,7 @@ export const useAudioPlayer = ({
     endAyah: number,
     ayahRepeatCount: number,
     passageRepeatCount: number
-  ): Promise<{ blobUrl: string; timestamps: {surah: number; ayah: number; repetition: number; passage: number; startTime: number}[] } | null> => {
+  ): Promise<{ blobUrl: string; timestamps: {surah: number; ayah: number; repetition: number; passage: number; startTime: number}[] } | 'too-large' | null> => {
     if (!selectedReciter || audioSource !== 'everyayah') return null;
     if (!audioContext) return null;
     
@@ -682,8 +682,15 @@ export const useAudioPlayer = ({
     
     if (ayahsInRange.length === 0) return null;
     
-    // Calculate total audio segments
+    // Guard: pre-building one giant WAV is expensive (download + decode + encode per ayah).
+    // Beyond this many segments, fall back to sequential playback which starts instantly
+    // (the event-driven repeat engine in handleAudioEnded handles counts correctly).
+    const MAX_CONCAT_SEGMENTS = 150;
     const totalSegments = ayahsInRange.length * ayahRepeatCount * passageRepeatCount;
+    if (totalSegments > MAX_CONCAT_SEGMENTS) {
+      console.log(`⚖️ Repeat too large to pre-concatenate (${ayahsInRange.length} ayahs × ${ayahRepeatCount} × ${passageRepeatCount} = ${totalSegments} segments) — using sequential playback instead`);
+      return 'too-large';
+    }
     
     // Create new AbortController for this operation
     preloadAbortControllerRef.current = new AbortController();
@@ -756,7 +763,10 @@ export const useAudioPlayer = ({
           audioBufferCache.set(key, audioBuffer);
           
           downloadProgress++;
-          setPreloadProgress({ current: downloadProgress, total: totalSegments });
+          // Report progress against unique ayahs being downloaded, not the
+          // total segment count (which includes repeats) — otherwise the bar
+          // crawls (e.g. 1/600) and looks stuck forever.
+          setPreloadProgress({ current: downloadProgress, total: ayahsInRange.length });
         } catch (decodeError) {
           console.error(`Failed to decode ayah ${surah}:${ayah}:`, decodeError);
           setIsPreloadingAyahs(false);
@@ -992,7 +1002,9 @@ export const useAudioPlayer = ({
           audioBufferCache.set(surahNum, audioBuffer);
           
           downloadProgress++;
-          setPreloadProgress({ current: downloadProgress, total: totalSegments });
+          // Report progress against unique surahs being downloaded, not the
+          // total segment count (which includes passage repeats).
+          setPreloadProgress({ current: downloadProgress, total: surahsInRange.length });
         } catch (error) {
           if (error instanceof Error && error.name === 'AbortError') {
             console.log('⛔ MP3Quran repeat preload aborted during fetch');
@@ -1945,8 +1957,23 @@ export const useAudioPlayer = ({
         passageCount
       );
       
+      if (result === 'too-large') {
+        // Range is too large to pre-build into one blob — use the sequential
+        // repeat engine instead, which starts playing immediately.
+        console.log('⚖️ Using sequential repeat playback (range too large to pre-build)');
+        setIsRepeatActive(true);
+        setIsRepeatConcatenatedMode(false);
+        setCurrentRepeatPassage(1);
+        setCurrentRepeatSurah(startSurah);
+        setCurrentRepeatAyah(startAyah);
+        setCurrentRepeatAyahCount(1);
+        playAyah(startSurah, startAyah);
+        return;
+      }
+      
       if (!result) {
         console.error('Failed to concatenate repeat audio');
+        setIsPreloadingAyahs(false);
         return;
       }
       
@@ -1980,9 +2007,29 @@ export const useAudioPlayer = ({
       
       audioElement.src = result.blobUrl;
       
+      // Safety: never leave the spinner hanging if the blob fails to load or stalls.
+      const handleLoadError = (err: unknown) => {
+        console.error('Failed to load/play repeat audio:', err);
+        setIsPlaying(false);
+        setIsPreloadingAyahs(false);
+        setIsRepeatActive(false);
+        setIsRepeatConcatenatedMode(false);
+        releaseWakeLock();
+        isAyahNavigation.current = false;
+      };
+      const handleElementError = () => handleLoadError(new Error('Audio element failed to load repeat blob'));
+      const metadataTimeoutId = window.setTimeout(() => {
+        handleLoadError(new Error('Timed out loading repeat audio'));
+      }, 30000);
+      const finishLoading = () => {
+        clearTimeout(metadataTimeoutId);
+        audioElement.removeEventListener('error', handleElementError);
+      };
+      
       const handleLoadedMetadata = () => {
         audioElement.currentTime = 0;
         audioElement.play().then(() => {
+          finishLoading();
           setIsPlaying(true);
           setIsPreloadingAyahs(false); // Hide spinner once playing
           if ('mediaSession' in navigator) {
@@ -1992,17 +2039,13 @@ export const useAudioPlayer = ({
             isAyahNavigation.current = false;
           }, 500);
         }).catch(err => {
-          console.error('Failed to play repeat audio:', err);
-          setIsPlaying(false);
-          setIsPreloadingAyahs(false);
-          setIsRepeatActive(false);
-          setIsRepeatConcatenatedMode(false);
-          releaseWakeLock();
-          isAyahNavigation.current = false;
+          finishLoading();
+          handleLoadError(err);
         });
       };
       
       audioElement.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+      audioElement.addEventListener('error', handleElementError, { once: true });
       audioElement.load();
     } else if (audioSource === 'mp3quran' && selectedMoshaf) {
       // MP3Quran mode: create concatenated audio with surah/passage repeats baked in
@@ -2058,9 +2101,29 @@ export const useAudioPlayer = ({
       
       audioElement.src = result.blobUrl;
       
+      // Safety: never leave the spinner hanging if the blob fails to load or stalls.
+      const handleMp3QuranLoadError = (err: unknown) => {
+        console.error('Failed to load/play MP3Quran repeat audio:', err);
+        setIsPlaying(false);
+        setIsPreloadingAyahs(false);
+        setIsRepeatActive(false);
+        setIsRepeatConcatenatedMode(false);
+        releaseWakeLock();
+        isAyahNavigation.current = false;
+      };
+      const handleMp3QuranElementError = () => handleMp3QuranLoadError(new Error('Audio element failed to load repeat blob'));
+      const mp3QuranMetadataTimeoutId = window.setTimeout(() => {
+        handleMp3QuranLoadError(new Error('Timed out loading MP3Quran repeat audio'));
+      }, 30000);
+      const finishMp3QuranLoading = () => {
+        clearTimeout(mp3QuranMetadataTimeoutId);
+        audioElement.removeEventListener('error', handleMp3QuranElementError);
+      };
+      
       const handleMp3QuranLoadedMetadata = () => {
         audioElement.currentTime = 0;
         audioElement.play().then(() => {
+          finishMp3QuranLoading();
           setIsPlaying(true);
           setIsPreloadingAyahs(false); // Hide spinner once playing
           if ('mediaSession' in navigator) {
@@ -2070,17 +2133,13 @@ export const useAudioPlayer = ({
             isAyahNavigation.current = false;
           }, 500);
         }).catch(err => {
-          console.error('Failed to play MP3Quran repeat audio:', err);
-          setIsPlaying(false);
-          setIsPreloadingAyahs(false);
-          setIsRepeatActive(false);
-          setIsRepeatConcatenatedMode(false);
-          releaseWakeLock();
-          isAyahNavigation.current = false;
+          finishMp3QuranLoading();
+          handleMp3QuranLoadError(err);
         });
       };
       
       audioElement.addEventListener('loadedmetadata', handleMp3QuranLoadedMetadata, { once: true });
+      audioElement.addEventListener('error', handleMp3QuranElementError, { once: true });
       audioElement.load();
     } else {
       // Fallback: use the old sequential playback method

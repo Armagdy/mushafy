@@ -144,15 +144,15 @@ export function PlayBar({
               onClick={onRepeatClick}
               className={cn(
                 chipClass,
-                !isRepeatActive && (
+                isRepeatActive && (
                   isGlassLight
-                    ? "bg-gray-400/20 hover:bg-gray-400/30 border-gray-500/20"
-                    : "bg-gray-600/50 hover:bg-gray-500/50 border-gray-400/30"
+                    ? "bg-amber-500/25 hover:bg-amber-500/40 border-amber-600/50"
+                    : "bg-amber-400/25 hover:bg-amber-400/40 border-amber-300/50"
                 )
               )}
               title="Repeat"
             >
-              <Repeat className={cn("w-5 h-5 md:w-6 md:h-6", chipTextClass, !isRepeatActive && (isGlassLight ? "text-gray-500" : "text-gray-300"))} />
+              <Repeat className={cn("w-5 h-5 md:w-6 md:h-6", chipTextClass, isRepeatActive && "text-amber-500")} />
             </button>
           </div>
           
