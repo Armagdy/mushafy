@@ -174,6 +174,27 @@ export default function ReciterView({
   const [selectedMp3Reading, setSelectedMp3Reading] = useState('');
   const [selectedMp3Style, setSelectedMp3Style] = useState('');
 
+  // ── Draft selection state ────────────────────────────────────────────────
+  // Everything the user picks in this view is DRAFT until they press Save.
+  // Browsing/selecting reciters must NEVER change the currently playing
+  // reciter — commits to the audio player happen only in the Save button's
+  // handler below.
+  const [draftFilterReading, setDraftFilterReading] = useState(filterReading);
+  const [draftFilterStyle, setDraftFilterStyle] = useState(filterStyle);
+  const [draftMp3Reciter, setDraftMp3Reciter] = useState<Mp3QuranReciter | null>(selectedMp3QuranReciter);
+  const [draftMoshaf, setDraftMoshaf] = useState<Mp3QuranMoshaf | null>(selectedMoshaf);
+
+  // Full EveryAyah reciter dataset — used to compute reading/style options for
+  // a draft-selected reciter before anything is committed to the player
+  const [everyAyahRecitersData, setEveryAyahRecitersData] = useState<any[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    getAudioData().then((data: any) => {
+      if (!cancelled && Array.isArray(data)) setEveryAyahRecitersData(data);
+    }).catch((err) => console.error('Failed to load EveryAyah reciters:', err));
+    return () => { cancelled = true; };
+  }, []);
+
   // MP3Quran timing validation state
   const [isCheckingTiming, setIsCheckingTiming] = useState(false);
   const [timingAvailable, setTimingAvailable] = useState(false);
@@ -315,45 +336,46 @@ export default function ReciterView({
     }
   }, [audioSource, filterReciterName, selectedMp3QuranReciter, unifiedReciters]);
 
-  // MP3Quran: init reading/style from selectedMoshaf
+  // MP3Quran: init reading/style from the DRAFT moshaf selection
   useEffect(() => {
-    if (selectedMp3QuranReciter && selectedMoshaf) {
-      setSelectedMp3Reading(getMoshafReading(selectedMoshaf.name));
-      setSelectedMp3Style(getMoshafStyle(selectedMoshaf.name));
+    if (draftMp3Reciter && draftMoshaf) {
+      setSelectedMp3Reading(getMoshafReading(draftMoshaf.name));
+      setSelectedMp3Style(getMoshafStyle(draftMoshaf.name));
     }
-  }, [selectedMp3QuranReciter?.id, selectedMoshaf?.id]);
+  }, [draftMp3Reciter?.id, draftMoshaf?.id]);
 
-  // MP3Quran: auto-select moshaf when reading+style change
+  // MP3Quran: auto-select the DRAFT moshaf when reading+style change
+  // (nothing is committed to the audio player here)
   useEffect(() => {
-    if (!selectedMp3QuranReciter || !selectedMp3Reading || !selectedMp3Style) return;
-    const matching = selectedMp3QuranReciter.moshaf.find(
+    if (!draftMp3Reciter || !selectedMp3Reading || !selectedMp3Style) return;
+    const matching = draftMp3Reciter.moshaf.find(
       (m) => getMoshafReading(m.name) === selectedMp3Reading && getMoshafStyle(m.name) === selectedMp3Style
     );
-    if (matching && matching.id !== selectedMoshaf?.id) {
-      onMoshafChange(matching);
+    if (matching && matching.id !== draftMoshaf?.id) {
+      setDraftMoshaf(matching);
     }
-  }, [selectedMp3Reading, selectedMp3Style, selectedMp3QuranReciter]);
+  }, [selectedMp3Reading, selectedMp3Style, draftMp3Reciter, draftMoshaf?.id]);
 
-  // Check MP3Quran surah availability
+  // Check MP3Quran surah availability (against the DRAFT moshaf)
   useEffect(() => {
-    if (selectedUnifiedReciter?.source !== 'mp3quran' || !selectedMoshaf) {
+    if (selectedUnifiedReciter?.source !== 'mp3quran' || !draftMoshaf) {
       setIsSurahAvailable(true);
       return;
     }
 
     const checkSurahAvailability = async () => {
-      const isCached = await isMp3QuranAudioCached(selectedMoshaf.id, selectedSurahForPlayback);
+      const isCached = await isMp3QuranAudioCached(draftMoshaf.id, selectedSurahForPlayback);
       if (isCached) {
         setIsSurahAvailable(true);
         return;
       }
       
-      const surahList = selectedMoshaf.surah_list.split(',').map(s => parseInt(s.trim(), 10));
+      const surahList = draftMoshaf.surah_list.split(',').map(s => parseInt(s.trim(), 10));
       setIsSurahAvailable(surahList.includes(selectedSurahForPlayback));
     };
 
     checkSurahAvailability();
-  }, [selectedUnifiedReciter, selectedMoshaf, selectedSurahForPlayback]);
+  }, [selectedUnifiedReciter, draftMoshaf, selectedSurahForPlayback]);
 
   // Check EveryAyah surah availability - DISABLED: No checks for EveryAyah
   useEffect(() => {
@@ -372,9 +394,9 @@ export default function ReciterView({
     }
   }, [selectedUnifiedReciter, selectedReciter, selectedSurahForPlayback]);
 
-  // Check MP3Quran ayah timing availability
+  // Check MP3Quran ayah timing availability (against the DRAFT selection)
   useEffect(() => {
-    if (selectedUnifiedReciter?.source !== 'mp3quran' || !selectedMp3QuranReciter || !selectedMoshaf) {
+    if (selectedUnifiedReciter?.source !== 'mp3quran' || !draftMp3Reciter || !draftMoshaf) {
       setTimingAvailable(false);
       setTimingError(null);
       setIsCheckingTiming(false);
@@ -387,25 +409,25 @@ export default function ReciterView({
       setTimingAvailable(false);
 
       try {
-        const cachedTiming = await getCachedAyahTiming(selectedMoshaf.id, selectedSurahForPlayback);
+        const cachedTiming = await getCachedAyahTiming(draftMoshaf.id, selectedSurahForPlayback);
         if (cachedTiming && cachedTiming.length > 0) {
           setTimingAvailable(true);
           setIsCheckingTiming(false);
           return;
         }
 
-        const cachedMp3Audio = await getCachedMp3QuranAudio(selectedMoshaf.id, selectedSurahForPlayback);
+        const cachedMp3Audio = await getCachedMp3QuranAudio(draftMoshaf.id, selectedSurahForPlayback);
         if (cachedMp3Audio && cachedMp3Audio.timingData && cachedMp3Audio.timingData.length > 0) {
-          await cacheAyahTiming(selectedMoshaf.id, selectedSurahForPlayback, cachedMp3Audio.timingData);
+          await cacheAyahTiming(draftMoshaf.id, selectedSurahForPlayback, cachedMp3Audio.timingData);
           setTimingAvailable(true);
           setIsCheckingTiming(false);
           return;
         }
 
-        const result = await checkAyahTiming(selectedSurahForPlayback, selectedMoshaf.id);
+        const result = await checkAyahTiming(selectedSurahForPlayback, draftMoshaf.id);
         
         if (result.success && result.timings.length > 0) {
-          await cacheAyahTiming(selectedMoshaf.id, selectedSurahForPlayback, result.timings);
+          await cacheAyahTiming(draftMoshaf.id, selectedSurahForPlayback, result.timings);
           setTimingAvailable(true);
           setTimingError(null);
         } else if (result.error === 'network') {
@@ -425,7 +447,7 @@ export default function ReciterView({
 
     const timeoutId = setTimeout(checkTiming, 300);
     return () => clearTimeout(timeoutId);
-  }, [selectedUnifiedReciter, selectedMp3QuranReciter, selectedMoshaf, selectedSurahForPlayback]);
+  }, [selectedUnifiedReciter, draftMp3Reciter, draftMoshaf, selectedSurahForPlayback]);
 
   // Normalize Arabic text for search
   const normalizeArabic = (text: string): string => {
@@ -488,16 +510,32 @@ export default function ReciterView({
     return moshafName;
   };
 
-  // Handle reciter selection
+  // Handle reciter selection — DRAFT ONLY.
+  // Nothing is committed to the audio player here; committing happens
+  // exclusively in the Save button handler, so the currently playing
+  // reciter is never changed just by browsing this page.
   const handleReciterSelect = (reciter: UnifiedReciter) => {
     setSelectedUnifiedReciter(reciter);
     setShowReciterScroll(false);
-    onAudioSourceChange(reciter.source);
     if (reciter.source === 'everyayah') {
-      onFilterReciterNameChange(reciter.nameAr);
+      // Default the draft reading/style to this reciter's first variant
+      const variants = everyAyahRecitersData.filter(r => extractBaseNameArLocal(r?.nameAr || '') === reciter.nameAr);
+      if (variants.length > 0) {
+        const readings = [...new Set(variants.map((v: any) => v.reading).filter(Boolean))];
+        const reading = readings[0] || 'hafs';
+        const styleVariants = variants.filter((v: any) => v.reading === reading);
+        const styles = [...new Set(styleVariants.map((v: any) => v.style).filter(Boolean))];
+        setDraftFilterReading(reading);
+        setDraftFilterStyle(styles[0] || 'murattal');
+      }
     } else if (reciter.source === 'mp3quran' && reciter.mp3QuranId) {
       const mp3Reciter = mp3QuranReciters.find(r => r.id === reciter.mp3QuranId);
-      if (mp3Reciter) onMp3QuranReciterChange(mp3Reciter);
+      if (mp3Reciter) {
+        setDraftMp3Reciter(mp3Reciter);
+        // Default the draft moshaf to this reciter's first moshaf
+        const firstMoshaf = mp3Reciter.moshaf?.[0];
+        if (firstMoshaf) setDraftMoshaf(firstMoshaf);
+      }
     }
   };
 
@@ -537,51 +575,79 @@ export default function ReciterView({
   }, [filteredAndSortedReciters, favoriteIds, downloadedIds]);
 
   // ── Column 1: reading type data ───────────────────────────────────────────────
+  // EveryAyah: variants of the DRAFT-selected reciter (used to build the
+  // reading/style columns before anything is committed)
+  const draftEveryAyahVariants = useMemo(() => {
+    if (selectedUnifiedReciter?.source !== 'everyayah' || !selectedUnifiedReciter.nameAr) return [];
+    return everyAyahRecitersData.filter(r => extractBaseNameArLocal(r?.nameAr || '') === selectedUnifiedReciter.nameAr);
+  }, [selectedUnifiedReciter, everyAyahRecitersData]);
+
   const mp3Readings = useMemo(() => {
-    if (!selectedMp3QuranReciter) return [];
-    const readings = selectedMp3QuranReciter.moshaf.map(m => getMoshafReading(m.name));
+    if (!draftMp3Reciter) return [];
+    const readings = draftMp3Reciter.moshaf.map(m => getMoshafReading(m.name));
     return [...new Set(readings)];
-  }, [selectedMp3QuranReciter]);
+  }, [draftMp3Reciter]);
 
   // ── Column 2: style data (filtered by reading for MP3Quran) ───────────────────
   const mp3StylesForReading = useMemo(() => {
-    if (!selectedMp3QuranReciter) return [];
+    if (!draftMp3Reciter) return [];
     const moshafs = selectedMp3Reading
-      ? selectedMp3QuranReciter.moshaf.filter(m => getMoshafReading(m.name) === selectedMp3Reading)
-      : selectedMp3QuranReciter.moshaf;
+      ? draftMp3Reciter.moshaf.filter(m => getMoshafReading(m.name) === selectedMp3Reading)
+      : draftMp3Reciter.moshaf;
     const styles = moshafs.map(m => getMoshafStyle(m.name));
     return [...new Set(styles)];
-  }, [selectedMp3QuranReciter, selectedMp3Reading]);
+  }, [draftMp3Reciter, selectedMp3Reading]);
 
   const getReadings = () => {
     if (!selectedUnifiedReciter) return [];
-    if (selectedUnifiedReciter.source === 'everyayah') return availableReadings.length > 0 ? availableReadings : ['hafs'];
+    if (selectedUnifiedReciter.source === 'everyayah') {
+      // Options for the DRAFT-selected reciter (falls back to the committed
+      // options while the reciter dataset loads)
+      if (draftEveryAyahVariants.length > 0) {
+        const readings = [...new Set(draftEveryAyahVariants.map((v: any) => v.reading).filter(Boolean))];
+        if (readings.length > 0) return readings;
+      }
+      return availableReadings.length > 0 ? availableReadings : ['hafs'];
+    }
     return mp3Readings;
   };
 
   const getStyles = () => {
     if (!selectedUnifiedReciter) return [];
-    if (selectedUnifiedReciter.source === 'everyayah') return availableStyles.length > 0 ? availableStyles : ['murattal'];
+    if (selectedUnifiedReciter.source === 'everyayah') {
+      if (draftEveryAyahVariants.length > 0) {
+        const styleVariants = draftEveryAyahVariants.filter((v: any) => !draftFilterReading || v.reading === draftFilterReading);
+        const styles = [...new Set(styleVariants.map((v: any) => v.style).filter(Boolean))];
+        if (styles.length > 0) return styles;
+      }
+      return availableStyles.length > 0 ? availableStyles : ['murattal'];
+    }
     return mp3StylesForReading;
   };
 
   const isReadingSelected = (reading: string) => {
-    if (selectedUnifiedReciter?.source === 'everyayah') return filterReading === reading;
+    if (selectedUnifiedReciter?.source === 'everyayah') return draftFilterReading === reading;
     return selectedMp3Reading === reading;
   };
 
   const isStyleSelected = (style: string) => {
-    if (selectedUnifiedReciter?.source === 'everyayah') return filterStyle === style;
+    if (selectedUnifiedReciter?.source === 'everyayah') return draftFilterStyle === style;
     return selectedMp3Style === style;
   };
 
   const handleReadingSelect = (reading: string) => {
     if (!selectedUnifiedReciter) return;
     if (selectedUnifiedReciter.source === 'everyayah') {
-      onFilterReadingChange(reading);
+      // Draft only — committed on Save
+      setDraftFilterReading(reading);
+      const styleVariants = draftEveryAyahVariants.filter((v: any) => v.reading === reading);
+      if (styleVariants.length > 0) {
+        const styles = [...new Set(styleVariants.map((v: any) => v.style).filter(Boolean))];
+        if (styles.length > 0) setDraftFilterStyle(styles[0]);
+      }
     } else {
       setSelectedMp3Reading(reading);
-      const moshafs = selectedMp3QuranReciter?.moshaf.filter(m => getMoshafReading(m.name) === reading) || [];
+      const moshafs = draftMp3Reciter?.moshaf.filter(m => getMoshafReading(m.name) === reading) || [];
       if (moshafs.length > 0) setSelectedMp3Style(getMoshafStyle(moshafs[0].name));
     }
   };
@@ -589,7 +655,8 @@ export default function ReciterView({
   const handleStyleSelect = (style: string) => {
     if (!selectedUnifiedReciter) return;
     if (selectedUnifiedReciter.source === 'everyayah') {
-      onFilterStyleChange(style);
+      // Draft only — committed on Save
+      setDraftFilterStyle(style);
     } else {
       setSelectedMp3Style(style);
     }
@@ -860,6 +927,27 @@ export default function ReciterView({
           <div className="shrink-0 pt-2 mt-1 border-t border-emerald-100 dark:border-emerald-900 bg-gradient-to-b from-transparent via-[#FBF9F4]/80 to-[#FBF9F4] dark:from-transparent dark:via-gray-900/80 dark:to-gray-900">
             <Button
               onClick={async () => {
+                // ── COMMIT the draft selection ──────────────────────────────
+                // This is the ONLY place the current playing reciter changes.
+                // Any previously saved reciter that was playing is stopped by
+                // onNavigateToSurah (stopAudio), even for the same surah.
+                const source = selectedUnifiedReciter?.source ?? audioSource;
+                onAudioSourceChange(source);
+                if (source === 'everyayah') {
+                  if (selectedUnifiedReciter?.nameAr) {
+                    onFilterReciterNameChange(selectedUnifiedReciter.nameAr);
+                  }
+                  onFilterReadingChange(draftFilterReading);
+                  onFilterStyleChange(draftFilterStyle);
+                } else {
+                  if (draftMp3Reciter) onMp3QuranReciterChange(draftMp3Reciter);
+                  if (draftMoshaf) {
+                    onMoshafChange(draftMoshaf);
+                    // Persist now — the parent's onListen callback still sees
+                    // the previous moshaf in this render's closure
+                    localStorage.setItem('quran-last-mp3quran-moshaf', draftMoshaf.id.toString());
+                  }
+                }
                 onListen();
                 await onNavigateToSurah(selectedSurahForPlayback);
               }}

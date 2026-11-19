@@ -1732,13 +1732,22 @@ export const useAudioPlayer = ({
       // Stop HTML Audio Element
       audioElement.pause();
       audioElement.currentTime = 0;
-      audioElement.src = '';
+      // Clear the source PROPERLY: assigning src = '' leaves the src property
+      // resolving to the page URL (still truthy), which breaks "is a source
+      // loaded?" checks — e.g. the progress bar's stop-detection. Removing the
+      // attribute and resetting the element makes audioElement.src === ''.
+      audioElement.removeAttribute('src');
+      audioElement.load();
       console.log('Audio element stopped and cleared');
     }
     
     // Clear all playback states
     setIsPlaying(false);
-    setCurrentPlayingAyah(null);
+    // KEEP currentPlayingAyah on stop: the selected ayah stays highlighted
+    // on the mushaf and acts as the resume point. The play logic already
+    // falls back to the current page's start when the kept selection is on
+    // another page, and the time-update tracker is gated by currentSurahAudio
+    // (cleared below), so a kept selection can't drive stale updates.
     setIsRepeatActive(false);
     setIsRepeatConcatenatedMode(false);
     setCurrentRepeatPassage(0);
@@ -2943,10 +2952,17 @@ export const useAudioPlayer = ({
       const qualityPriority = ['192kbps', '128kbps', '64kbps', '48kbps', '40kbps', '32kbps', '16kbps'];
       const bestQuality = qualityPriority.find(q => qualities.includes(q)) || qualities[0];
       
-      setFilterReading(readings[0]);
-      setFilterStyle(styles[0]);
+      // Only reset reading/style when the current ones are not valid for the
+      // newly selected reciter. The reciter config commits the reciter name
+      // and the user's chosen reading/style together (on Save), and those
+      // choices must not be overwritten with the defaults here.
+      if (!readings.includes(filterReading)) setFilterReading(readings[0]);
+      if (!styles.includes(filterStyle)) setFilterStyle(styles[0]);
       setFilterQuality(bestQuality);
     }
+    // (filterReading/filterStyle are intentionally NOT deps: this effect must
+    // only run when the reciter NAME changes, not on every reading/style tweak)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterReciterName, reciters]);
   
   // Update available qualities when reading or style changes

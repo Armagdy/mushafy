@@ -913,11 +913,22 @@ const Surah = () => {
               
               // Check if MP3Quran reciter without ayah timing is selected
               if (audioSource === 'mp3quran' && !hasAyahTimings) {
-                toast({
-                  title: t('cannotSelectAyahWithReciter'),
-                  description: t('pleaseChooseAnotherReciter'),
-                  variant: 'destructive',
-                });
+                // Without ayah timings we cannot seek to a specific ayah.
+                // However, if the selected ayah is in a DIFFERENT surah than
+                // the one currently playing, switch playback to that surah
+                // (from its beginning) instead of showing the error.
+                const playingSurah = currentPlayingAyah?.surah ?? currentSurahAudio;
+                if (playingSurah != null && surah !== playingSurah) {
+                  playAyah(surah, 1);
+                } else {
+                  // Same surah as the one playing (or nothing loaded) -
+                  // specific ayah selection is impossible without timing data
+                  toast({
+                    title: t('cannotSelectAyahWithReciter'),
+                    description: t('pleaseChooseAnotherReciter'),
+                    variant: 'destructive',
+                  });
+                }
                 return;
               }
               
@@ -983,11 +994,22 @@ const Surah = () => {
               
               // Check if MP3Quran reciter without ayah timing is selected
               if (audioSource === 'mp3quran' && !hasAyahTimings) {
-                toast({
-                  title: t('cannotSelectAyahWithReciter'),
-                  description: t('pleaseChooseAnotherReciter'),
-                  variant: 'destructive',
-                });
+                // Without ayah timings we cannot seek to a specific ayah.
+                // However, if the selected ayah is in a DIFFERENT surah than
+                // the one currently playing, switch playback to that surah
+                // (from its beginning) instead of showing the error.
+                const playingSurah = currentPlayingAyah?.surah ?? currentSurahAudio;
+                if (playingSurah != null && surah !== playingSurah) {
+                  playAyah(surah, 1);
+                } else {
+                  // Same surah as the one playing (or nothing loaded) -
+                  // specific ayah selection is impossible without timing data
+                  toast({
+                    title: t('cannotSelectAyahWithReciter'),
+                    description: t('pleaseChooseAnotherReciter'),
+                    variant: 'destructive',
+                  });
+                }
                 return;
               }
               
@@ -1308,7 +1330,11 @@ const Surah = () => {
       <div
         className={cn(
           "z-[100] transition-[opacity,transform] duration-300 ease-out",
-          isFullscreen || !currentPlayingAyah
+          // Hidden when: fullscreen, nothing selected, or audio fully STOPPED
+          // (stopAudio clears the element's src — a paused player keeps its
+          // source loaded, so pausing keeps the bar visible while stopping
+          // hides it)
+          isFullscreen || !currentPlayingAyah || (!isPlaying && !audioElement?.src)
             ? "opacity-0 translate-y-full pointer-events-none"
             : "opacity-100 translate-y-0"
         )}
@@ -1726,11 +1752,15 @@ const Surah = () => {
             }
           }}
           onReciterNavigateToSurah={async (surahId) => {
+            // ALWAYS stop any playing audio when the user saves a reciter —
+            // the previously saved reciter must never keep playing after a
+            // save, even when the selected surah didn't change.
+            stopAudio();
+
             // Check if user is changing to a different surah
             const isDifferentSurah = surahId !== currentSurahId;
-            
+
             if (isDifferentSurah) {
-              stopAudio();
               setCurrentPlayingAyah({ surah: surahId, ayah: 1 });
               isAyahNavigation.current = true;
               const firstPage = await getAyahPage(surahId, 1);
@@ -1741,7 +1771,7 @@ const Surah = () => {
                 }
               }
             }
-            
+
             // Close the overlay (whether same surah or different)
             setConfigOverlayType(null);
           }}
