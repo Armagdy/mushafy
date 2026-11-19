@@ -365,7 +365,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
                     className={cn(
                       "block p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-900/20",
                       textSizeClasses.text,
-                      "text-right text-emerald-900 dark:text-emerald-100 leading-[2.2] font-arabic"
+                      "text-right text-emerald-900 dark:text-emerald-100 leading-[2.2] font-quran"
                     )}
                   >
                     {highlightText(result.arabicText, searchWord, true)}

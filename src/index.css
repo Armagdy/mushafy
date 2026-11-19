@@ -207,6 +207,10 @@
     font-family: var(--font-arabic);
   }
 
+  .font-quran {
+    font-family: var(--font-quran);
+  }
+
   .font-display {
     font-family: var(--font-display);
   }
@@ -255,7 +259,7 @@
 
   /* Quran text styling */
   .quran-text {
-    font-family: var(--font-arabic);
+    font-family: var(--font-quran);
     font-size: 1.75rem;
     line-height: 2.5;
     letter-spacing: 0.02em;

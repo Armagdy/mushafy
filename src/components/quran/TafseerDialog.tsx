@@ -260,7 +260,7 @@ export function TafseerDialog({
             </div>
           ) : ayahText ? (
             <ScrollArea className="max-h-[120px] sm:max-h-[150px] md:max-h-[180px] lg:max-h-[200px] p-4 border border-emerald-300 dark:border-emerald-600 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20">
-              <div className={cn("leading-[2.2] text-right text-emerald-900 dark:text-emerald-50", textSizeClasses.text)} style={{ fontFamily: "'Changa', sans-serif" }}>
+              <div className={cn("font-quran leading-[2.2] text-right text-emerald-900 dark:text-emerald-50", textSizeClasses.text)}>
                 {ayahText}
               </div>
             </ScrollArea>

@@ -150,9 +150,9 @@ const SurahReader = ({ surah, onBack }: SurahReaderProps) => {
                               )}
                             >
                               <p 
-                                className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl leading-[2.2] text-[#2c1810] inline"
+                                className="font-quran text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl leading-[2.2] text-[#2c1810] inline"
                                 style={{ 
-                                  fontFamily: "'Changa', sans-serif",
+                                  fontFamily: "var(--font-quran)",
                                   wordSpacing: '0.15em'
                                 }}
                               >

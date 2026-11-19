@@ -1194,7 +1194,7 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
                                     : `${localQuarterNumber}. `}
                                 </span>
                                 {quarter.ayahText && typeof quarter.ayahText === 'string' && (
-                                  <span className="font-arabic">
+                                  <span className="font-quran">
                                     {quarter.ayahText.substring(0, 50)}
                                     {quarter.ayahText.length > 50 ? '...' : ''}
                                   </span>

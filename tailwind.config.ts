@@ -74,6 +74,7 @@ export default {
         arabic: ['Changa', 'Noto Sans Arabic', 'sans-serif'],
         display: ['Changa', 'sans-serif'],
         body: ['Changa', 'Noto Sans Arabic', 'sans-serif'],
+        quran: ['KFGQPC HAFS', 'Amiri Quran', 'Changa', 'Noto Sans Arabic', 'serif'],
       },
       borderRadius: {
         lg: "var(--radius)",

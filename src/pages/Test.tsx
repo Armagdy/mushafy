@@ -1110,7 +1110,7 @@ export default function Test() {
                   )}>
                     <p
                       className="text-2xl md:text-3xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200"
-                      style={{ fontFamily: "'Changa', sans-serif" }}
+                      style={{ fontFamily: "var(--font-quran)" }}
                     >
                       {currentQuestion.partialText}
                     </p>
@@ -1154,7 +1154,7 @@ export default function Test() {
                           </p>
                           <p
                             className="text-xl md:text-2xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 text-right"
-                            style={{ fontFamily: "'Changa', sans-serif" }}
+                            style={{ fontFamily: "var(--font-quran)" }}
                           >
                             {currentQuestion.questionAyah.text}
                           </p>
@@ -1186,7 +1186,7 @@ export default function Test() {
                       </div>
 
                       <div className="text-2xl md:text-3xl font-amiri text-gray-800 dark:text-gray-200"
-                           style={{ fontFamily: "'Changa', sans-serif", lineHeight: "2.5" }}>
+                           style={{ fontFamily: "var(--font-quran)", lineHeight: "2.5" }}>
                         {/* Question Ayah */}
                         <span>{currentQuestion.questionAyah.text}</span>
                         <span 
@@ -1255,7 +1255,7 @@ export default function Test() {
                   )}>
                     <p
                       className="text-2xl md:text-3xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 text-center"
-                      style={{ fontFamily: "'Changa', sans-serif" }}
+                      style={{ fontFamily: "var(--font-quran)" }}
                     >
                       {currentTikrar.phrase}
                     </p>
@@ -1317,7 +1317,7 @@ export default function Test() {
                         </div>
                         <p
                           className="text-xl md:text-2xl leading-relaxed font-amiri text-gray-800 dark:text-gray-200 text-right"
-                          style={{ fontFamily: "'Changa', sans-serif" }}
+                          style={{ fontFamily: "var(--font-quran)" }}
                         >
                           {highlightText(occ.fullText, currentTikrar.phrase)}
                         </p>
