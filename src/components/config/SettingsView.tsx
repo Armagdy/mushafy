@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { BookOpen, Book, Navigation, Menu, GraduationCap, Palette, HardDriveDownload, Type, ChevronLeft, ChevronRight, Sunrise, BookOpenCheck, PenLine } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import { Download } from "./Download";
 import { StyleSettings } from "./StyleSettings";
 import MemorizeView from "./MemorizeView";
+import Azkar from "@/pages/Azkar";
+import Test from "@/pages/Test";
 
 /**
  * Settings View Component
@@ -21,7 +23,6 @@ interface SettingsViewProps {
 }
 
 export default function SettingsView({ onNavigateToPage, currentPage }: SettingsViewProps) {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t, isRTL, language } = useLanguage();
   const { mushafType, setMushafType } = useMushaf();
@@ -78,15 +79,7 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
           return (
             <button
               key={category.id}
-              onClick={() => {
-                if (category.id === 'test') {
-                  navigate('/test');
-                } else if (category.id === 'azkar') {
-                  navigate('/azkar');
-                } else {
-                  setSearchParams({ category: category.id });
-                }
-              }}
+              onClick={() => setSearchParams({ category: category.id })}
               className="w-full flex items-center gap-4 min-h-[64px] px-3 py-3 rounded-2xl transition-colors active:bg-emerald-100 dark:active:bg-emerald-900/40"
             >
               {/* Leading icon in app-themed container - consistent placement for scanning */}
@@ -271,6 +264,9 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
       case 'download':
         return <Download />;
         
+      case 'azkar':
+        return <Azkar embedded />;
+        
       case 'memorize':
         return (
           <MemorizeView
@@ -280,16 +276,7 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
         );
         
       case 'test':
-        return (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-emerald-700">
-              <GraduationCap className="w-5 h-5" />
-              <span className={cn("font-medium", textSizeClasses.label)}>
-                {isRTL ? 'قريباً' : 'Coming soon'}
-              </span>
-            </div>
-          </div>
-        );
+        return <Test embedded />;
         
       default:
         return null;

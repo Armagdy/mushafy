@@ -42,7 +42,7 @@ interface TikrarQuestion {
   questionType?: 'normal' | 'similar-ending';
 }
 
-export default function Test() {
+export default function Test({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const { t, isRTL, language } = useLanguage();
   const { dialogTextSize } = useDialogTextSize();
@@ -772,45 +772,55 @@ export default function Test() {
     return language === 'ar' ? surah?.name : surah?.englishName;
   };
 
+  const restartButton = testRange ? (
+    <Button
+      onClick={() => {
+        setTestRange(null);
+        setCurrentQuestion(null);
+        setCurrentTikrar(null);
+        setShowAnswer(false);
+        setHintLevel(0);
+        setQuestionsCount(0);
+        setUsedHifzKeys(new Set());
+        setUsedTikrarPhrases(new Set());
+        setUsedTikrarAyahs(new Set());
+        setAllTestsCompleted(false);
+      }}
+      className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
+    >
+      <Settings className="w-5 h-5" />
+    </Button>
+  ) : null;
+
   return (
     <div className={cn(
-      "min-h-screen bg-[#FBF9F4] dark:bg-black",
+      embedded ? '' : 'min-h-screen bg-[#FBF9F4] dark:bg-black',
       isRTL ? "rtl" : "ltr"
     )}>
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8 pt-6">
-          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
-            {t('testFeature')}
-          </h1>
-          <div className="flex items-center gap-3">
-            {testRange && (
+      <div className={cn(
+        'mx-auto max-w-4xl',
+        embedded ? '' : 'container px-4 py-8'
+      )}>
+        {embedded ? (
+          /* Embedded in settings: title + back live in the settings sub-screen app bar */
+          testRange && <div className="flex justify-end mb-4">{restartButton}</div>
+        ) : (
+          /* Header */
+          <div className="flex items-center justify-between mb-8 pt-6">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+              {t('testFeature')}
+            </h1>
+            <div className="flex items-center gap-3">
+              {restartButton}
               <Button
-                onClick={() => {
-                  setTestRange(null);
-                  setCurrentQuestion(null);
-                  setCurrentTikrar(null);
-                  setShowAnswer(false);
-                  setHintLevel(0);
-                  setQuestionsCount(0);
-                  setUsedHifzKeys(new Set());
-                  setUsedTikrarPhrases(new Set());
-                  setUsedTikrarAyahs(new Set());
-                  setAllTestsCompleted(false);
-                }}
+                onClick={() => navigate('/')}
                 className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
               >
-                <Settings className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5" />
               </Button>
-            )}
-            <Button
-              onClick={() => navigate('/')}
-              className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Test Content */}
         {!testRange ? (

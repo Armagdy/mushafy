@@ -9,7 +9,7 @@ import { azkarSabah, azkarMasa, Dhikr } from '@/data/azkar';
 
 type AzkarTab = 'sabah' | 'masa';
 
-export default function Azkar() {
+export default function Azkar({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const { t, isRTL, language } = useLanguage();
 
@@ -50,29 +50,48 @@ export default function Azkar() {
     setProgress({});
   };
 
+  const resetButton = (
+    <Button
+      onClick={resetProgress}
+      aria-label={t('azkarReset')}
+      className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
+    >
+      <RotateCcw className="w-5 h-5" />
+    </Button>
+  );
+
   return (
-    <div className={cn('h-full overflow-hidden bg-[#FBF9F4] dark:bg-black', isRTL ? 'rtl' : 'ltr')}>
-      <div className="h-full flex flex-col max-w-3xl mx-auto px-4">
-        <div className="flex items-center justify-between mb-4 pt-6 shrink-0">
-          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
-            {t('azkar')}
-          </h1>
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={resetProgress}
-              aria-label={t('azkarReset')}
-              className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
-            >
-              <RotateCcw className="w-5 h-5" />
-            </Button>
-            <Button
-              onClick={() => navigate('/')}
-              className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
+    <div
+      className={cn(
+        embedded ? '' : 'h-full overflow-hidden bg-[#FBF9F4] dark:bg-black',
+        isRTL ? 'rtl' : 'ltr'
+      )}
+    >
+      <div
+        className={cn(
+          'flex flex-col max-w-3xl mx-auto',
+          embedded ? '' : 'h-full px-4'
+        )}
+      >
+        {embedded ? (
+          /* Embedded in settings: title + back live in the settings sub-screen app bar */
+          <div className="flex justify-end mb-3">{resetButton}</div>
+        ) : (
+          <div className="flex items-center justify-between mb-4 pt-6 shrink-0">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent">
+              {t('azkar')}
+            </h1>
+            <div className="flex items-center gap-3">
+              {resetButton}
+              <Button
+                onClick={() => navigate('/')}
+                className="bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB] w-10 h-10 p-0 flex items-center justify-center"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 mb-3 shrink-0">
           <button
@@ -117,7 +136,13 @@ export default function Azkar() {
           </span>
         </div>
 
-        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4 pb-6">
+        <div
+          ref={scrollRef}
+          className={cn(
+            'space-y-4 pb-6',
+            embedded ? '' : 'flex-1 min-h-0 overflow-y-auto overscroll-contain'
+          )}
+        >
           {azkarList.map((dhikr) => {
             const current = progress[dhikr.id] ?? 0;
             const isDone = current >= dhikr.count;
