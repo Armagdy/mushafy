@@ -32,32 +32,29 @@ export function FullPageLayout({
     <div 
       className={cn("min-h-screen bg-[#FBF9F4] flex flex-col", className)} 
       dir={isRTL ? 'rtl' : 'ltr'}
-      style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
     >
-      {/* Top Bar with title and back button */}
+      {/* Top App Bar - Android-style: plain back icon + start-aligned title */}
       <motion.div 
-        className="bg-gradient-to-b from-emerald-800 to-emerald-600 px-4 pb-3 flex items-center gap-3 sticky top-0 z-50"
-        style={{ paddingTop: 'max(1.25rem, env(safe-area-inset-top))' }}
+        className="bg-gradient-to-b from-emerald-800 to-emerald-600 px-2 pb-3 flex items-center gap-1 sticky top-0 z-50"
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
         initial={{ y: -60, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
       >
         <button
           onClick={() => navigate('/')}
-          className="flex items-center justify-center w-9 h-9 bg-emerald-800/50 hover:bg-emerald-800/70 rounded-lg border border-[#F2E3BB]/30 shadow-md transition-all"
+          className="flex items-center justify-center w-12 h-12 rounded-full shrink-0 transition-colors active:bg-emerald-950/30"
           aria-label="Go back"
         >
           {isRTL ? (
-            <ChevronRight className="w-6 h-6 text-[#F2E3BB]" />
+            <ChevronRight className="w-7 h-7 text-[#F2E3BB]" />
           ) : (
-            <ChevronLeft className="w-6 h-6 text-[#F2E3BB]" />
+            <ChevronLeft className="w-7 h-7 text-[#F2E3BB]" />
           )}
         </button>
-        <h1 className={cn("flex-1 text-center font-bold text-[#F2E3BB]", textSizeClasses.title)}>
+        <h1 className={cn("flex-1 font-bold text-[#F2E3BB] truncate", textSizeClasses.title)}>
           {title}
         </h1>
-        {/* Placeholder for symmetry */}
-        <div className="w-9" />
       </motion.div>
       
       {/* Main Content Area */}

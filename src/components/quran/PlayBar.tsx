@@ -131,7 +131,7 @@ export function PlayBar({
               )}
               title={(audioSource === 'mp3quran' && !hasAyahTimings) ? t('ayahSelectionNotAvailable') : ''}
             >
-              <span className={cn(chipTextClass, "text-base md:text-xl font-bold")} style={{ fontFamily: "'Amiri', serif" }}>
+              <span className={cn(chipTextClass, "text-base md:text-xl font-bold")} style={{ fontFamily: "'Changa', sans-serif" }}>
                 {(audioSource === 'mp3quran' && !hasAyahTimings) 
                   ? '--' 
                   : currentPlayingAyah 
@@ -161,7 +161,7 @@ export function PlayBar({
             onClick={onReciterClick}
             className={cn(chipClass, "flex-[2] md:flex-1 min-w-0 md:max-w-md lg:max-w-lg")}
           >
-            <span className={cn(chipTextClass, "text-base md:text-xl font-bold truncate")} style={{ fontFamily: "'Amiri', serif" }}>
+            <span className={cn(chipTextClass, "text-base md:text-xl font-bold truncate")} style={{ fontFamily: "'Changa', sans-serif" }}>
               {getReciterName()}
             </span>
           </button>

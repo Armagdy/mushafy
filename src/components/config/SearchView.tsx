@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { useQuranData } from "@/hooks/useQuranData";
@@ -6,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 interface SearchViewProps {
   onNavigate?: (page: number, ayah?: { surah: number; ayah: number }) => void;
@@ -72,6 +71,27 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
 
     return () => clearInterval(intervalId);
   }, [searchWord, wordSearchResults.length, hasSearched]);
+
+  // Live search (Material SearchView pattern): run the search automatically
+  // a short moment after typing stops. Enter still triggers it immediately.
+  useEffect(() => {
+    const word = searchWord.trim();
+    if (word.length < 2) return;
+    const timer = setTimeout(() => {
+      performWordSearch();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchWord]);
+
+  // Clear the search input and all results
+  const clearSearch = () => {
+    if (searchInputRef.current) {
+      searchInputRef.current.value = '';
+    }
+    setSearchWord('');
+    setWordSearchResults([]);
+    setHasSearched(false);
+  };
 
   // Number formatting for Arabic/English
   const formatNumber = (num: number | string): string => {
@@ -235,139 +255,131 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
   }
 
   return (
-    <div className={cn("p-4 space-y-2 sm:space-y-3", isRTL ? "rtl" : "ltr")}>
-      {/* Header */}
-      <h1 className={cn(
-        "text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-800 to-emerald-600 bg-clip-text text-transparent mb-4",
-        isRTL ? "text-right" : "text-left"
-      )}>
-        {isRTL ? 'بحث' : 'Search'}
-      </h1>
-      
-      {/* Search Input */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-4"
-      >
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className={cn(
-              "absolute top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 dark:text-emerald-400",
-              isRTL ? "right-3" : "left-3"
-            )} />
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder={t('searchWordPlaceholder')}
-              onInput={(e) => {
-                const input = e.target as HTMLInputElement;
-                // Filter: keep only Arabic characters in real-time
-                if (!isArabicText(input.value)) {
-                  // Find last valid Arabic substring
-                  const filtered = input.value.split('').filter((char, i) => 
-                    isArabicText(input.value.substring(0, i + 1))
-                  ).join('');
-                  input.value = filtered;
-                }
-                // State is updated by 50ms polling, not here
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  performWordSearch();
-                }
-              }}
-              className={cn(
-                "w-full py-2 rounded-lg border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2",
-                isRTL ? "pr-10 pl-3" : "pl-10 pr-3",
-                textSizeClasses.text
-              )}
-            />
-          </div>
-          <Button
-            onClick={performWordSearch}
+    <div className={cn("w-full max-w-2xl mx-auto min-h-full", isRTL ? "rtl" : "ltr")}>
+      {/* Search bar - docked under the app bar, like Android search screens */}
+      <div className="sticky top-0 z-10 bg-[#FBF9F4] dark:bg-black pt-2 pb-2 px-3">
+        <div className="flex items-center gap-2 min-h-[52px] px-3 rounded-2xl bg-white dark:bg-gray-900 border border-emerald-200 dark:border-emerald-800 shadow-sm focus-within:border-emerald-500 dark:focus-within:border-emerald-500 transition-colors">
+          <Search className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder={t('searchWordPlaceholder')}
+            onInput={(e) => {
+              const input = e.target as HTMLInputElement;
+              // Filter: keep only Arabic characters in real-time
+              if (!isArabicText(input.value)) {
+                // Find last valid Arabic substring
+                const filtered = input.value.split('').filter((char, i) =>
+                  isArabicText(input.value.substring(0, i + 1))
+                ).join('');
+                input.value = filtered;
+              }
+              // State is updated by 50ms polling, not here
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                performWordSearch();
+              }
+            }}
             className={cn(
-              "px-4 py-2 bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]",
-              textSizeClasses.button
+              "flex-1 min-w-0 min-h-[44px] bg-transparent focus:outline-none text-emerald-900 dark:text-emerald-100 placeholder:text-emerald-400/70",
+              textSizeClasses.text
             )}
-          >
-            {isRTL ? 'بحث' : 'Search'}
-          </Button>
+          />
+          {searchWord && (
+            <button
+              onClick={clearSearch}
+              className="flex items-center justify-center w-9 h-9 rounded-full text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 active:bg-emerald-100 dark:active:bg-emerald-900/40 transition-colors shrink-0"
+              aria-label={isRTL ? 'مسح' : 'Clear search'}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
-        
+      </div>
+
+      {/* Content below the docked bar */}
+      <div className="px-3 pt-2 pb-4 space-y-2">
         {/* Search Instructions */}
         {!isSearchLoading && wordSearchResults.length === 0 && !searchWord && (
-          <div className={cn(
-            "text-center py-8 px-4 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20",
-            textSizeClasses.text
-          )}>
-            <Search className="w-12 h-12 mx-auto mb-3 text-emerald-600 dark:text-emerald-400" />
-            <p className="text-emerald-800 dark:text-emerald-300 font-medium mb-2">
-              {isRTL ? 'ابحث فى نصوص الايات' : 'Search for a word or phrase'}
+          <div className="py-12 px-4 text-center space-y-3">
+            <span className="mx-auto flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md">
+              <Search className="w-7 h-7 text-[#F2E3BB]" />
+            </span>
+            <p className={cn("text-emerald-800 dark:text-emerald-300 font-medium", textSizeClasses.text)}>
+              {isRTL ? 'ابحث فى نصوص الآيات' : 'Search for a word or phrase'}
             </p>
             <p className="text-emerald-600 dark:text-emerald-400 text-sm">
               {isRTL ? '(البحث بالعربية فقط)' : '(Arabic text only)'}
             </p>
           </div>
         )}
-        
+
         {/* Loading State */}
         {isSearchLoading && (
-          <div className="flex flex-col items-center justify-center py-8 space-y-3">
+          <div className="flex flex-col items-center justify-center py-10 space-y-3">
             <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
             <p className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
               {isRTL ? 'جاري البحث...' : 'Searching...'}
             </p>
           </div>
         )}
-        
-        {/* Search Results */}
+
+        {/* Search Results - flat Material rows like the settings list */}
         {!isSearchLoading && wordSearchResults.length > 0 && (
-          <div className="space-y-2">
-            <div className={cn("font-medium text-emerald-800 dark:text-emerald-300 mb-2", textSizeClasses.text)}>
+          <>
+            <div className={cn("px-1 py-2 font-semibold text-emerald-800 dark:text-emerald-300", textSizeClasses.text)}>
               {t('foundIn')} {formatNumber(wordSearchResults.length)} {t('ayahs')}
             </div>
-            <div className="max-h-[500px] sm:max-h-[550px] md:max-h-[600px] overflow-y-auto space-y-2">
-              {wordSearchResults.map((result, index) => (
-                <motion.button
-                  key={`${result.surahNumber}-${result.ayahNumber}-${index}`}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  whileHover={{ scale: 1.02 }}
-                  onClick={() => handleResultClick(result.page, result.surahNumber, result.ayahNumber)}
-                  className={cn(
-                    "w-full p-3 rounded-lg border border-emerald-200 dark:border-emerald-700 bg-[#FBF9F4] dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-gray-700 transition-all",
-                    isRTL ? "text-right" : "text-left"
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className={cn("font-semibold text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
-                      {isRTL ? result.surahName : result.surahNameEn} - {isRTL ? 'الآية' : 'Ayah'} {formatNumber(result.ayahNumber)}
-                    </div>
-                    <div className={cn("text-emerald-600 dark:text-emerald-400 whitespace-nowrap", textSizeClasses.text)}>
+            {wordSearchResults.map((result, index) => (
+              <motion.button
+                key={`${result.surahNumber}-${result.ayahNumber}-${index}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(index * 0.03, 0.3) }}
+                onClick={() => handleResultClick(result.page, result.surahNumber, result.ayahNumber)}
+                className="w-full flex items-start gap-4 px-3 py-3 rounded-2xl active:bg-emerald-100 dark:active:bg-emerald-900/40 transition-colors"
+              >
+                {/* Leading themed container showing the ayah number */}
+                <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+                  <span className={cn("font-bold text-[#F2E3BB]", textSizeClasses.text)}>
+                    {formatNumber(result.ayahNumber)}
+                  </span>
+                </span>
+
+                <span className="flex-1 min-w-0 space-y-1.5">
+                  {/* Row header: surah name + page chip */}
+                  <span className="flex items-center justify-between gap-2">
+                    <span className={cn("font-medium text-emerald-800 dark:text-emerald-200 truncate", textSizeClasses.label)}>
+                      {isRTL ? result.surahName : result.surahNameEn}
+                    </span>
+                    <span className={cn(
+                      "shrink-0 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300",
+                      textSizeClasses.text
+                    )}>
                       {isRTL ? 'صفحة' : 'Page'} {formatNumber(result.page)}
-                    </div>
-                  </div>
-                  <div 
+                    </span>
+                  </span>
+                  {/* Ayah text with highlighted match */}
+                  <span
                     className={cn(
-                      "p-3 border border-emerald-300 dark:border-emerald-600 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20",
+                      "block p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-900/20",
                       textSizeClasses.text,
                       "text-right text-emerald-900 dark:text-emerald-100 leading-[2.2] font-arabic"
                     )}
                   >
                     {highlightText(result.arabicText, searchWord, true)}
-                  </div>
-                </motion.button>
-              ))}
-            </div>
-          </div>
+                  </span>
+                </span>
+              </motion.button>
+            ))}
+          </>
         )}
-        
+
         {/* No Results */}
         {!isSearchLoading && hasSearched && wordSearchResults.length === 0 && searchWord.trim().length >= 2 && (
           <div className={cn(
-            "text-center py-8 px-4 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/20",
+            "text-center py-10 px-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-900/20",
             textSizeClasses.text
           )}>
             <p className="text-emerald-800 dark:text-emerald-300 font-medium">
@@ -378,7 +390,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
             </p>
           </div>
         )}
-      </motion.div>
+      </div>
     </div>
   );
 }

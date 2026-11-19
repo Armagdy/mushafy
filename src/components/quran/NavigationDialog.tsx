@@ -544,7 +544,7 @@ export function NavigationDialog({
                         textSizeClasses.text,
                         isRTL ? "text-right text-emerald-900 dark:text-emerald-100 leading-[2.2]" : "text-left text-emerald-900 dark:text-emerald-100 leading-relaxed"
                       )}
-                      style={isRTL ? { fontFamily: "'Scheherazade New', 'Noto Naskh Arabic', serif" } : undefined}
+                      style={isRTL ? { fontFamily: "'Changa', sans-serif" } : undefined}
                     >
                       {isRTL 
                         ? highlightText(result.arabicText, searchWord, true)

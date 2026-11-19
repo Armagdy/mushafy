@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { surahs } from "@/data/surahs";
-import { BookOpen, Hash, FileText, Layers, ChevronLeft, ChevronRight, ArrowLeft, ArrowRight, Search } from "lucide-react";
+import { BookOpen, Hash, FileText, Layers, ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 interface NavigationViewProps {
   onNavigate?: (page: number, ayah?: { surah: number; ayah: number }) => void;
@@ -617,9 +617,10 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   ];
   
   // Render list of navigation types
+  // Render list of navigation types (Material-style, same as SettingsView)
   const renderNavigationList = () => {
     return (
-      <div className="divide-y divide-emerald-100 dark:divide-emerald-900">
+      <div>
         {navigationTypes.map((navType) => {
           const Icon = navType.icon;
           
@@ -627,31 +628,33 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
             <button
               key={navType.id}
               onClick={() => setSearchParams({ type: navType.id })}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-5 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors",
-                isRTL ? "justify-start" : "justify-end"
-              )}
+              className="w-full flex items-center gap-4 min-h-[64px] px-3 py-3 rounded-2xl transition-colors active:bg-emerald-100 dark:active:bg-emerald-900/40"
             >
-              {isRTL ? (
-                <ChevronLeft className="w-6 h-6 text-emerald-500" />
-              ) : (
-                <ChevronRight className="w-6 h-6 text-emerald-500" />
-              )}
+              {/* Leading icon in app-themed container - consistent placement for scanning */}
+              <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+                <Icon className="w-6 h-6 text-[#F2E3BB]" />
+              </span>
+              {/* Primary label */}
               <span className={cn(
-                "font-medium text-emerald-700 dark:text-emerald-400",
+                "flex-1 text-start font-medium text-emerald-800 dark:text-emerald-200",
                 textSizeClasses.label
               )}>
                 {navType.label}
               </span>
-              <Icon className="w-6 h-6 flex-shrink-0 text-emerald-600 dark:text-emerald-500" />
+              {/* Trailing chevron - mirrors automatically in RTL */}
+              {isRTL ? (
+                <ChevronLeft className="w-5 h-5 text-emerald-400 shrink-0" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-emerald-400 shrink-0" />
+              )}
             </button>
           );
         })}
-        </div>
+      </div>
     );
   };
   
-  // Render header with back button
+  // Render sub-screen app bar - back arrow + title (same as SettingsView)
   const renderNavigationHeader = () => {
     const currentNavType = navigationTypes.find(nav => nav.id === activeNavType);
     if (!currentNavType) return null;
@@ -659,26 +662,24 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
     const Icon = currentNavType.icon;
     
     return (
-      <div className="flex items-center gap-3 pb-4 border-b border-emerald-100 dark:border-emerald-900">
-        <Button
-          variant="ghost"
-          size="icon"
+      <div className="sticky top-0 z-10 bg-[#FBF9F4] dark:bg-black border-b border-emerald-100 dark:border-emerald-900 -mx-4 px-4 mb-3">
+        <button
           onClick={() => setSearchParams({})}
-          className="text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800"
+          className="w-full flex items-center gap-1 px-2 py-1 min-h-[56px] transition-colors active:bg-emerald-100 dark:active:bg-emerald-900/40"
         >
           {isRTL ? (
-            <ArrowRight className="w-5 h-5" />
+            <ChevronRight className="w-7 h-7 text-emerald-600 dark:text-emerald-400 shrink-0" />
           ) : (
-            <ArrowLeft className="w-5 h-5" />
+            <ChevronLeft className="w-7 h-7 text-emerald-600 dark:text-emerald-400 shrink-0" />
           )}
-        </Button>
-        <Icon className="w-6 h-6 text-emerald-600 dark:text-emerald-500" />
-        <h2 className={cn(
-          "font-semibold text-emerald-800 dark:text-emerald-300",
-          textSizeClasses.title
-        )}>
-          {currentNavType.label}
-        </h2>
+          <span className={cn(
+            "flex items-center gap-2 font-medium text-emerald-800 dark:text-emerald-200",
+            textSizeClasses.label
+          )}>
+            <Icon className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
+            {currentNavType.label}
+          </span>
+        </button>
       </div>
     );
   };
@@ -1228,14 +1229,16 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
   };
   
   return (
-    <div className="p-4 space-y-2 sm:space-y-3">
+    <div className="w-full max-w-2xl mx-auto">
       {!activeNavType ? (
-        renderNavigationList()
+        <div className="pt-2 px-3 pb-4">
+          {renderNavigationList()}
+        </div>
       ) : (
-        <>
+        <div className="p-4">
           {renderNavigationHeader()}
           {renderNavigationContent()}
-        </>
+        </div>
       )}
     </div>
   );

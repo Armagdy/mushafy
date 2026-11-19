@@ -1,9 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Scheherazade+New:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Changa:wght@200;300;400;500;600;700;800&display=swap');
 
 @font-face {
   font-family: 'Khat e Sulas';
   src: url('/alfont_com_ArbFONTS-Khat-e-Sulas-Shipped.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'KFGQPC HAFS';
+  src: url('/assets/fonts/quran-hafs/kfgqpc-hafs.woff2') format('woff2');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -66,10 +73,13 @@
     --shadow-card: 0 8px 30px -10px hsl(160 30% 15% / 0.12);
     --shadow-elevated: 0 20px 50px -15px hsl(160 30% 15% / 0.15);
 
-    /* Typography */
-    --font-arabic: 'Amiri', 'Noto Naskh Arabic', serif;
-    --font-display: 'Playfair Display', serif;
-    --font-body: 'Inter', sans-serif;
+    /* Typography - Changa (Arabic + Latin, Google Fonts) */
+    --font-arabic: 'Changa', 'Noto Sans Arabic', sans-serif;
+    --font-display: 'Changa', sans-serif;
+    --font-body: 'Changa', 'Noto Sans Arabic', sans-serif;
+
+    /* Quranic script - KFGQPC Uthmanic HAFS (King Fahd Complex, for Quran ayah text only) */
+    --font-quran: 'KFGQPC HAFS', 'Amiri Quran', 'Changa', 'Noto Sans Arabic', serif;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -130,11 +140,16 @@
 @layer base {
   * {
     @apply border-border;
+    /* Remove gray tap flash on Android */
+    -webkit-tap-highlight-color: transparent;
   }
 
   html {
     /* Standard base font size */
     font-size: 13px;
+    /* Prevent Android WebView text inflation */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   @media (min-width: 768px) {
@@ -154,6 +169,8 @@
     max-height: 100dvh;
     overflow: hidden;
     background-color: #ffffff;
+    /* Stop pull-to-refresh and overscroll glow in Android WebView */
+    overscroll-behavior: none;
   }
 
   html.dark, html.dark body {
@@ -166,6 +183,8 @@
     font-family: var(--font-body);
     font-size: 1rem;
     line-height: 1.6;
+    /* Remove ~300ms tap delay and double-tap zoom on Android */
+    touch-action: manipulation;
     /* Safe area handling for notched devices */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);

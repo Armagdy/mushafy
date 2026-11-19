@@ -1,7 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Bookmark, Volume2, Search, Navigation, BookmarkCheck, Menu, Book, BookText, Globe, X, Settings, BookMarked, BookOpen, Play, Pause, Square, ChevronDown, Repeat, Sun, Moon, PenLine, Layers } from 'lucide-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { surahs } from '@/data/surahs';
 import { Button } from '@/components/ui/button';
 import { TopBar } from '@/components/quran/TopBar';
@@ -1569,8 +1569,10 @@ const Surah = () => {
       />
 
       {/* ConfigOverlay for Settings, Bookmarks, Tafseer, etc. */}
-      {configOverlayType && (
-        <ConfigOverlay
+      {/* AnimatePresence lets the sheet slide up on open / down on close */}
+      <AnimatePresence>
+        {configOverlayType && (
+          <ConfigOverlay
           type={configOverlayType}
           onClose={() => {
             setConfigOverlayType(null);
@@ -1691,7 +1693,8 @@ const Surah = () => {
           onSetCurrentPlayingAyah={setCurrentPlayingAyah}
           onSeekToAyahPosition={seekToAyahPosition}
         />
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Page Annotation Editor — full-screen overlay; while it is open the
           swiper is covered, so page swiping is disabled. Text mushafs

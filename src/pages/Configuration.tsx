@@ -4,7 +4,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { FullPageLayout } from "@/components/layout/FullPageLayout";
 import { BottomBar } from "@/components/quran/BottomBar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useViewSwipe } from "@/hooks/useViewSwipe";
 import { App } from '@capacitor/app';
 
 // Import different configuration views
@@ -19,6 +21,30 @@ import SearchView from "@/components/config/SearchView";
 type ConfigType = 'settings' | 'bookmarks' | 'navigation' | 'reciter' | 'tafseer' | 'repeat' | 'search';
 
 /**
+ * Visual order of the bottom-bar views - used to pick the horizontal
+ * slide direction when switching between them (ViewPager-style).
+ */
+const VIEW_ORDER: ConfigType[] = [
+  'navigation', 'search', 'tafseer', 'bookmarks', 'settings', 'reciter', 'repeat',
+];
+
+/** Horizontal slide variants - "enter" comes from the side we move toward.
+ *  Exiting views get pointer-events: none so a lingering/interrupted exit
+ *  can never swallow taps meant for the incoming view. */
+const viewVariants = {
+  enter: (dir: number) => ({
+    x: dir === 0 ? '0%' : `${dir * 100}%`,
+    opacity: dir === 0 ? 0 : 1,
+  }),
+  center: { x: '0%', opacity: 1 },
+  exit: (dir: number) => ({
+    x: dir === 0 ? '0%' : `${-dir * 100}%`,
+    opacity: dir === 0 ? 0 : 1,
+    pointerEvents: 'none',
+  }),
+};
+
+/**
  * Unified Configuration Page
  * Handles all dialog-like views (Settings, Bookmarks, Navigation, etc.)
  * Route: /config/:type
@@ -29,6 +55,33 @@ export default function Configuration() {
   const [searchParams] = useSearchParams();
   const { t, language, isRTL } = useLanguage();
   const { toast } = useToast();
+  
+  // Track the previous view to compute the horizontal slide direction
+  const prevTypeRef = useRef<ConfigType>(configType);
+  const slideDirection = (() => {
+    const nextIdx = VIEW_ORDER.indexOf(configType);
+    const prevIdx = VIEW_ORDER.indexOf(prevTypeRef.current);
+    prevTypeRef.current = configType;
+    if (nextIdx === -1 || prevIdx === -1 || nextIdx === prevIdx) return 0;
+    const forward = nextIdx > prevIdx ? 1 : -1;
+    return isRTL ? -forward : forward;
+  })();
+
+  // Swipe between bottom-bar views (ViewPager gesture).
+  // Disabled while a sub-screen is open so scrolling inside those screens
+  // can never be mistaken for a view switch. Tafseer is excluded too:
+  // its ayah cards already own a horizontal drag.
+  const swipeHandlers = useViewSwipe((dir) => {
+    const barTypes: ConfigType[] = ['navigation', 'search', 'tafseer', 'bookmarks', 'settings'];
+    const inSubScreen = !!(searchParams.get('category') || searchParams.get('type'));
+    if (inSubScreen || configType === 'tafseer' || !barTypes.includes(configType)) return;
+    const idx = barTypes.indexOf(configType);
+    const forward = isRTL ? dir === 'right' : dir === 'left';
+    const nextIdx = forward ? idx + 1 : idx - 1;
+    if (nextIdx >= 0 && nextIdx < barTypes.length) {
+      navigate(`/config/${barTypes[nextIdx]}`);
+    }
+  });
   
   // Handle legacy routes (/settings, /bookmarks) by mapping to correct type
   const configType = type || (window.location.pathname.includes('/settings') ? 'settings' : 
@@ -202,27 +255,57 @@ export default function Configuration() {
   };
   
   return (
-    <FullPageLayout title={getTitle()} showBottomPadding={true}>
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto pb-20">
-        {renderView()}
-      </div>
-      
-      {/* Bottom Navigation Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-emerald-800 to-emerald-600 z-40 pt-2">
-        <BottomBar
-          showBottomBarText={showBottomBarText}
-          totalBookmarks={getTotalBookmarks()}
-          isMobile={isMobile}
-          viewMode={viewMode}
-          onGoToClick={() => navigate('/config/navigation')}
-          onSearchClick={() => navigate('/config/search')}
-          onBookmarkClick={() => navigate('/config/bookmarks')}
-          onSettingsClick={() => navigate('/config/settings')}
-          onTafseerClick={() => navigate('/config/tafseer')}
-          onViewModeToggle={() => updateViewMode(viewMode === 'single' ? 'double' : 'single')}
-        />
-      </div>
-    </FullPageLayout>
+    /* Slide up from the bottom on first entry (component stays mounted
+       while switching bottom-bar items, so this only plays once) */
+    <motion.div
+      initial={{ y: '100%' }}
+      animate={{ y: 0 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+    >
+      <FullPageLayout title={getTitle()} showBottomPadding={false}>
+        {/* Main Content - slides horizontally when switching bottom-bar views.
+            Touch handlers allow swiping to the next/previous bar item. */}
+        <div className="h-full overflow-hidden" {...swipeHandlers}>
+          <AnimatePresence initial={false} custom={slideDirection} mode="popLayout">
+            <motion.div
+              key={configType}
+              custom={slideDirection}
+              variants={viewVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+              className="h-full overflow-y-auto pb-20"
+            >
+              {renderView()}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+        
+        {/* Bottom Navigation Bar */}
+        <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-emerald-800 to-emerald-600 z-40 pt-2">
+          <BottomBar
+            showBottomBarText={showBottomBarText}
+            totalBookmarks={getTotalBookmarks()}
+            isMobile={isMobile}
+            viewMode={viewMode}
+            activeButton={
+              configType === 'navigation' ? 'navigation'
+              : configType === 'search' ? 'search'
+              : configType === 'tafseer' ? 'tafseer'
+              : configType === 'bookmarks' ? 'bookmarks'
+              : configType === 'settings' ? 'settings'
+              : null
+            }
+            onGoToClick={() => navigate('/config/navigation')}
+            onSearchClick={() => navigate('/config/search')}
+            onBookmarkClick={() => navigate('/config/bookmarks')}
+            onSettingsClick={() => navigate('/config/settings')}
+            onTafseerClick={() => navigate('/config/tafseer')}
+            onViewModeToggle={() => updateViewMode(viewMode === 'single' ? 'double' : 'single')}
+          />
+        </div>
+      </FullPageLayout>
+    </motion.div>
   );
 }

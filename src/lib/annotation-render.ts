@@ -23,7 +23,7 @@ export interface Bounds {
 // ---------------------------------------------------------------------------
 
 /** Arabic-friendly font stack used for text annotations. */
-export const TEXT_FONT_STACK = `"Amiri", "Segoe UI", system-ui, sans-serif`;
+export const TEXT_FONT_STACK = `"Changa", "Segoe UI", system-ui, sans-serif`;
 /** Line height multiplier for multi-line text annotations. */
 export const TEXT_LINE_HEIGHT = 1.3;
 

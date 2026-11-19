@@ -1,7 +1,5 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Bookmark, BookMarked, BookOpen, X, Plus, ChevronLeft, ChevronRight, RefreshCw, Trash2 } from "lucide-react";
+import { Bookmark, BookMarked, BookOpen, Plus, ChevronLeft, ChevronRight, RefreshCw, Trash2 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDialogTextSize, getDialogTextSizeClasses } from "@/contexts/DialogTextSizeContext";
 import { useToast } from "@/hooks/use-toast";
@@ -231,74 +229,202 @@ export default function BookmarksView({
 
   return (
     <div className={cn("p-4 space-y-2 sm:space-y-3", isRTL ? "rtl" : "ltr")}>
-      {/* Show list of bookmark categories if no category selected */}
+      {/* Main screen: Add/Edit buttons on top + bookmarks as sorted cards */}
       {!activeCategory && (
-        <div className="divide-y divide-emerald-100 dark:divide-emerald-900">
-          {/* Add New Bookmark */}
-          <button
-            onClick={() => setSearchParams({ category: 'add' })}
-            className={cn(
-              "w-full flex items-center gap-3 px-4 py-5 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors",
-              isRTL ? "justify-start" : "justify-end"
-            )}
-          >
-            {isRTL ? (
-              <ChevronLeft className="w-6 h-6 text-emerald-500" />
-            ) : (
-              <ChevronRight className="w-6 h-6 text-emerald-500" />
-            )}
-            <span className={cn(
-              "font-medium text-emerald-700 dark:text-emerald-400",
-              textSizeClasses.label
-            )}>
-              {isRTL ? 'إضافة علامة جديدة' : 'Add New Bookmark'}
-            </span>
-            <Plus className="w-6 h-6 flex-shrink-0 text-emerald-600 dark:text-emerald-500" />
-          </button>
+        <div className="w-full max-w-2xl mx-auto space-y-5">
+          {/* Action buttons - always visible at the top */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setSearchParams({ category: 'add' })}
+              className={cn(
+                "flex items-center justify-center gap-2 min-h-[52px] px-4 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 border border-emerald-700/60 shadow-md text-[#F2E3BB] font-medium active:scale-[0.97] transition-all",
+                textSizeClasses.button
+              )}
+            >
+              <Plus className="w-5 h-5 shrink-0" />
+              <span className="truncate">{isRTL ? 'إضافة علامة' : 'Add Bookmark'}</span>
+            </button>
+            <button
+              onClick={() => setSearchParams({ category: 'update' })}
+              className={cn(
+                "flex items-center justify-center gap-2 min-h-[52px] px-4 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 border border-emerald-700/60 shadow-md text-[#F2E3BB] font-medium active:scale-[0.97] transition-all",
+                textSizeClasses.button
+              )}
+            >
+              <RefreshCw className="w-5 h-5 shrink-0" />
+              <span className="truncate">{isRTL ? 'تحديث علامة' : 'Edit Bookmark'}</span>
+            </button>
+          </div>
 
-          {/* Update Bookmark */}
-          <button
-            onClick={() => setSearchParams({ category: 'update' })}
-            className={cn(
-              "w-full flex items-center gap-3 px-4 py-5 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors",
-              isRTL ? "justify-start" : "justify-end"
-            )}
-          >
-            {isRTL ? (
-              <ChevronLeft className="w-6 h-6 text-emerald-500" />
-            ) : (
-              <ChevronRight className="w-6 h-6 text-emerald-500" />
-            )}
-            <span className={cn(
-              "font-medium text-emerald-700 dark:text-emerald-400",
-              textSizeClasses.label
-            )}>
-              {isRTL ? 'تحديث علامة' : 'Update Bookmark'}
-            </span>
-            <RefreshCw className="w-6 h-6 flex-shrink-0 text-emerald-600 dark:text-emerald-500" />
-          </button>
+          {/* Last used bookmark - quick access to the most recent one */}
+          {(() => {
+            const lastBookmark = getLastBookmark();
+            if (!lastBookmark) return null;
+            const { page, type: lastType } = lastBookmark;
+            const Icon = lastType === 'bookmark' ? Bookmark : lastType === 'memorization' ? BookMarked : BookOpen;
 
-          {/* View Bookmarks */}
-          <button
-            onClick={() => setSearchParams({ category: 'view' })}
-            className={cn(
-              "w-full flex items-center gap-3 px-4 py-5 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors",
-              isRTL ? "justify-start" : "justify-end"
-            )}
-          >
-            {isRTL ? (
-              <ChevronLeft className="w-6 h-6 text-emerald-500" />
-            ) : (
-              <ChevronRight className="w-6 h-6 text-emerald-500" />
-            )}
-            <span className={cn(
-              "font-medium text-emerald-700 dark:text-emerald-400",
-              textSizeClasses.label
-            )}>
-              {isRTL ? 'العلامات' : 'Bookmarks'}
-            </span>
-            <Bookmark className="w-6 h-6 flex-shrink-0 text-emerald-600 dark:text-emerald-500" />
-          </button>
+            return (
+              <div className="space-y-2">
+                <div className={cn("px-1 font-semibold text-emerald-700 dark:text-emerald-400", textSizeClasses.text)}>
+                  {t('lastBookmark')}
+                </div>
+                <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-900/30 dark:to-gray-900 shadow-sm overflow-hidden">
+                  <button
+                    onClick={() => {
+                      onTouchBookmark(page, lastType);
+                      onNavigate(page, safeBookmarkPageSurahIds[page], safeBookmarkPageAyahs[page]);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 p-3 active:bg-emerald-100/50 dark:active:bg-emerald-900/40 transition-colors",
+                      isRTL ? 'text-right' : 'text-left'
+                    )}
+                  >
+                    {/* Themed icon */}
+                    <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+                      <Icon className="w-5 h-5 text-[#F2E3BB]" />
+                    </span>
+                    {/* Surah + page on one line */}
+                    <span className={cn("flex-1 min-w-0 truncate font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+                      {safeBookmarkPageSurahs[page] || '...'}
+                      {' '}{t('page')} {formatNumber(page)}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Bookmarks - grouped by type, sorted by page, shown as cards */}
+          {(() => {
+            const groups: {
+              key: 'bookmark' | 'memorization' | 'reading';
+              label: string;
+              icon: typeof Bookmark;
+              pages: number[];
+              deleteType: 'quick' | 'memorization' | 'reading';
+              headerClass: string;
+            }[] = [
+              {
+                key: 'bookmark',
+                label: isRTL ? 'علامات' : 'Bookmarks',
+                icon: Bookmark,
+                pages: [...safeBookmarks].sort((a, b) => a - b),
+                deleteType: 'quick',
+                headerClass: 'text-amber-600 dark:text-amber-400',
+              },
+              {
+                key: 'memorization',
+                label: isRTL ? 'حفظ' : 'Memorization',
+                icon: BookMarked,
+                pages: [...safeMemorizationBookmarks].sort((a, b) => a - b),
+                deleteType: 'memorization',
+                headerClass: 'text-emerald-600 dark:text-emerald-400',
+              },
+              {
+                key: 'reading',
+                label: isRTL ? 'قراءة' : 'Reading',
+                icon: BookOpen,
+                pages: [...safeReadingBookmarks].sort((a, b) => a - b),
+                deleteType: 'reading',
+                headerClass: 'text-blue-600 dark:text-blue-400',
+              },
+            ];
+
+            const hasAny = groups.some(g => g.pages.length > 0);
+
+            if (!hasAny) {
+              return (
+                <div className="py-12 px-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-900/20 text-center space-y-3">
+                  <span className="mx-auto flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md">
+                    <Bookmark className="w-7 h-7 text-[#F2E3BB]" />
+                  </span>
+                  <p className={cn("text-emerald-800 dark:text-emerald-300 font-medium", textSizeClasses.text)}>
+                    {t('noBookmarks')}
+                  </p>
+                </div>
+              );
+            }
+
+            return groups.filter(g => g.pages.length > 0).map(group => {
+              const Icon = group.icon;
+              return (
+                <div
+                  key={group.key}
+                  className={cn(
+                    "rounded-2xl border shadow-sm overflow-hidden bg-white dark:bg-gray-900",
+                    group.key === 'bookmark' && "border-amber-200/70 dark:border-amber-900/50",
+                    group.key === 'memorization' && "border-emerald-200 dark:border-emerald-800",
+                    group.key === 'reading' && "border-blue-200/70 dark:border-blue-900/50"
+                  )}
+                >
+                  {/* Category header - tinted per type */}
+                  <div className={cn(
+                    "flex items-center gap-3 p-3 border-b",
+                    group.key === 'bookmark' && "bg-amber-50/70 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/40",
+                    group.key === 'memorization' && "bg-emerald-50/70 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800",
+                    group.key === 'reading' && "bg-blue-50/70 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/40"
+                  )}>
+                    <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+                      <Icon className="w-5 h-5 text-[#F2E3BB]" />
+                    </span>
+                    <span className={cn("flex-1 font-semibold", group.headerClass, textSizeClasses.label)}>
+                      {group.label}
+                    </span>
+                    <span className={cn(
+                      "shrink-0 px-2.5 py-0.5 rounded-full font-medium",
+                      group.key === 'bookmark' && "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300",
+                      group.key === 'memorization' && "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300",
+                      group.key === 'reading' && "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300",
+                      textSizeClasses.text
+                    )}>
+                      {formatNumber(group.pages.length)}
+                    </span>
+                  </div>
+                  {/* Bookmarks inside the category card - sorted by page */}
+                  {group.pages.map((page, index) => (
+                    <div
+                      key={`${group.key}-${page}`}
+                      className={cn(
+                        "flex items-center gap-2 px-2",
+                        index > 0 && "border-t border-emerald-100/60 dark:border-emerald-900/60"
+                      )}
+                    >
+                      <button
+                        onClick={() => {
+                          onTouchBookmark(page, group.key);
+                          onNavigate(page, safeBookmarkPageSurahIds[page], safeBookmarkPageAyahs[page]);
+                        }}
+                        className={cn(
+                          "flex-1 min-w-0 flex items-center justify-between gap-3 py-3 px-2 active:bg-emerald-50 dark:active:bg-emerald-900/40 transition-colors",
+                          isRTL ? 'text-right' : 'text-left'
+                        )}
+                      >
+                        {/* Surah + page on one line */}
+                        <span className={cn("flex-1 min-w-0 truncate font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+                          {safeBookmarkPageSurahs[page] || '...'}
+                          {' '}{t('page')} {formatNumber(page)}
+                        </span>
+                        {/* Trailing chevron - navigation affordance */}
+                        {isRTL ? (
+                          <ChevronLeft className="w-5 h-5 text-emerald-300 dark:text-emerald-700 shrink-0" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-emerald-300 dark:text-emerald-700 shrink-0" />
+                        )}
+                      </button>
+                      {/* Delete */}
+                      <button
+                        onClick={() => setDeleteConfirmation({ page, type: group.deleteType })}
+                        className="w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 dark:text-gray-500 hover:text-red-500 active:bg-red-100 dark:active:bg-red-900/30 transition-colors shrink-0"
+                        aria-label="Remove bookmark"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
 
@@ -504,8 +630,8 @@ export default function BookmarksView({
                     className: 'bg-emerald-500 text-white border-emerald-600',
                   });
                   
-                  // Switch to view bookmarks
-                  setSearchParams({ category: 'view' });
+                  // Return to main screen (shows all bookmark cards)
+                  setSearchParams({});
                 }}
                 className={cn("w-full bg-emerald-700 hover:bg-emerald-800 rounded-lg border border-emerald-600 shadow-md text-[#F2E3BB]", textSizeClasses.button)}
               >
@@ -801,7 +927,8 @@ export default function BookmarksView({
                         });
                         
                         setSelectedUpdatePage(null);
-                        setSearchParams({ category: 'view' });
+                        // Return to main screen (shows all bookmark cards)
+                        setSearchParams({});
                       } catch (error) {
                         toast({
                           title: isRTL ? 'خطأ' : 'Error',

@@ -699,7 +699,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
           width: '100%',
           height: '100%',
           minHeight: fillMinHeight,
-          fontFamily: `'p${pageNumber}-${mushafType}', 'Amiri', serif`,
+          fontFamily: `'p${pageNumber}-${mushafType}', 'Changa', sans-serif`,
           direction: 'rtl',
         }}
       >
@@ -726,7 +726,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       ref={containerRef}
       className={`tartel-page tartel-page-transition flex flex-col items-center bg-transparent ${isFullscreenDarkMode ? 'tartel-dark-mode' : ''} ${isTransitioning ? 'tartel-transitioning' : ''} ${className}`}
       style={{
-        fontFamily: `'p${pageNumber}-${mushafType}', 'Amiri', serif`,
+        fontFamily: `'p${pageNumber}-${mushafType}', 'Changa', sans-serif`,
         direction: 'rtl',
         // Horizontal fit multiplier (<= 1): shrinks the ayah font when the
         // widest line would overflow the line box on narrow widths.

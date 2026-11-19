@@ -68,10 +68,10 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
     { id: 'test', icon: GraduationCap, label: isRTL ? 'اختبار' : 'Test' },
   ];
   
-  // Render list of categories
+  // Render list of categories (Material-style settings list)
   const renderCategoriesList = () => {
     return (
-      <div className="divide-y divide-emerald-100 dark:divide-emerald-900">
+      <div className="w-full max-w-2xl mx-auto pt-2 px-3 pb-4">
         {settingsCategories.map((category) => {
           const Icon = category.icon;
           
@@ -87,23 +87,25 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
                   setSearchParams({ category: category.id });
                 }
               }}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-5 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors",
-                isRTL ? "justify-start" : "justify-end"
-              )}
+              className="w-full flex items-center gap-4 min-h-[64px] px-3 py-3 rounded-2xl transition-colors active:bg-emerald-100 dark:active:bg-emerald-900/40"
             >
-              {isRTL ? (
-                <ChevronLeft className="w-6 h-6 text-emerald-500" />
-              ) : (
-                <ChevronRight className="w-6 h-6 text-emerald-500" />
-              )}
+              {/* Leading icon in app-themed container - consistent placement for scanning */}
+              <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+                <Icon className="w-6 h-6 text-[#F2E3BB]" />
+              </span>
+              {/* Primary label */}
               <span className={cn(
-                "font-medium text-emerald-700 dark:text-emerald-400",
+                "flex-1 text-start font-medium text-emerald-800 dark:text-emerald-200",
                 textSizeClasses.label
               )}>
                 {category.label}
               </span>
-              <Icon className="w-6 h-6 flex-shrink-0 text-emerald-600 dark:text-emerald-500" />
+              {/* Trailing chevron - mirrors automatically in RTL */}
+              {isRTL ? (
+                <ChevronLeft className="w-5 h-5 text-emerald-400 shrink-0" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-emerald-400 shrink-0" />
+              )}
             </button>
           );
         })}
@@ -141,7 +143,7 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
                       key={option.value}
                       onClick={() => handleMushafChange(option.value)}
                       className={cn(
-                        "relative flex flex-col gap-2 p-2 rounded-lg border-2 transition-all duration-200 hover:shadow-lg overflow-hidden",
+                        "relative flex flex-col gap-2 p-2 rounded-lg border-2 transition-all duration-200 hover:shadow-lg active:scale-[0.97] overflow-hidden",
                         isSelected 
                           ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 shadow-md" 
                           : "border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 hover:border-emerald-400"
@@ -228,7 +230,7 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
                 <button
                   onClick={() => setDialogTextSize('small')}
                   className={cn(
-                    "flex items-center justify-center px-3 py-2 rounded-lg border transition-all font-medium",
+                    "flex items-center justify-center px-3 min-h-[44px] rounded-lg border transition-all font-medium active:scale-[0.97]",
                     textSizeClasses.button,
                     dialogTextSize === 'small'
                       ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
@@ -240,7 +242,7 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
                 <button
                   onClick={() => setDialogTextSize('medium')}
                   className={cn(
-                    "flex items-center justify-center px-3 py-2 rounded-lg border transition-all font-medium",
+                    "flex items-center justify-center px-3 min-h-[44px] rounded-lg border transition-all font-medium active:scale-[0.97]",
                     textSizeClasses.button,
                     dialogTextSize === 'medium'
                       ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
@@ -252,7 +254,7 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
                 <button
                   onClick={() => setDialogTextSize('large')}
                   className={cn(
-                    "flex items-center justify-center px-3 py-2 rounded-lg border transition-all font-medium",
+                    "flex items-center justify-center px-3 min-h-[44px] rounded-lg border transition-all font-medium active:scale-[0.97]",
                     textSizeClasses.button,
                     dialogTextSize === 'large'
                       ? "bg-emerald-700 text-[#F2E3BB] border-emerald-600 shadow-md"
@@ -304,46 +306,28 @@ export default function SettingsView({ onNavigateToPage, currentPage }: Settings
       ) : (
         /* Show category content with back button */
         <div className="h-full overflow-y-auto">
-          {/* Back button header */}
-          <div className="sticky top-0 z-10 bg-[#FBF9F4] dark:bg-black border-b border-emerald-200 dark:border-emerald-800">
+          {/* Sub-screen app bar - back arrow + title */}
+          <div className="sticky top-0 z-10 bg-[#FBF9F4] dark:bg-black border-b border-emerald-100 dark:border-emerald-900">
             <button
               onClick={() => setSearchParams({})}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-4 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors",
-                isRTL ? "justify-start" : "justify-end"
-              )}
+              className="w-full flex items-center gap-1 px-2 py-1 min-h-[56px] transition-colors active:bg-emerald-100 dark:active:bg-emerald-900/40"
             >
               {isRTL ? (
-                <>
-                  <ChevronRight className="w-7 h-7 text-emerald-600" />
-                  <span className={cn(
-                    "font-medium text-emerald-800 dark:text-emerald-300",
-                    textSizeClasses.label
-                  )}>
-                    {settingsCategories.find(c => c.id === activeCategory)?.label}
-                  </span>
-                  {(() => {
-                    const category = settingsCategories.find(c => c.id === activeCategory);
-                    const Icon = category?.icon;
-                    return Icon ? <Icon className="w-6 h-6 text-emerald-600 dark:text-emerald-500" /> : null;
-                  })()}
-                </>
+                <ChevronRight className="w-7 h-7 text-emerald-600 dark:text-emerald-400 shrink-0" />
               ) : (
-                <>
-                  {(() => {
-                    const category = settingsCategories.find(c => c.id === activeCategory);
-                    const Icon = category?.icon;
-                    return Icon ? <Icon className="w-6 h-6 text-emerald-600 dark:text-emerald-500" /> : null;
-                  })()}
-                  <span className={cn(
-                    "font-medium text-emerald-800 dark:text-emerald-300",
-                    textSizeClasses.label
-                  )}>
-                    {settingsCategories.find(c => c.id === activeCategory)?.label}
-                  </span>
-                  <ChevronLeft className="w-7 h-7 text-emerald-600" />
-                </>
+                <ChevronLeft className="w-7 h-7 text-emerald-600 dark:text-emerald-400 shrink-0" />
               )}
+              <span className={cn(
+                "flex items-center gap-2 font-medium text-emerald-800 dark:text-emerald-200",
+                textSizeClasses.label
+              )}>
+                {(() => {
+                  const category = settingsCategories.find(c => c.id === activeCategory);
+                  const Icon = category?.icon;
+                  return Icon ? <Icon className="w-5 h-5 text-emerald-500 dark:text-emerald-400" /> : null;
+                })()}
+                {settingsCategories.find(c => c.id === activeCategory)?.label}
+              </span>
             </button>
           </div>
           

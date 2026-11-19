@@ -66,13 +66,13 @@ export function TopBar({
             >
               <span 
                 className={cn("text-xs", mutedText, "tracking-wide leading-none")}
-                style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+                style={{ fontFamily: "'Changa', sans-serif" }}
               >
                 {t('page')}
               </span>
               <span 
                 className={cn("text-xl md:text-2xl font-bold", primaryText, "leading-none mt-0.5")}
-                style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+                style={{ fontFamily: "'Changa', sans-serif" }}
               >
                 {formatNumber(currentPageNum)}
               </span>
@@ -90,7 +90,7 @@ export function TopBar({
                 <span className={cn("text-base", mutedText, "leading-none")}>﴾</span>
                 <span 
                   className={cn("text-xl md:text-2xl font-bold", primaryText, "leading-none")}
-                  style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+                  style={{ fontFamily: "'Changa', sans-serif" }}
                 >
                   {language === 'ar' ? currentSurah.name : currentSurah.englishName}
                 </span>
@@ -101,7 +101,7 @@ export function TopBar({
                   <>
                     <span 
                       className={cn("text-[10px] md:text-xs", mutedText, "leading-none")}
-                      style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+                      style={{ fontFamily: "'Changa', sans-serif" }}
                     >
                       {t('ayah')} {formatNumber(currentAyah)}
                     </span>
@@ -110,7 +110,7 @@ export function TopBar({
                 )}
                 <span 
                   className={cn("text-[10px] md:text-xs", mutedText, "leading-none")}
-                  style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+                  style={{ fontFamily: "'Changa', sans-serif" }}
                 >
                   {t('surah')} {formatNumber(currentSurah.id)}
                 </span>
@@ -127,13 +127,13 @@ export function TopBar({
             >
               <span 
                 className={cn("text-xs", mutedText, "tracking-wide leading-none")}
-                style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+                style={{ fontFamily: "'Changa', sans-serif" }}
               >
                 {t('juz')}
               </span>
               <span 
                 className={cn("text-xl md:text-2xl font-bold", primaryText, "leading-none mt-0.5")}
-                style={{ fontFamily: "'Scheherazade New', 'Amiri', serif" }}
+                style={{ fontFamily: "'Changa', sans-serif" }}
               >
                 {formatNumber(currentJuz)}
               </span>

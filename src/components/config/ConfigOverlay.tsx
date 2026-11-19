@@ -1,13 +1,14 @@
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useDarkMode } from "@/contexts/DarkModeContext";
 import { useBookmarks } from "@/hooks/useBookmarks";
-import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { motion, AnimatePresence } from "framer-motion";
+import { useViewSwipe } from "@/hooks/useViewSwipe";
 
 // Import different configuration views
 import SettingsView from "@/components/config/SettingsView";
@@ -21,6 +22,34 @@ import AyahSelectorView from "@/components/config/AyahSelectorView";
 import { BottomBar } from "@/components/quran/BottomBar";
 
 export type ConfigType = 'settings' | 'bookmarks' | 'navigation' | 'reciter' | 'tafseer' | 'repeat' | 'search' | 'ayahselector';
+
+/**
+ * Visual order of the bottom-bar views - used to pick the horizontal
+ * slide direction when switching between them (ViewPager-style).
+ */
+const VIEW_ORDER: ConfigType[] = [
+  'navigation', 'search', 'tafseer', 'bookmarks', 'settings',
+  'reciter', 'repeat', 'ayahselector',
+];
+
+/** Views reachable by swiping - the five bottom-bar destinations. */
+const BAR_VIEWS: ConfigType[] = ['navigation', 'search', 'tafseer', 'bookmarks', 'settings'];
+
+/** Horizontal slide variants - "enter" comes from the side we move toward.
+ *  Exiting views get pointer-events: none so a lingering/interrupted exit
+ *  can never swallow taps meant for the incoming view. */
+const viewVariants = {
+  enter: (dir: number) => ({
+    x: dir === 0 ? '0%' : `${dir * 100}%`,
+    opacity: dir === 0 ? 0 : 1,
+  }),
+  center: { x: '0%', opacity: 1 },
+  exit: (dir: number) => ({
+    x: dir === 0 ? '0%' : `${-dir * 100}%`,
+    opacity: dir === 0 ? 0 : 1,
+    pointerEvents: 'none',
+  }),
+};
 
 interface ConfigOverlayProps {
   type: ConfigType;
@@ -162,6 +191,42 @@ export default function ConfigOverlay({
   const { t, language, isRTL } = useLanguage();
   const { isDarkMode } = useDarkMode();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Track the previous view to compute the horizontal slide direction.
+  // Moving forward through the bottom bar slides content in from the end
+  // side (mirrored in RTL); same/unknown pairs just cross-fade.
+  const prevTypeRef = useRef<ConfigType>(type);
+  const computeSlideDirection = (next: ConfigType, prev: ConfigType): number => {
+    const nextIdx = VIEW_ORDER.indexOf(next);
+    const prevIdx = VIEW_ORDER.indexOf(prev);
+    if (nextIdx === -1 || prevIdx === -1 || nextIdx === prevIdx) return 0;
+    const forward = nextIdx > prevIdx ? 1 : -1;
+    return isRTL ? -forward : forward;
+  };
+  const slideDirection = computeSlideDirection(type, prevTypeRef.current);
+  prevTypeRef.current = type;
+
+  // Swipe between bottom-bar views (ViewPager gesture).
+  // Disabled while a sub-screen is open (settings category, bookmarks
+  // add/update, navigation type...) so scrolling inside those screens
+  // can never be mistaken for a view switch. Tafseer is excluded too:
+  // its ayah cards already own a horizontal drag.
+  const hasActiveSubView = (): boolean => {
+    if (type === 'settings' && searchParams.get('category')) return true;
+    if (type === 'navigation' && searchParams.get('type')) return true;
+    if (type === 'bookmarks' && searchParams.get('category')) return true;
+    return false;
+  };
+  const swipeHandlers = useViewSwipe((dir) => {
+    if (hasActiveSubView() || type === 'tafseer' || !BAR_VIEWS.includes(type)) return;
+    const idx = BAR_VIEWS.indexOf(type);
+    // Forward = next item in the bar; physical direction mirrors in RTL
+    const forward = isRTL ? dir === 'right' : dir === 'left';
+    const nextIdx = forward ? idx + 1 : idx - 1;
+    if (nextIdx >= 0 && nextIdx < BAR_VIEWS.length) {
+      onChangeView(BAR_VIEWS[nextIdx]);
+    }
+  });
 
   // Chrome theme ('green' | 'glass') — read on mount, live-updated from settings
   const [chromeTheme, setChromeTheme] = useState<'green' | 'glass'>(() => {
@@ -410,12 +475,15 @@ export default function ConfigOverlay({
   };
   
   return (
-    <>
-      {/* Content (header + main view) */}
-      <div
-        className="fixed inset-0 z-[100] flex flex-col bg-[#FBF9F4] dark:bg-black"
-      >
-        {/* Header with close button */}
+    <motion.div
+      className="fixed inset-0 z-[100] flex flex-col bg-[#FBF9F4] dark:bg-black"
+      /* Open/close: the whole sheet slides up from the bottom */
+      initial={{ y: '100%' }}
+      animate={{ y: 0 }}
+      exit={{ y: '100%' }}
+      transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+    >
+      {/* Header - Android-style top app bar: back arrow + start-aligned title */}
         <div 
           className={cn(
             "sticky top-0 z-10 shadow-lg pt-6",
@@ -428,45 +496,67 @@ export default function ConfigOverlay({
                 : "bg-gradient-to-b from-emerald-800 to-emerald-600"
           )}
         >
-          <div className="flex items-center justify-between px-4 py-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
+          <div className="flex items-center gap-1 px-2 py-1">
+            <button
+              onClick={() => {
+                // Behaves like Android system back: leave sub-view first, then close
+                if (!goBackInView()) onClose();
+              }}
               className={cn(
-                "hover:bg-emerald-700/10 dark:hover:bg-white/10",
-                isGlassLight ? "text-emerald-800" : "text-[#F2E3BB] hover:bg-emerald-700/50"
+                "flex items-center justify-center w-12 h-12 rounded-full shrink-0 transition-colors active:bg-emerald-950/30 dark:active:bg-white/10",
+                isGlassLight ? "text-emerald-800 active:bg-emerald-900/10" : "text-[#F2E3BB]"
+              )}
+              aria-label={isRTL ? "رجوع" : "Go back"}
+            >
+              {isRTL ? (
+                <ChevronRight className="w-7 h-7" />
+              ) : (
+                <ChevronLeft className="w-7 h-7" />
+              )}
+            </button>
+            
+            <motion.h1
+              key={type}
+              initial={slideDirection === 0 ? { opacity: 0 } : { opacity: 0, x: `${-slideDirection * 8}%` }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className={cn(
+                "text-xl md:text-2xl font-bold truncate",
+                isGlassLight ? "text-emerald-800" : "text-[#F2E3BB]"
               )}
             >
-              <X className="w-6 h-6" />
-            </Button>
-            
-            <h1 className={cn(
-              "text-xl md:text-2xl font-bold",
-              isGlassLight ? "text-emerald-800" : "text-[#F2E3BB]"
-            )}>
               {getTitle()}
-            </h1>
-            
-            {/* Empty div for centering title */}
-            <div className="w-10" />
+            </motion.h1>
           </div>
         </div>
         
-        {/* Scrollable content */}
-        <div className={cn(
-          "flex-1 flex flex-col",
-          type === 'reciter' ? 'overflow-hidden min-h-0' : 'overflow-y-auto pb-20'
-        )}>
-          <div className="flex-1 flex flex-col min-h-0">
-            {renderView()}
-          </div>
+        {/* View content - slides horizontally when switching bottom-bar views.
+            Touch handlers allow swiping to the next/previous bar item. */}
+        <div className="flex-1 min-h-0 overflow-hidden" {...swipeHandlers}>
+          <AnimatePresence initial={false} custom={slideDirection} mode="popLayout">
+            <motion.div
+              key={type}
+              custom={slideDirection}
+              variants={viewVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+              className={cn(
+                "h-full flex flex-col",
+                type === 'reciter' ? 'overflow-hidden min-h-0' : 'overflow-y-auto pb-20'
+              )}
+            >
+              <div className="flex-1 flex flex-col min-h-0">
+                {renderView()}
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
-      </div>
 
-      {/* Bottom Navigation Bar - Fixed, doesn't slide */}
+      {/* Bottom Navigation Bar - part of the sliding sheet */}
       <div className={cn(
-        "fixed bottom-0 left-0 right-0 z-[101] pt-2",
+        "pt-2",
         chromeTheme === 'glass'
           ? isDarkMode
             ? "bg-black/40 backdrop-blur-xl border-t border-white/10"
@@ -489,14 +579,14 @@ export default function ConfigOverlay({
             : type === 'tafseer' ? 'tafseer'
             : null
           }
-          onGoToClick={() => type === 'navigation' ? onClose() : onChangeView('navigation')}
-          onSearchClick={() => type === 'search' ? onClose() : onChangeView('search')}
-          onBookmarkClick={() => type === 'bookmarks' ? onClose() : onChangeView('bookmarks')}
-          onSettingsClick={() => type === 'settings' ? onClose() : onChangeView('settings')}
-          onTafseerClick={() => type === 'tafseer' ? onClose() : onChangeView('tafseer')}
+          onGoToClick={() => type === 'navigation' ? (goBackInView() || onClose()) : onChangeView('navigation')}
+          onSearchClick={() => type === 'search' ? (goBackInView() || onClose()) : onChangeView('search')}
+          onBookmarkClick={() => type === 'bookmarks' ? (goBackInView() || onClose()) : onChangeView('bookmarks')}
+          onSettingsClick={() => type === 'settings' ? (goBackInView() || onClose()) : onChangeView('settings')}
+          onTafseerClick={() => type === 'tafseer' ? (goBackInView() || onClose()) : onChangeView('tafseer')}
           onViewModeToggle={onViewModeToggle}
         />
       </div>
-    </>
+    </motion.div>
   );
 }

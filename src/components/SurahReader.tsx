@@ -44,7 +44,7 @@ const VerseNumber = ({ number }: { number: number }) => (
         dominantBaseline="middle" 
         fill="#8b6914"
         fontSize="14"
-        fontFamily="'Amiri', serif"
+        fontFamily="'Changa', sans-serif"
         fontWeight="bold"
       >
         {toArabicNumber(number)}
@@ -122,7 +122,7 @@ const SurahReader = ({ surah, onBack }: SurahReaderProps) => {
                         <p className="text-base sm:text-lg text-[#8b6914] mb-1">سُورَةُ</p>
                         <h1 
                           className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-[#2c1810]" 
-                          style={{ fontFamily: "'Amiri', 'Noto Naskh Arabic', serif" }}
+                          style={{ fontFamily: "'Changa', sans-serif" }}
                         >
                           {surah.name}
                         </h1>
@@ -152,7 +152,7 @@ const SurahReader = ({ surah, onBack }: SurahReaderProps) => {
                               <p 
                                 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl leading-[2.2] text-[#2c1810] inline"
                                 style={{ 
-                                  fontFamily: "'Amiri', 'Noto Naskh Arabic', serif",
+                                  fontFamily: "'Changa', sans-serif",
                                   wordSpacing: '0.15em'
                                 }}
                               >

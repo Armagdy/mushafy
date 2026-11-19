@@ -71,9 +71,9 @@ export default {
         },
       },
       fontFamily: {
-        arabic: ['Amiri', 'Noto Naskh Arabic', 'serif'],
-        display: ['Playfair Display', 'serif'],
-        body: ['Inter', 'sans-serif'],
+        arabic: ['Changa', 'Noto Sans Arabic', 'sans-serif'],
+        display: ['Changa', 'sans-serif'],
+        body: ['Changa', 'Noto Sans Arabic', 'sans-serif'],
       },
       borderRadius: {
         lg: "var(--radius)",

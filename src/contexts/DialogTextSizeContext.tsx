@@ -38,7 +38,7 @@ const DialogTextSizeContext = createContext<DialogTextSizeContextType | undefine
 export function DialogTextSizeProvider({ children }: { children: React.ReactNode }) {
   const [dialogTextSize, setDialogTextSizeState] = useState<DialogTextSize>(() => {
     const saved = localStorage.getItem('quran-dialog-text-size');
-    return (saved as DialogTextSize) || 'medium';
+    return (saved as DialogTextSize) || 'small';
   });
 
   useEffect(() => {

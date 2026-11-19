@@ -144,7 +144,7 @@ export default function Azkar() {
                         ? 'text-emerald-800 dark:text-emerald-200'
                         : 'text-emerald-950 dark:text-emerald-100'
                     )}
-                    style={{ fontFamily: dhikr.quran ? "'Scheherazade New', 'Amiri', serif" : "'Noto Sans Arabic', 'Segoe UI', sans-serif" }}
+                    style={{ fontFamily: "'Changa', sans-serif" }}
                   >
                     {dhikr.text}
                   </p>

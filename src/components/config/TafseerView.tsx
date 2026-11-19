@@ -453,7 +453,7 @@ export default function TafseerView() {
                     animate={{ ...slideVariants.center, x: dragOffset }}
                     exit="exit"
                     className={cn("leading-[2.2] text-right text-emerald-900 dark:text-emerald-50", textSizeClasses.text)}
-                    style={{ fontFamily: "'Scheherazade New', 'Noto Naskh Arabic', serif" }}
+                    style={{ fontFamily: "'Changa', sans-serif" }}
                   >
                     {ayahText}
                   </motion.div>
