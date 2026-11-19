@@ -666,135 +666,159 @@ export default function BookmarksView({
               animate={{ opacity: 1, y: 0 }}
               className="flex flex-col h-full max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-16rem)]"
             >
-              {/* Last Bookmark Section */}
+              {/* Last used bookmark - same card style as the default view */}
               {(() => {
                 const lastBookmark = getLastBookmark();
                 if (!lastBookmark) return null;
-                
-                const { page, type } = lastBookmark;
-                const Icon = type === 'bookmark' ? Bookmark : type === 'memorization' ? BookMarked : BookOpen;
-                
+
+                const { page, type: lastType } = lastBookmark;
+                const Icon = lastType === 'bookmark' ? Bookmark : lastType === 'memorization' ? BookMarked : BookOpen;
+
                 return (
-                  <div className="mb-4 flex-shrink-0">
-                    <div className={cn(
-                      "font-semibold px-2 py-1 mb-2",
-                      type === 'bookmark' && "text-amber-600 dark:text-amber-400",
-                      type === 'memorization' && "text-emerald-600 dark:text-emerald-400",
-                      type === 'reading' && "text-blue-600 dark:text-blue-400",
-                      textSizeClasses.text
-                    )}>
+                  <div className="mb-4 flex-shrink-0 space-y-2">
+                    <div className={cn("px-1 font-semibold text-emerald-700 dark:text-emerald-400", textSizeClasses.text)}>
                       {t('lastBookmark')}
                     </div>
-                    <button
-                      onClick={() => {
-                        setSelectedUpdatePage(page);
-                        setUpdateNewPage(currentPage);
-                        setUpdateNewSurahId(currentSurahId);
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-3 rounded-lg transition-colors shadow-sm",
-                        type === 'bookmark' && "hover:bg-amber-100/50 dark:hover:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 bg-gradient-to-r from-amber-50 to-white dark:from-amber-950/20 dark:to-emerald-950/30",
-                        type === 'memorization' && "hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-900/30 dark:to-emerald-950/30",
-                        type === 'reading' && "hover:bg-blue-100/50 dark:hover:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-emerald-950/30",
-                        isRTL ? 'text-right' : 'text-left'
-                      )}
-                    >
-                      <Icon className={cn(
-                        "w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0",
-                        type === 'bookmark' && "text-amber-500",
-                        type === 'memorization' && "text-emerald-600",
-                        type === 'reading' && "text-blue-600"
-                      )} />
-                      <div className={cn("flex-1 min-w-0 font-medium truncate", textSizeClasses.text)}>
-                        {t('page')} {formatNumber(page)} - {safeBookmarkPageSurahs[page] || '...'}
-                      </div>
-                    </button>
+                    <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-900/30 dark:to-gray-900 shadow-sm overflow-hidden">
+                      <button
+                        onClick={() => {
+                          setSelectedUpdatePage(page);
+                          setUpdateNewPage(currentPage);
+                          setUpdateNewSurahId(currentSurahId);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-3 p-3 active:bg-emerald-100/50 dark:active:bg-emerald-900/40 transition-colors",
+                          isRTL ? 'text-right' : 'text-left'
+                        )}
+                      >
+                        <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+                          <Icon className="w-5 h-5 text-[#F2E3BB]" />
+                        </span>
+                        <span className={cn("flex-1 min-w-0 truncate font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+                          {safeBookmarkPageSurahs[page] || '...'}
+                          {' '}{t('page')} {formatNumber(page)}
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 );
               })()}
 
-              <div className="flex-1 overflow-y-auto">
-                {/* Quick Bookmarks */}
-                {safeBookmarks.length > 0 && (
-                  <div className="px-1 sm:px-2 py-1 space-y-2">
-                    <div className={cn("font-semibold text-amber-600 dark:text-amber-400 px-2 py-1", textSizeClasses.text)}>
-                      {isRTL ? 'علامات' : 'Bookmarks'} ({safeBookmarks.length})
-                    </div>
-                    {safeBookmarks.map((page) => (
-                      <button
-                        key={`update-quick-${page}`}
-                        onClick={() => {
-                          setSelectedUpdatePage(page);
-                          setUpdateNewPage(currentPage);
-                          setUpdateNewSurahId(currentSurahId);
-                        }}
-                        className={cn("w-full flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-3 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 rounded-lg transition-colors border border-amber-200 dark:border-amber-800/40 bg-gradient-to-r from-amber-50 to-white dark:from-amber-950/20 dark:to-emerald-950/30 shadow-sm", isRTL ? 'text-right' : 'text-left')}
-                      >
-                        <Bookmark className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 flex-shrink-0" />
-                        <div className={cn("flex-1 min-w-0 font-medium truncate", textSizeClasses.text)}>
-                          {t('page')} {formatNumber(page)} - {safeBookmarkPageSurahs[page] || '...'}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div className="flex-1 overflow-y-auto space-y-4">
+                {/* Bookmarks - grouped by type, sorted by page, same cards as the default view */}
+                {(() => {
+                  const groups: {
+                    key: 'bookmark' | 'memorization' | 'reading';
+                    label: string;
+                    icon: typeof Bookmark;
+                    pages: number[];
+                    headerClass: string;
+                  }[] = [
+                    {
+                      key: 'bookmark',
+                      label: isRTL ? 'علامات' : 'Bookmarks',
+                      icon: Bookmark,
+                      pages: [...safeBookmarks].sort((a, b) => a - b),
+                      headerClass: 'text-amber-600 dark:text-amber-400',
+                    },
+                    {
+                      key: 'memorization',
+                      label: isRTL ? 'حفظ' : 'Memorization',
+                      icon: BookMarked,
+                      pages: [...safeMemorizationBookmarks].sort((a, b) => a - b),
+                      headerClass: 'text-emerald-600 dark:text-emerald-400',
+                    },
+                    {
+                      key: 'reading',
+                      label: isRTL ? 'قراءة' : 'Reading',
+                      icon: BookOpen,
+                      pages: [...safeReadingBookmarks].sort((a, b) => a - b),
+                      headerClass: 'text-blue-600 dark:text-blue-400',
+                    },
+                  ];
 
-                {/* Memorization Bookmarks */}
-                {safeMemorizationBookmarks.length > 0 && (
-                  <div className="px-1 sm:px-2 py-1 space-y-2">
-                    <div className={cn("font-semibold text-emerald-600 dark:text-emerald-400 px-2 py-1", textSizeClasses.text)}>
-                      {isRTL ? 'حفظ' : 'Memorization'} ({safeMemorizationBookmarks.length})
-                    </div>
-                    {safeMemorizationBookmarks.map((page) => (
-                      <button
-                        key={`update-mem-${page}`}
-                        onClick={() => {
-                          setSelectedUpdatePage(page);
-                          setUpdateNewPage(currentPage);
-                          setUpdateNewSurahId(currentSurahId);
-                        }}
-                        className={cn("w-full flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-3 hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 rounded-lg transition-colors border border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-white dark:from-emerald-900/30 dark:to-emerald-950/30 shadow-sm", isRTL ? 'text-right' : 'text-left')}
-                      >
-                        <BookMarked className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 flex-shrink-0" />
-                        <div className={cn("flex-1 min-w-0 font-medium truncate", textSizeClasses.text)}>
-                          {t('page')} {formatNumber(page)} - {safeBookmarkPageSurahs[page] || '...'}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                  const hasAny = groups.some(g => g.pages.length > 0);
 
-                {/* Reading Bookmarks */}
-                {safeReadingBookmarks.length > 0 && (
-                  <div className="px-1 sm:px-2 py-1 space-y-2">
-                    <div className={cn("font-semibold text-blue-600 dark:text-blue-400 px-2 py-1", textSizeClasses.text)}>
-                      {isRTL ? 'قراءة' : 'Reading'} ({safeReadingBookmarks.length})
-                    </div>
-                    {safeReadingBookmarks.map((page) => (
-                      <button
-                        key={`update-read-${page}`}
-                        onClick={() => {
-                          setSelectedUpdatePage(page);
-                          setUpdateNewPage(currentPage);
-                          setUpdateNewSurahId(currentSurahId);
-                        }}
-                        className={cn("w-full flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-3 hover:bg-blue-100/50 dark:hover:bg-blue-900/20 rounded-lg transition-colors border border-blue-200 dark:border-blue-800/40 bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/20 dark:to-emerald-950/30 shadow-sm", isRTL ? 'text-right' : 'text-left')}
-                      >
-                        <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0" />
-                        <div className={cn("flex-1 min-w-0 font-medium truncate", textSizeClasses.text)}>
-                          {t('page')} {page} - {safeBookmarkPageSurahs[page] || '...'}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                  if (!hasAny) {
+                    return (
+                      <div className="py-12 px-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-900/20 text-center space-y-3">
+                        <span className="mx-auto flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md">
+                          <Bookmark className="w-7 h-7 text-[#F2E3BB]" />
+                        </span>
+                        <p className={cn("text-emerald-800 dark:text-emerald-300 font-medium", textSizeClasses.text)}>
+                          {t('noBookmarks')}
+                        </p>
+                      </div>
+                    );
+                  }
 
-                {/* No Bookmarks Message */}
-                {safeBookmarks.length === 0 && safeMemorizationBookmarks.length === 0 && safeReadingBookmarks.length === 0 && (
-                  <div className={cn("px-3 sm:px-4 py-4 sm:py-6 text-emerald-600 dark:text-emerald-400 text-center", textSizeClasses.text)}>
-                    {t('noBookmarks')}
-                  </div>
-                )}
+                  return groups.filter(g => g.pages.length > 0).map(group => {
+                    const Icon = group.icon;
+                    return (
+                      <div
+                        key={`update-${group.key}`}
+                        className={cn(
+                          "rounded-2xl border shadow-sm overflow-hidden bg-white dark:bg-gray-900",
+                          group.key === 'bookmark' && "border-amber-200/70 dark:border-amber-900/50",
+                          group.key === 'memorization' && "border-emerald-200 dark:border-emerald-800",
+                          group.key === 'reading' && "border-blue-200/70 dark:border-blue-900/50"
+                        )}
+                      >
+                        {/* Category header - tinted per type */}
+                        <div className={cn(
+                          "flex items-center gap-3 p-3 border-b",
+                          group.key === 'bookmark' && "bg-amber-50/70 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/40",
+                          group.key === 'memorization' && "bg-emerald-50/70 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800",
+                          group.key === 'reading' && "bg-blue-50/70 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/40"
+                        )}>
+                          <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+                            <Icon className="w-5 h-5 text-[#F2E3BB]" />
+                          </span>
+                          <span className={cn("flex-1 font-semibold", group.headerClass, textSizeClasses.label)}>
+                            {group.label}
+                          </span>
+                          <span className={cn(
+                            "shrink-0 px-2.5 py-0.5 rounded-full font-medium",
+                            group.key === 'bookmark' && "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300",
+                            group.key === 'memorization' && "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300",
+                            group.key === 'reading' && "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300",
+                            textSizeClasses.text
+                          )}>
+                            {formatNumber(group.pages.length)}
+                          </span>
+                        </div>
+                        {/* Bookmarks inside the category card - sorted by page */}
+                        {group.pages.map((page, index) => (
+                          <button
+                            key={`update-${group.key}-${page}`}
+                            onClick={() => {
+                              setSelectedUpdatePage(page);
+                              setUpdateNewPage(currentPage);
+                              setUpdateNewSurahId(currentSurahId);
+                            }}
+                            className={cn(
+                              "w-full flex items-center justify-between gap-3 py-3 px-4 active:bg-emerald-50 dark:active:bg-emerald-900/40 transition-colors",
+                              index > 0 && "border-t border-emerald-100/60 dark:border-emerald-900/60",
+                              isRTL ? 'text-right' : 'text-left'
+                            )}
+                          >
+                            {/* Surah + page on one line */}
+                            <span className={cn("flex-1 min-w-0 truncate font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
+                              {safeBookmarkPageSurahs[page] || '...'}
+                              {' '}{t('page')} {formatNumber(page)}
+                            </span>
+                            {/* Trailing chevron - selection affordance */}
+                            {isRTL ? (
+                              <ChevronLeft className="w-5 h-5 text-emerald-300 dark:text-emerald-700 shrink-0" />
+                            ) : (
+                              <ChevronRight className="w-5 h-5 text-emerald-300 dark:text-emerald-700 shrink-0" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </motion.div>
           ) : (
@@ -805,8 +829,9 @@ export default function BookmarksView({
             >
               {/* Current Bookmark Info */}
               <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3 sm:p-4 mb-3">
-                <div className={cn("text-emerald-700 dark:text-emerald-400", isRTL ? 'text-right' : 'text-left', textSizeClasses.text)}>
-                  {isRTL ? 'التحديث من:' : 'Updating from:'} {safeBookmarkPageSurahs[selectedUpdatePage] || '...'} - {t('page')} {formatNumber(selectedUpdatePage)}
+                <div className={cn("text-emerald-700 dark:text-emerald-400", isRTL ? 'text-right' : 'text-left', textSizeClasses.label)}>
+                  <span className="font-semibold">{safeBookmarkPageSurahs[selectedUpdatePage] || '...'}</span>
+                  {' '}{isRTL ? 'التحديث من:' : 'Updating from:'} {t('page')} {formatNumber(selectedUpdatePage)}
                 </div>
               </div>
 
