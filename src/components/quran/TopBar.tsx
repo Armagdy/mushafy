@@ -53,10 +53,13 @@ export function TopBar({
   const mutedText = isGlassLight ? 'text-emerald-700/70' : 'text-[#F2E3BB]/70';
 
   return (
-    // Transparent outer strip — ZERO top padding, flush with the top of the
-    // screen on every device. On wide screens the bar itself is a centered
-    // floating panel; on phones it renders like the old full-bleed band but
-    // with no gap above it.
+    // Transparent outer strip — flush with the top of the screen on every
+    // device. On wide screens the bar itself is a centered floating panel;
+    // on phones it renders like the old full-bleed band. The header pads
+    // itself down by the status-bar safe-area inset (edge-to-edge Android /
+    // iOS PWA), so its themed background fills the status-bar strip and the
+    // content starts below the battery/notification icons — same rule as the
+    // fullscreen overlay header. Inset is 0 on desktop, so nothing changes.
     <div className="w-full flex justify-center md:px-3">
       <header
         className={cn(
@@ -69,9 +72,13 @@ export function TopBar({
               ? "bg-emerald-950"
               : "bg-gradient-to-b from-emerald-800 to-emerald-600"
         )}
-        // Inline maxWidth (measured pages' width) overrides the max-w-4xl
-        // fallback class on desktop; absent on phones.
-        style={maxWidthPx ? { maxWidth: `${maxWidthPx}px` } : undefined}
+        style={{
+          // Status-bar inset (same rule as the fullscreen overlay header).
+          paddingTop: 'env(safe-area-inset-top)',
+          // Inline maxWidth (measured pages' width) overrides the max-w-4xl
+          // fallback class on desktop; absent on phones.
+          ...(maxWidthPx ? { maxWidth: `${maxWidthPx}px` } : null),
+        }}
       >
         {/* Main Header */}
         <div className="relative">
