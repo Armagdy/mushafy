@@ -640,7 +640,7 @@ export default function NavigationView({ onNavigate, onClose, initialType, initi
               className="w-full flex items-center gap-4 min-h-[64px] px-3 py-3 rounded-2xl transition-colors active:bg-emerald-100 dark:active:bg-emerald-900/40"
             >
               {/* Leading icon in app-themed container - consistent placement for scanning */}
-              <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+              <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-emerald-700 shadow-md shrink-0">
                 <Icon className="w-6 h-6 text-[#F2E3BB]" />
               </span>
               {/* Primary label */}

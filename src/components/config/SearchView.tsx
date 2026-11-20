@@ -267,7 +267,7 @@ export default function SearchView({ onNavigate, onClose }: SearchViewProps) {
         {/* Search Instructions */}
         {!isSearchLoading && wordSearchResults.length === 0 && !searchWord && (
           <div className="py-12 px-4 text-center space-y-3">
-            <span className="mx-auto flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md">
+            <span className="mx-auto flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-700 shadow-md">
               <Search className="w-7 h-7 text-[#F2E3BB]" />
             </span>
             <p className={cn("text-emerald-800 dark:text-emerald-300 font-medium", textSizeClasses.text)}>

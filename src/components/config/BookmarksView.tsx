@@ -237,7 +237,7 @@ export default function BookmarksView({
             <button
               onClick={() => setSearchParams({ category: 'add' })}
               className={cn(
-                "flex items-center justify-center gap-2 min-h-[52px] px-4 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 border border-emerald-700/60 shadow-md text-[#F2E3BB] font-medium active:scale-[0.97] transition-all",
+                "flex items-center justify-center gap-2 min-h-[52px] px-4 rounded-2xl bg-emerald-700 border border-emerald-700/60 shadow-md text-[#F2E3BB] font-medium active:scale-[0.97] transition-all",
                 textSizeClasses.button
               )}
             >
@@ -247,7 +247,7 @@ export default function BookmarksView({
             <button
               onClick={() => setSearchParams({ category: 'update' })}
               className={cn(
-                "flex items-center justify-center gap-2 min-h-[52px] px-4 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 border border-emerald-700/60 shadow-md text-[#F2E3BB] font-medium active:scale-[0.97] transition-all",
+                "flex items-center justify-center gap-2 min-h-[52px] px-4 rounded-2xl bg-emerald-700 border border-emerald-700/60 shadow-md text-[#F2E3BB] font-medium active:scale-[0.97] transition-all",
                 textSizeClasses.button
               )}
             >
@@ -280,7 +280,7 @@ export default function BookmarksView({
                     )}
                   >
                     {/* Themed icon */}
-                    <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+                    <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-700 shadow-md shrink-0">
                       <Icon className="w-5 h-5 text-[#F2E3BB]" />
                     </span>
                     {/* Surah + page on one line */}
@@ -335,7 +335,7 @@ export default function BookmarksView({
             if (!hasAny) {
               return (
                 <div className="py-12 px-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-900/20 text-center space-y-3">
-                  <span className="mx-auto flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md">
+                  <span className="mx-auto flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-700 shadow-md">
                     <Bookmark className="w-7 h-7 text-[#F2E3BB]" />
                   </span>
                   <p className={cn("text-emerald-800 dark:text-emerald-300 font-medium", textSizeClasses.text)}>
@@ -364,7 +364,7 @@ export default function BookmarksView({
                     group.key === 'memorization' && "bg-emerald-50/70 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800",
                     group.key === 'reading' && "bg-blue-50/70 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/40"
                   )}>
-                    <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+                    <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-700 shadow-md shrink-0">
                       <Icon className="w-5 h-5 text-[#F2E3BB]" />
                     </span>
                     <span className={cn("flex-1 font-semibold", group.headerClass, textSizeClasses.label)}>
@@ -691,7 +691,7 @@ export default function BookmarksView({
                           isRTL ? 'text-right' : 'text-left'
                         )}
                       >
-                        <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+                        <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-700 shadow-md shrink-0">
                           <Icon className="w-5 h-5 text-[#F2E3BB]" />
                         </span>
                         <span className={cn("flex-1 min-w-0 truncate font-semibold text-emerald-800 dark:text-emerald-200", textSizeClasses.label)}>
@@ -742,7 +742,7 @@ export default function BookmarksView({
                   if (!hasAny) {
                     return (
                       <div className="py-12 px-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-900/20 text-center space-y-3">
-                        <span className="mx-auto flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md">
+                        <span className="mx-auto flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-700 shadow-md">
                           <Bookmark className="w-7 h-7 text-[#F2E3BB]" />
                         </span>
                         <p className={cn("text-emerald-800 dark:text-emerald-300 font-medium", textSizeClasses.text)}>
@@ -771,7 +771,7 @@ export default function BookmarksView({
                           group.key === 'memorization' && "bg-emerald-50/70 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800",
                           group.key === 'reading' && "bg-blue-50/70 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/40"
                         )}>
-                          <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-b from-emerald-800 to-emerald-600 shadow-md shrink-0">
+                          <span className="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-700 shadow-md shrink-0">
                             <Icon className="w-5 h-5 text-[#F2E3BB]" />
                           </span>
                           <span className={cn("flex-1 font-semibold", group.headerClass, textSizeClasses.label)}>
