@@ -42,7 +42,6 @@ const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'ما
 const AR_WEEKDAYS = ['أح', 'إث', 'ثل', 'أر', 'خم', 'جم', 'سب'];
 const AR_WEEKDAYS_FULL = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 const EN_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const REVISION_CHIPS = [0, 5, 10, 20, 40, 60];
 const JUZ_FREQS: { id: JuzRevisionFrequency; key: TranslationKey }[] = [
   { id: 'off', key: 'memorizeJuzFreqOff' },
   { id: 'weekly', key: 'memorizeJuzFreqWeekly' },
@@ -450,9 +449,6 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
             {t('memorizeRevision')} — {t('memorizeMemorizedPages')}
           </span>
         </div>
-        <p className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
-          {t('memorizeMemorizedPagesHint')}
-        </p>
         <div className="flex items-center justify-center gap-4">
           <button
             onClick={() => setFormRevisionPages(v => Math.max(0, v - 5))}
@@ -475,17 +471,6 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
             className="w-11 h-11 rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 text-xl font-bold hover:bg-emerald-50 dark:hover:bg-emerald-900 active:scale-[0.97] transition-all flex items-center justify-center"
           >+</button>
         </div>
-        <div className="flex flex-wrap justify-center gap-2">
-          {REVISION_CHIPS.map(n => (
-            <button
-              key={n}
-              onClick={() => setFormRevisionPages(n)}
-              className={chipButtonClass(formRevisionPages === n)}
-            >
-              {n === 0 ? t('memorizeRevisionNone') : t('memorizeLastPages').replace('{n}', fmt(n))}
-            </button>
-          ))}
-        </div>
         {formRevisionPages > 0 && (
           <p className={cn("text-center text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
             {t('memorizeRevisionStatement')}
@@ -501,13 +486,7 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
             {t('memorizeJuzRevision')} — {t('memorizeMemorizedPages')}
           </span>
         </div>
-        <p className={cn("text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
-          {t('memorizeJuzHint')}
-        </p>
 
-        <span className={cn("block font-medium text-emerald-800 dark:text-emerald-300", textSizeClasses.label)}>
-          {t('memorizeJuzFreq')}
-        </span>
         <div className="flex flex-wrap justify-center gap-2">
           {JUZ_FREQS.map(f => (
             <button
@@ -600,9 +579,6 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
             </label>
           </div>
         </div>
-        <p className={cn("text-center text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
-          {t('memorizeReminderSetupHint')}
-        </p>
       </div>
 
       <button
@@ -872,7 +848,7 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
               {t('memorizeJuzRevision')}
             </span>
             <p className={cn(
-              "font-medium truncate",
+              "font-medium break-words",
               j.done
                 ? "line-through text-violet-700/80 dark:text-violet-500/80"
                 : "text-emerald-900 dark:text-emerald-100"
@@ -955,7 +931,7 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
                 )}
               </div>
               <p className={cn(
-                "font-medium truncate",
+                "font-medium break-words",
                 content.memorizeDone
                   ? "line-through text-emerald-600 dark:text-emerald-500"
                   : "text-emerald-900 dark:text-emerald-100"
@@ -1018,14 +994,14 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
                     {t('memorizeRevisePortion')}
                   </span>
                   <p className={cn(
-                    "font-medium truncate",
+                    "font-medium break-words",
                     content.revisionDone
                       ? "line-through text-amber-700/80 dark:text-amber-500/80"
                       : "text-emerald-900 dark:text-emerald-100"
                   )}>
                     {spans.map(s => s.label).join(' • ')}
                   </p>
-                  <p className="text-xs text-emerald-700 dark:text-emerald-400 truncate">
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 break-words">
                     {spans.map(s => s.pagesLabel).join(' • ')}
                   </p>
                 </div>
