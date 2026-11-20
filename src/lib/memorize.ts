@@ -7,6 +7,12 @@ import { getQuranMetaData } from './quran-data-service';
  * A plan walks a mushaf region starting from a chosen surah, on a repeating
  * cycle: `memorizeDays` consecutive days each introduce one new portion,
  * followed by `restDays` days of rest.
+ * Revision (المراجعة): each memorize day revises `revisionPages` (N) pages
+ * of already-memorized material counted from the newest memorized page — Z
+ * pages memorized inside the plan plus N − Z from the previously-memorized
+ * pool. While a surah is midway, its un-memorized remainder cuts the span
+ * into two ranges; once it is finished the span is one normal N-page range.
+ * Rest days carry nothing.
  * Direction:
  *  - forward  = startSurah → An-Nas in pure sequential chunks;
  *  - backward = startSurah → Al-Fatiha, visiting surahs in descending order,
@@ -17,9 +23,10 @@ import { getQuranMetaData } from './quran-data-service';
 
 export type MemorizeUnit = 'ayah' | 'half-page' | 'page' | 'two-pages' | 'rub' | 'hizb';
 export type MemorizeDirection = 'forward' | 'backward';
+export type JuzRevisionFrequency = 'off' | 'weekly' | 'twice-weekly' | 'monthly' | 'twice-monthly';
 
 export interface MemorizePlan {
-  version: 8;
+  version: 12;
   createdAt: number;
   startDate: string; // local 'YYYY-MM-DD'
   startSurah: number; // 1..114; where the memorization sequence starts
@@ -28,7 +35,16 @@ export interface MemorizePlan {
   memorizeDays: number; // >= 1; consecutive days that each get a new portion
   restDays: number; // >= 0; days of rest after each memorize run
   direction: MemorizeDirection;
-  completedTasks: number[]; // indices of portions marked done
+  /** 0..604 already-memorized pages beside the plan's start point. */
+  revisionPages: number;
+  completedTasks: number[]; // indices of new portions marked done
+  completedRevisions: number[]; // indices of revision portions marked done
+  /** Cycling of whole memorized juz (independent of the page revision).
+   *  The memorized-juz pool itself is derived automatically from the plan's
+   *  start point and direction. */
+  juzRevisionFrequency: JuzRevisionFrequency;
+  /** Date keys of completed juz revisions. */
+  completedJuz: string[];
 }
 
 export const TOTAL_AYAHS = 6236;
@@ -39,30 +55,23 @@ const LEGACY_STORAGE_KEY = 'quran-revision-plan';
 // Storage
 // ---------------------------------------------------------------------------
 
+/** Shape read from storage — may be any historical plan version. */
+type StoredPlan = Partial<Omit<MemorizePlan, 'version'>> & { version?: number };
+
 export function loadMemorizePlan(): MemorizePlan | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return migrateLegacyPlan();
-    const parsed = JSON.parse(raw) as MemorizePlan & { version?: number };
+    const parsed = JSON.parse(raw) as StoredPlan;
     if (!parsed || typeof parsed !== 'object') return migrateLegacyPlan();
-    if (parsed.version === 8 && isValidPlan(parsed)) return parsed;
-    // v7 lacked startSurah (default Al-Fatiha); v6 already carried one.
-    if (parsed.version === 7 || parsed.version === 6) {
-      const candidate: MemorizePlan = {
-        ...(parsed as MemorizePlan),
-        version: 8,
-        startSurah: clampSurah((parsed as Partial<MemorizePlan>).startSurah),
-      };
-      if (
-        candidate.unit &&
-        candidate.direction &&
-        typeof candidate.startDate === 'string' &&
-        candidate.memorizeDays >= 1 &&
-        candidate.restDays >= 0 &&
-        Array.isArray(candidate.completedTasks)
-      ) {
-        return candidate;
-      }
+    if (parsed.version === 12 && isValidPlan(parsed as MemorizePlan)) return parsed as MemorizePlan;
+    // v11 and earlier lacked nothing but the manual memorized-juz count,
+    // which v12 derives automatically from the plan's start and direction;
+    // v10 lacked the juz fields; v9 lacked completedRevisions; v8 lacked
+    // revisionPages; v7/v6 lacked startSurah.
+    if (parsed.version === 11 || parsed.version === 10 || parsed.version === 9 || parsed.version === 8 || parsed.version === 7 || parsed.version === 6) {
+      const candidate = upgradeLegacyPlan(parsed);
+      if (candidate) return candidate;
     }
     return migrateLegacyPlan();
   } catch {
@@ -75,6 +84,15 @@ function clampSurah(v: unknown): number {
   return Number.isFinite(n) && n >= 1 && n <= 114 ? Math.floor(n) : 1;
 }
 
+function clampPages(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 && n <= 604 ? Math.floor(n) : 20;
+}
+
+const JUZ_FREQUENCIES_SET = new Set<JuzRevisionFrequency>([
+  'off', 'weekly', 'twice-weekly', 'monthly', 'twice-monthly',
+]);
+
 function isValidPlan(p: MemorizePlan): boolean {
   return !!(
     p.unit &&
@@ -83,29 +101,55 @@ function isValidPlan(p: MemorizePlan): boolean {
     clampSurah(p.startSurah) === p.startSurah &&
     p.memorizeDays >= 1 &&
     p.restDays >= 0 &&
-    Array.isArray(p.completedTasks)
+    clampPages(p.revisionPages) === p.revisionPages &&
+    Array.isArray(p.completedTasks) &&
+    Array.isArray(p.completedRevisions) &&
+    JUZ_FREQUENCIES_SET.has(p.juzRevisionFrequency) &&
+    Array.isArray(p.completedJuz)
   );
 }
+
+/** Coerce any pre-v12 payload shape into a valid v12 plan (or null). */
+function upgradeLegacyPlan(old: StoredPlan | Partial<MemorizePlan>): MemorizePlan | null {
+  if (!old || typeof old !== 'object') return null;
+  const candidate: MemorizePlan = {
+    version: 12,
+    createdAt: Number(old.createdAt) || Date.now(),
+    startDate: typeof old.startDate === 'string' ? old.startDate : toDateKey(new Date()),
+    startSurah: clampSurah(old.startSurah),
+    unit: old.unit ?? 'page',
+    ayahsPerDay: Number(old.ayahsPerDay) || 0,
+    memorizeDays: Math.max(1, Number(old.memorizeDays) || 1),
+    restDays: Math.max(0, Number(old.restDays) || 0),
+    direction: old.direction === 'backward' ? 'backward' : 'forward',
+    revisionPages: clampPages(old.revisionPages),
+    completedTasks: Array.isArray(old.completedTasks) ? old.completedTasks : [],
+    completedRevisions: Array.isArray((old as { completedRevisions?: number[] }).completedRevisions)
+      ? (old as { completedRevisions: number[] }).completedRevisions
+      : [],
+    juzRevisionFrequency: JUZ_FREQUENCIES_SET.has((old as { juzRevisionFrequency?: JuzRevisionFrequency }).juzRevisionFrequency)
+      ? (old as { juzRevisionFrequency: JuzRevisionFrequency }).juzRevisionFrequency
+      : 'off',
+    completedJuz: Array.isArray((old as { completedJuz?: string[] }).completedJuz)
+      ? (old as { completedJuz: string[] }).completedJuz
+      : [],
+  };
+  if (!UNITS_SET.has(candidate.unit) || !DIRECTIONS_SET.has(candidate.direction)) return null;
+  return isValidPlan(candidate) ? candidate : null;
+}
+
+const UNITS_SET = new Set<MemorizeUnit>(['ayah', 'half-page', 'page', 'two-pages', 'rub', 'hizb']);
+const DIRECTIONS_SET = new Set<MemorizeDirection>(['forward', 'backward']);
 
 /** Upgrade a pre-rename revision plan (old key) into the new store. */
 function migrateLegacyPlan(): MemorizePlan | null {
   try {
     const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return null;
-    const old = JSON.parse(raw) as Partial<MemorizePlan> & { version?: number };
+    const old = JSON.parse(raw) as StoredPlan;
     if (!old || typeof old !== 'object' || !old.unit) return null;
-    const upgraded: MemorizePlan = {
-      version: 8,
-      createdAt: Number(old.createdAt) || Date.now(),
-      startDate: typeof old.startDate === 'string' ? old.startDate : toDateKey(new Date()),
-      startSurah: clampSurah(old.startSurah),
-      unit: old.unit,
-      ayahsPerDay: Number(old.ayahsPerDay) || 0,
-      memorizeDays: Math.max(1, Number(old.memorizeDays) || 1),
-      restDays: Math.max(0, Number(old.restDays) || 0),
-      direction: old.direction === 'backward' ? 'backward' : 'forward',
-      completedTasks: Array.isArray(old.completedTasks) ? old.completedTasks : [],
-    };
+    const upgraded = upgradeLegacyPlan(old);
+    if (!upgraded) return null;
     saveMemorizePlan(upgraded);
     localStorage.removeItem(LEGACY_STORAGE_KEY);
     return upgraded;
@@ -191,6 +235,8 @@ export interface QuranBoundaries {
   pageStarts: number[];
   /** absolute index of first ayah of hizb quarter q */
   quarterStarts: number[];
+  /** absolute index of first ayah of juz j (j = arrayIndex + 1) */
+  juzStarts: number[];
 }
 
 let boundariesPromise: Promise<QuranBoundaries> | null = null;
@@ -200,6 +246,7 @@ export function getQuranBoundaries(): Promise<QuranBoundaries> {
     boundariesPromise = getQuranMetaData().then(meta => ({
       pageStarts: meta.pages.map(([s, a]: [number, number]) => absIndexOf(s, a)),
       quarterStarts: meta.hizb_quarters.map(([s, a]: [number, number]) => absIndexOf(s, a)),
+      juzStarts: meta.juzs.map(([s, a]: [number, number]) => absIndexOf(s, a)),
     }));
   }
   return boundariesPromise;
@@ -379,6 +426,15 @@ export function toggleTask(plan: MemorizePlan, index: number): MemorizePlan {
   return { ...plan, completedTasks };
 }
 
+/** Toggle the day's revision portion done/undone (independent of the task). */
+export function toggleRevision(plan: MemorizePlan, index: number): MemorizePlan {
+  const exists = plan.completedRevisions.includes(index);
+  const completedRevisions = exists
+    ? plan.completedRevisions.filter(i => i !== index)
+    : [...plan.completedRevisions, index].sort((a, z) => a - z);
+  return { ...plan, completedRevisions };
+}
+
 /** Index of the first uncompleted task (or totalTasks when all done). */
 export function getNextTaskIndex(plan: MemorizePlan, b: QuranBoundaries): number {
   const total = getTotalTasks(plan, b);
@@ -413,4 +469,287 @@ export function describeSegment(segment: MemorizeSegment, b: QuranBoundaries): S
     pageFrom: indexOfAtOrBefore(b.pageStarts, segment.startAbs) + 1,
     pageTo: indexOfAtOrBefore(b.pageStarts, segment.endAbs) + 1,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Revision (المراجعة) of already-memorized pages
+// ---------------------------------------------------------------------------
+
+/**
+ * How much of the plan counts as memorized when scheduling day `index`:
+ * everything the schedule covered before that day (index − 1, clamped to the
+ * plan's last task), plus anything the user actually marked done. Progress
+ * therefore advances every day the plan moves, and checking a day off can
+ * only pull it forward.
+ */
+function progressAt(plan: MemorizePlan, b: QuranBoundaries, index: number): number {
+  const total = getTotalTasks(plan, b);
+  const scheduled = Math.min(index - 1, total - 1);
+  const h = plan.completedTasks.length > 0 ? Math.max(...plan.completedTasks) : -1;
+  return Math.max(scheduled, h);
+}
+
+/** A revision range: the ayah span [startAbs..endAbs] of one page block. */
+export interface RevisionRange {
+  startAbs: number;
+  endAbs: number;
+}
+
+/**
+ * The day's revision: `revisionPages` (N) pages of already-memorized
+ * material counted from the most recently memorized page:
+ *  - first the pages memorized inside the plan so far (Z), newest first;
+ *  - then the previously-memorized pool beside the plan's start (N − Z),
+ *    skipping the pages currently being memorized.
+ *
+ * While the surah being memorized is midway, its not-yet-memorized remainder
+ * cuts the span in two: the memorized part below (Z) and the previous pool
+ * above (N − Z). Once that surah is finished everything is contiguous and
+ * the result is a single normal N-page range. Forward plans always produce
+ * one range (their un-memorized remainder lies beyond the span). Returns []
+ * when revision is off or nothing is memorized yet.
+ */
+export function getRevisionRanges(plan: MemorizePlan, b: QuranBoundaries, index: number): RevisionRange[] {
+  const n = clampPages(plan.revisionPages ?? 0);
+  if (n <= 0 || b.pageStarts.length === 0) return [];
+  const surah = clampSurah(plan.startSurah);
+  const p = progressAt(plan, b, index);
+  const pageOf = (abs: number) => indexOfAtOrBefore(b.pageStarts, abs);
+
+  if (plan.direction === 'forward') {
+    // one span ending at the newest memorized ayah, descending N pages
+    const firstStart = absIndexOf(surah, 1);
+    const frontier = p >= 0 ? getTaskSegment(plan, b, p) : null;
+    const anchor = frontier ? frontier.endAbs : firstStart - 1;
+    if (anchor < 0) return [];
+    const topIdx = pageOf(anchor);
+    const beginIdx = Math.max(0, topIdx - (n - 1));
+    return [{ startAbs: b.pageStarts[beginIdx], endAbs: anchor }];
+  }
+
+  // ---- backward: Z in-plan pages + (N − Z) previous-pool pages ----
+  const firstEnd = surah < 114 ? absIndexOf(surah + 1, 1) - 1 : TOTAL_AYAHS - 1;
+  if (surah >= 114 && p < 0) return [];
+
+  // block 1: the current surah's memorized part (bottom of the span)
+  // block 2: the completed surahs above it, through the plan's first surah
+  let b1: RevisionRange | null = null;
+  let b2: RevisionRange | null = null;
+  let fsEnd = firstEnd; // last ayah of the surah being memorized
+  if (p >= 0) {
+    const frontier = getTaskSegment(plan, b, p);
+    if (!frontier) return [];
+    const fs = resolveAbsIndex(frontier.startAbs).surah;
+    fsEnd = fs < 114 ? absIndexOf(fs + 1, 1) - 1 : TOTAL_AYAHS - 1;
+    b1 = { startAbs: absIndexOf(fs, 1), endAbs: frontier.endAbs };
+    if (firstEnd > fsEnd) b2 = { startAbs: fsEnd + 1, endAbs: firstEnd };
+  }
+
+  const pagesOf = (r: RevisionRange) => pageOf(r.endAbs) - pageOf(r.startAbs) + 1;
+
+  // keep at most N in-plan pages, dropping the oldest
+  let budget = n;
+  if (b1) {
+    if (pagesOf(b1) > budget) {
+      b1 = { startAbs: b.pageStarts[pageOf(b1.endAbs) - budget + 1], endAbs: b1.endAbs };
+      budget = 0;
+    } else {
+      budget -= pagesOf(b1);
+    }
+  }
+  if (b2 && budget > 0) {
+    if (pagesOf(b2) > budget) {
+      b2 = { startAbs: b2.startAbs, endAbs: b.pageStarts[pageOf(b2.startAbs) + budget] - 1 };
+      budget = 0;
+    } else {
+      budget -= pagesOf(b2);
+    }
+  } else if (budget <= 0) {
+    b2 = null;
+  }
+
+  // previous pool fills the rest, skipping the cut (pages holding the
+  // current surah's un-memorized remainder) and already-counted pages
+  let old: RevisionRange | null = null;
+  if (budget > 0 && surah < 114) {
+    const gapCut = p >= 0
+      ? (b1 && b1.endAbs < fsEnd ? pageOf(fsEnd) + 1 : 0) // current surah midway
+      : pageOf(firstEnd) + 1;                             // first surah not started yet
+    const inPlanTop = b2 ?? b1;
+    const overlapCut = inPlanTop ? pageOf(inPlanTop.endAbs) + 1 : 0;
+    const startIdx = Math.max(pageOf(firstEnd + 1), gapCut, overlapCut);
+    if (startIdx < b.pageStarts.length) {
+      const endIdx = Math.min(startIdx + budget - 1, b.pageStarts.length - 1);
+      old = {
+        startAbs: b.pageStarts[startIdx],
+        endAbs: (endIdx + 1 < b.pageStarts.length ? b.pageStarts[endIdx + 1] : TOTAL_AYAHS) - 1,
+      };
+    }
+  }
+
+  // merge ayah-contiguous blocks; the cut keeps the low block separate
+  const gap = !!b1 && b1.endAbs < fsEnd; // the surah being memorized is midway
+  if (b1 && b2 && !gap) {
+    b1 = { startAbs: b1.startAbs, endAbs: b2.endAbs };
+    b2 = null;
+  }
+  const upper = b2 && old
+    ? { startAbs: b2.startAbs, endAbs: old.endAbs }
+    : (b2 ?? old);
+  if (b1 && upper && !gap) {
+    return [{ startAbs: b1.startAbs, endAbs: upper.endAbs }];
+  }
+  const out: RevisionRange[] = [];
+  if (b1) out.push(b1);
+  if (upper) out.push(upper);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Juz revision (مراجعة الأجزاء) — cycling of whole memorized juz
+// ---------------------------------------------------------------------------
+
+/** How many days between juz-revision slots for each frequency. */
+const JUZ_FREQUENCY_SLOTS: Record<Exclude<JuzRevisionFrequency, 'off'>, { period: number; offsets: number[] }> = {
+  'weekly': { period: 7, offsets: [0] },
+  'twice-weekly': { period: 7, offsets: [0, 3] },
+  'monthly': { period: 30, offsets: [0] },
+  'twice-monthly': { period: 30, offsets: [0, 15] },
+};
+
+/**
+ * The plan's progress as of an arbitrary DATE (unlike progressAt, which is
+ * task-index based): everything scheduled before that day, plus anything the
+ * user actually marked done. Works for memorize days, rest days and days
+ * past the plan's end (where the whole plan counts as covered).
+ */
+function progressAtDate(plan: MemorizePlan, b: QuranBoundaries, dateKey: string): number {
+  const total = getTotalTasks(plan, b);
+  const h = plan.completedTasks.length > 0 ? Math.max(...plan.completedTasks) : -1;
+  const offset = daysBetween(plan.startDate, dateKey);
+  if (offset < 0) return h;
+
+  const m = Math.max(1, plan.memorizeDays || 1);
+  const r = Math.max(0, plan.restDays || 0);
+  const cycle = Math.floor(offset / (m + r));
+  const pos = offset % (m + r);
+  // rest days: every memorize day of this cycle has passed
+  const covered = pos < m ? cycle * m + pos - 1 : cycle * m + m - 1;
+  return Math.max(Math.min(covered, total - 1), h);
+}
+
+/** Absolute ayah span of juz `juz` (1..30). */
+export function getJuzSpan(b: QuranBoundaries, juz: number): { startAbs: number; endAbs: number } {
+  const j = Math.min(Math.max(juz, 1), 30);
+  return {
+    startAbs: b.juzStarts[j - 1],
+    endAbs: (j < 30 ? b.juzStarts[j] : TOTAL_AYAHS) - 1,
+  };
+}
+
+/**
+ * The fully-memorized juz pool as of `dateKey`, newest first — derived
+ * automatically from the plan itself:
+ *  - everything on the previously-memorized side of the plan's start point
+ *    counts as known (after the start surah for backward plans, before it
+ *    for forward ones), so any juz lying wholly in that region is in;
+ *  - as the plan progresses, a juz joins the moment the frontier covers its
+ *    remaining part (juz straddling the start point included).
+ * Newest-first = ascending numbers for backward plans (the lowest is the
+ * most recently memorized), descending for forward ones.
+ */
+export function getJuzPool(plan: MemorizePlan, b: QuranBoundaries, dateKey: string): number[] {
+  const pool = new Set<number>();
+  if (b.juzStarts.length !== 30) return [];
+
+  const surah0 = clampSurah(plan.startSurah);
+  const p = progressAtDate(plan, b, dateKey);
+  const frontier = p >= 0 ? getTaskSegment(plan, b, p) : null;
+
+  for (let j = 1; j <= 30; j++) {
+    const span = getJuzSpan(b, j);
+    let complete: boolean;
+    if (frontier) {
+      const fs = resolveAbsIndex(frontier.startAbs).surah;
+      const fsStart = absIndexOf(fs, 1);
+      const fsEnd = fs < 114 ? absIndexOf(fs + 1, 1) - 1 : TOTAL_AYAHS - 1;
+      if (plan.direction === 'backward') {
+        // the current surah's memorized part, or anything above its end —
+        // completed surahs and previously-memorized material are contiguous
+        complete = (span.startAbs >= fsStart && span.endAbs <= frontier.endAbs)
+          || span.startAbs >= fsEnd + 1;
+      } else {
+        // everything from the mushaf's start through the frontier is covered
+        complete = span.endAbs <= frontier.endAbs;
+      }
+    } else if (plan.direction === 'backward') {
+      // nothing in-plan yet: only the region after the start surah counts
+      const regionStart = surah0 < 114 ? absIndexOf(surah0 + 1, 1) : TOTAL_AYAHS;
+      complete = span.startAbs >= regionStart;
+    } else {
+      // nothing in-plan yet: only the region before the start surah counts
+      complete = span.endAbs <= absIndexOf(surah0, 1) - 1;
+    }
+    if (complete) pool.add(j);
+  }
+
+  return [...pool].sort((a, z) => (plan.direction === 'backward' ? a - z : z - a));
+}
+
+/**
+ * The whole juz to revise on a given day (or null): slot days fall on the
+ * frequency's rhythm counted from the plan's start; each slot takes the
+ * next juz of the pool in rotation, newest first — e.g. with juz 29 and 30
+ * memorized at once a week: week 1 → 29, week 2 → 30, week 3 → 29, ...
+ */
+export function getJuzRevision(plan: MemorizePlan, b: QuranBoundaries, dateKey: string): number | null {
+  const f = plan.juzRevisionFrequency;
+  if (!f || f === 'off') return null;
+  const offset = daysBetween(plan.startDate, dateKey);
+  if (offset < 0) return null;
+
+  const { period, offsets } = JUZ_FREQUENCY_SLOTS[f];
+  const oi = offsets.indexOf(offset % period);
+  if (oi < 0) return null;
+
+  const slot = Math.floor(offset / period) * offsets.length + oi;
+  const pool = getJuzPool(plan, b, dateKey);
+  if (pool.length === 0) return null;
+  return pool[slot % pool.length];
+}
+
+/** Toggle a day's juz revision done/undone (keyed by date). */
+export function toggleJuzRevision(plan: MemorizePlan, dateKey: string): MemorizePlan {
+  const exists = plan.completedJuz.includes(dateKey);
+  const completedJuz = exists
+    ? plan.completedJuz.filter(k => k !== dateKey)
+    : [...plan.completedJuz, dateKey].sort();
+  return { ...plan, completedJuz };
+}
+
+// ---------------------------------------------------------------------------
+// Calendar mapping (day -> task)
+// ---------------------------------------------------------------------------
+
+export type MemorizeDayKind =
+  | { type: 'memorize'; index: number }
+  | { type: 'rest' }
+  | { type: 'off' };
+
+/**
+ * What a given calendar day holds:
+ *  - 'memorize': a new portion (and its paired revision) — `index` is the
+ *    task index; it may exceed the last task when the plan is finished,
+ *    callers should treat a null segment as 'off';
+ *  - 'rest': inside the plan's cycle, resting;
+ *  - 'off': before the plan starts or past its final task.
+ */
+export function getDayKind(plan: MemorizePlan, dateKey: string): MemorizeDayKind {
+  const offset = daysBetween(plan.startDate, dateKey);
+  if (offset < 0) return { type: 'off' };
+  const m = Math.max(1, plan.memorizeDays || 1);
+  const r = Math.max(0, plan.restDays || 0);
+  const pos = offset % (m + r);
+  if (pos >= m) return { type: 'rest' };
+  return { type: 'memorize', index: Math.floor(offset / (m + r)) * m + pos };
 }

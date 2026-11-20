@@ -8,6 +8,8 @@ import {
   loadMemorizePlan, saveMemorizePlan, clearMemorizePlan,
   getTaskSegment, getTotalTasks, getStats, getNextTaskIndex, toggleTask,
   getTaskDate, describeSegment, resolveAbsIndex, getSurahFirstPage,
+  getRevisionRanges, getJuzPool, getJuzRevision, getJuzSpan, getDayKind,
+  toggleRevision, toggleJuzRevision,
   toDateKey, todayKey, addDaysToKey, daysBetween,
   QuranBoundaries,
 } from "@/lib/memorize";
@@ -25,11 +27,12 @@ const absIndex = (surahId: number, ayah: number): number => {
 const boundaries: QuranBoundaries = {
   pageStarts: meta.pages.map(([s, a]: [number, number]) => absIndex(s, a)),
   quarterStarts: meta.hizb_quarters.map(([s, a]: [number, number]) => absIndex(s, a)),
+  juzStarts: meta.juzs.map(([s, a]: [number, number]) => absIndex(s, a)),
 };
 
 function makePlan(overrides: Partial<MemorizePlan> = {}): MemorizePlan {
   return {
-    version: 8,
+    version: 12,
     createdAt: Date.now(),
     startDate: '2026-01-01',
     startSurah: 1,
@@ -38,7 +41,11 @@ function makePlan(overrides: Partial<MemorizePlan> = {}): MemorizePlan {
     memorizeDays: 1,
     restDays: 0,
     direction: 'forward',
+    revisionPages: 0,
     completedTasks: [],
+    completedRevisions: [],
+    juzRevisionFrequency: 'off',
+    completedJuz: [],
     ...overrides,
   };
 }
@@ -212,6 +219,323 @@ describe("memorize/rest cycle dates", () => {
   });
 });
 
+describe("revision ranges (Z memorized + N − Z previous, cut when a surah is midway)", () => {
+  const pageOf = (abs: number) => boundaries.pageStarts.findIndex(p => p > abs) - 1;
+  const pages = (ranges: { startAbs: number; endAbs: number }[]) =>
+    ranges.reduce((sum, r) => sum + pageOf(r.endAbs) - pageOf(r.startAbs) + 1, 0);
+
+  it("no revision when revisionPages is 0 or nothing is memorized yet", () => {
+    expect(getRevisionRanges(makePlan({ revisionPages: 0, startSurah: 78, direction: 'backward' }), boundaries, 0)).toEqual([]);
+    // backward plan starting at An-Nas: nothing memorized before it yet
+    expect(getRevisionRanges(makePlan({ revisionPages: 20, startSurah: 114, direction: 'backward' }), boundaries, 0)).toEqual([]);
+    // forward plan starting at Al-Fatiha (page 1): nothing before it
+    expect(getRevisionRanges(makePlan({ revisionPages: 20, startSurah: 1, direction: 'forward' }), boundaries, 0)).toEqual([]);
+  });
+
+  it("backward day 0: the N pages of the previous pool, past the cut page", () => {
+    const plan = makePlan({ revisionPages: 20, startSurah: 78, direction: 'backward' });
+    const ranges = getRevisionRanges(plan, boundaries, 0);
+    expect(ranges.length).toBe(1);
+    const firstEnd = absIndex(79, 1) - 1;
+    const startIdx = pageOf(firstEnd) + 1; // skip the page holding the surah
+    expect(ranges[0].startAbs).toBe(boundaries.pageStarts[startIdx]);
+    expect(ranges[0].endAbs).toBe(boundaries.pageStarts[startIdx + 20] - 1);
+    expect(pages(ranges)).toBe(20);
+  });
+
+  it("backward day 1 (surah midway): two ranges — Z below the cut, N − Z above", () => {
+    const plan = makePlan({ revisionPages: 20, unit: 'page', startSurah: 78, direction: 'backward' });
+    const ranges = getRevisionRanges(plan, boundaries, 1);
+    expect(ranges.length).toBe(2);
+
+    // range 1: the memorized page of the current surah (Z = 1)
+    expect(ranges[0].startAbs).toBe(absIndex(78, 1));
+    expect(ranges[0].endAbs).toBe(getTaskSegment(plan, boundaries, 0)!.endAbs);
+
+    // range 2: the N − Z = 19 previous pages, starting after the cut page
+    const firstEnd = absIndex(79, 1) - 1;
+    const cutIdx = pageOf(firstEnd) + 1;
+    expect(ranges[1].startAbs).toBe(boundaries.pageStarts[cutIdx]);
+    expect(pageOf(ranges[1].endAbs) - pageOf(ranges[1].startAbs) + 1).toBe(19);
+    expect(pages(ranges)).toBe(20);
+  });
+
+  it("backward: once the surah is finished the revision is ONE normal N-page span", () => {
+    const plan = makePlan({ revisionPages: 20, unit: 'page', startSurah: 78, direction: 'backward' });
+    const ranges = getRevisionRanges(plan, boundaries, 2);
+    expect(ranges.length).toBe(1);
+    expect(ranges[0].startAbs).toBe(absIndex(78, 1));
+    // the surah's 2 pages merge with the previous pool into one span
+    expect(ranges[0].endAbs).toBeGreaterThan(getTaskSegment(plan, boundaries, 1)!.endAbs);
+    expect(pages(ranges)).toBe(20);
+  });
+
+  it("backward deeper (next surah midway): two ranges totalling N pages", () => {
+    const plan = makePlan({ revisionPages: 20, unit: 'page', startSurah: 78, direction: 'backward' });
+    const ranges = getRevisionRanges(plan, boundaries, 3);
+    expect(ranges.length).toBe(2);
+    // lower range: the next surah's memorized page
+    expect(ranges[0].startAbs).toBe(absIndex(77, 1));
+    expect(ranges[0].endAbs).toBe(getTaskSegment(plan, boundaries, 2)!.endAbs);
+    // upper range: the completed surahs + previous pool
+    expect(ranges[1].startAbs).toBe(absIndex(78, 1));
+    expect(pages(ranges)).toBe(20);
+  });
+
+  it("checking today's task or running ahead of schedule pulls the ranges forward", () => {
+    // index 1 with task 1 already marked done: progress = max(0, 1) = 1,
+    // the surah is finished → one normal 20-page span from its first ayah
+    const checked = makePlan({
+      revisionPages: 20, unit: 'page',
+      startSurah: 78, direction: 'backward',
+      completedTasks: [1],
+    });
+    const ranges = getRevisionRanges(checked, boundaries, 1);
+    expect(ranges.length).toBe(1);
+    expect(ranges[0].startAbs).toBe(absIndex(78, 1));
+    expect(pages(ranges)).toBe(20);
+
+    // day 5 with a stale checkmark: the schedule (task 4) wins
+    const stale = makePlan({
+      revisionPages: 20, unit: 'page',
+      startSurah: 78, direction: 'backward',
+      completedTasks: [0],
+    });
+    const ahead = getRevisionRanges(stale, boundaries, 5);
+    const frontier = getTaskSegment(stale, boundaries, 4)!;
+    const fs = resolveAbsIndex(frontier.startAbs).surah;
+    expect(ahead[0].startAbs).toBe(absIndex(fs, 1));
+  });
+
+  it("backward trims to the newest N pages once in-plan progress exceeds N", () => {
+    const plan = makePlan({ revisionPages: 3, unit: 'page', startSurah: 78, direction: 'backward' });
+    const ranges = getRevisionRanges(plan, boundaries, 10);
+    expect(pages(ranges)).toBe(3);
+    // the newest page (the frontier's) is always included
+    const frontier = getTaskSegment(plan, boundaries, 9)!;
+    expect(pageOf(ranges[0].startAbs)).toBe(pageOf(frontier.startAbs));
+  });
+
+  it("backward from An-Nas: the revision grows from zero with progress", () => {
+    const empty = makePlan({ revisionPages: 20, startSurah: 114, direction: 'backward' });
+    expect(getRevisionRanges(empty, boundaries, 0)).toEqual([]);
+
+    const growing = makePlan({
+      revisionPages: 20, unit: 'page',
+      startSurah: 114, direction: 'backward',
+      completedTasks: [0],
+    });
+    const ranges = getRevisionRanges(growing, boundaries, 1);
+    expect(ranges.length).toBe(1);
+    expect(ranges[0].startAbs).toBe(absIndex(114, 1));
+    expect(ranges[0].endAbs).toBe(6235); // clamped: An-Nas fits on the last page
+  });
+
+  it("backward: clamps at the end of the mushaf", () => {
+    const plan = makePlan({ revisionPages: 20, startSurah: 110, direction: 'backward' });
+    const ranges = getRevisionRanges(plan, boundaries, 0);
+    expect(ranges.length).toBe(1);
+    expect(ranges[0].endAbs).toBe(6235); // An-Nas's last ayah
+  });
+
+  it("forward: one span ending at the last memorized page", () => {
+    const plan = makePlan({ revisionPages: 20, unit: 'page', startSurah: 36, direction: 'forward' });
+
+    // no progress yet: ends right before the start surah
+    const day0 = getRevisionRanges(plan, boundaries, 0);
+    expect(day0.length).toBe(1);
+    expect(day0[0].endAbs).toBe(absIndex(36, 1) - 1);
+
+    // day 2: two pages memorized in-plan; the span ends at the newest one
+    const day2 = getRevisionRanges(plan, boundaries, 2);
+    expect(day2.length).toBe(1);
+    expect(day2[0].endAbs).toBe(getTaskSegment(plan, boundaries, 1)!.endAbs);
+    expect(pages(day2)).toBe(20);
+  });
+});
+
+describe("juz revision (cycling of whole memorized juz)", () => {
+  it("getJuzSpan covers each juz exactly (juz 29 ends where juz 30 starts)", () => {
+    expect(getJuzSpan(boundaries, 29)).toEqual({ startAbs: absIndex(67, 1), endAbs: absIndex(78, 1) - 1 });
+    expect(getJuzSpan(boundaries, 30)).toEqual({ startAbs: absIndex(78, 1), endAbs: 6235 });
+    expect(getJuzSpan(boundaries, 1).startAbs).toBe(0);
+  });
+
+  it("no juz revision when the frequency is off or the pool is empty", () => {
+    const off = makePlan({ startSurah: 77, direction: 'backward', juzRevisionFrequency: 'off' });
+    expect(getJuzRevision(off, boundaries, '2026-01-01')).toBeNull();
+
+    // backward starting AT An-Nas: nothing memorized before it yet
+    const empty = makePlan({ startSurah: 114, direction: 'backward', juzRevisionFrequency: 'weekly' });
+    expect(getJuzRevision(empty, boundaries, '2026-01-01')).toBeNull();
+  });
+
+  it("backward: previously-memorized juz derive automatically from the start point (user's example)", () => {
+    // memorized juz 30 before the plan; memorizing juz 29 now (backward
+    // from surah 77, one page a day, once a week)
+    const plan = makePlan({
+      startDate: '2026-01-01',
+      startSurah: 77, direction: 'backward', unit: 'page',
+      juzRevisionFrequency: 'weekly',
+    });
+
+    // day 0: only juz 30 lies wholly after the start surah
+    expect(getJuzPool(plan, boundaries, '2026-01-01')).toEqual([30]);
+    // non-slot days carry nothing
+    expect(getJuzRevision(plan, boundaries, '2026-01-02')).toBeNull();
+    // weekly slot while juz 29 is still being memorized
+    expect(getJuzRevision(plan, boundaries, '2026-01-08')).toBe(30);
+
+    // juz 29 completes once the frontier leaves surah 67
+    let p0 = 0;
+    while (resolveAbsIndex(getTaskSegment(plan, boundaries, p0)!.startAbs).surah > 66) p0++;
+    const completionOffset = p0 + 1;
+    // first weekly slot at/after the completion
+    const s0 = Math.ceil(completionOffset / 7);
+    const at = (slot: number) => addDaysToKey('2026-01-01', slot * 7);
+
+    // consecutive slots alternate 29 / 30 / 29 (or 30 / 29 / 30)
+    const a = getJuzRevision(plan, boundaries, at(s0))!;
+    const b = getJuzRevision(plan, boundaries, at(s0 + 1))!;
+    const c = getJuzRevision(plan, boundaries, at(s0 + 2))!;
+    expect(a).not.toBe(b);
+    expect(b).not.toBe(c);
+    expect(a).toBe(c);
+    expect([29, 30]).toContain(a);
+    expect([29, 30]).toContain(b);
+  });
+
+  it("backward: a juz straddling the start point completes in-plan", () => {
+    // backward from surah 78 (the start of juz 30): juz 30 needs surah 78,
+    // which the plan memorizes — it joins once the frontier enters surah 77
+    const plan = makePlan({
+      startDate: '2026-01-01',
+      startSurah: 78, direction: 'backward', unit: 'page',
+      juzRevisionFrequency: 'weekly',
+    });
+    // nothing memorized yet and nothing wholly after An-Nas's first surah
+    expect(getJuzPool(plan, boundaries, '2026-01-01')).toEqual([]);
+    // find the first task below surah 78; the day after it juz 30 completes
+    let p = 0;
+    while (resolveAbsIndex(getTaskSegment(plan, boundaries, p)!.startAbs).surah >= 78) p++;
+    expect(getJuzPool(plan, boundaries, addDaysToKey('2026-01-01', p))).not.toContain(30);
+    expect(getJuzPool(plan, boundaries, addDaysToKey('2026-01-01', p + 1))).toContain(30);
+  });
+
+  it("twice-weekly: two slots per week (days 0 and 3 of each week)", () => {
+    const plan = makePlan({
+      startDate: '2026-01-01',
+      startSurah: 77, direction: 'backward', unit: 'page',
+      juzRevisionFrequency: 'twice-weekly',
+    });
+    expect(getJuzRevision(plan, boundaries, '2026-01-01')).toBe(30);
+    expect(getJuzRevision(plan, boundaries, '2026-01-02')).toBeNull();
+    expect(getJuzRevision(plan, boundaries, '2026-01-03')).toBeNull();
+    expect(getJuzRevision(plan, boundaries, '2026-01-04')).toBe(30);
+    expect(getJuzRevision(plan, boundaries, '2026-01-08')).toBe(30);
+    expect(getJuzRevision(plan, boundaries, '2026-01-11')).toBe(30);
+  });
+
+  it("monthly: one slot per 30 days", () => {
+    const plan = makePlan({
+      startDate: '2026-01-01',
+      startSurah: 77, direction: 'backward', unit: 'page',
+      juzRevisionFrequency: 'monthly',
+    });
+    expect(getJuzRevision(plan, boundaries, '2026-01-29')).toBeNull();
+    expect(getJuzRevision(plan, boundaries, '2026-01-31')).toBe(30);
+    expect(getJuzRevision(plan, boundaries, '2026-03-02')).toBe(30);
+  });
+
+  it("forward: previously-memorized juz derive from the start point, newest-first", () => {
+    // forward from surah 67: juz 1..28 lie wholly before it
+    const plan = makePlan({
+      startDate: '2026-01-01',
+      startSurah: 67, direction: 'forward', unit: 'page',
+      juzRevisionFrequency: 'weekly',
+    });
+    const pool = getJuzPool(plan, boundaries, '2026-01-01');
+    expect(pool.length).toBe(28);
+    expect(pool[0]).toBe(28); // newest = highest
+    expect(pool[27]).toBe(1);
+    // weekly slots walk the pool one juz at a time: 28, 27, 26, ...
+    expect(getJuzRevision(plan, boundaries, '2026-01-01')).toBe(28);
+    expect(getJuzRevision(plan, boundaries, '2026-01-08')).toBe(27);
+    expect(getJuzRevision(plan, boundaries, '2026-01-15')).toBe(26);
+  });
+
+  it("forward: juz completed inside the plan join the pool", () => {
+    const plan = makePlan({
+      startDate: '2026-01-01',
+      startSurah: 1, direction: 'forward', unit: 'page',
+      juzRevisionFrequency: 'weekly',
+    });
+    // after ~30 pages the first juz is fully covered
+    expect(getJuzPool(plan, boundaries, addDaysToKey('2026-01-01', 30))).toEqual([1]);
+    // and a week later it still rotates over just that juz
+    expect(getJuzRevision(plan, boundaries, addDaysToKey('2026-01-01', 35))).toBe(1);
+  });
+
+  it("nothing before the plan's start date", () => {
+    const plan = makePlan({
+      startDate: '2026-01-10',
+      startSurah: 77, direction: 'backward', unit: 'page',
+      juzRevisionFrequency: 'weekly',
+    });
+    expect(getJuzRevision(plan, boundaries, '2026-01-03')).toBeNull();
+  });
+
+  it("toggles juz revisions by date keeping sorted order", () => {
+    let plan = makePlan();
+    plan = toggleJuzRevision(plan, '2026-03-01');
+    plan = toggleJuzRevision(plan, '2026-02-01');
+    expect(plan.completedJuz).toEqual(['2026-02-01', '2026-03-01']);
+    plan = toggleJuzRevision(plan, '2026-03-01');
+    expect(plan.completedJuz).toEqual(['2026-02-01']);
+  });
+});
+
+describe("calendar day mapping", () => {
+  it("maps days to tasks and rest days without rest", () => {
+    const plan = makePlan({ startDate: '2026-03-01', memorizeDays: 1, restDays: 0 });
+    expect(getDayKind(plan, '2026-03-01')).toEqual({ type: 'memorize', index: 0 });
+    expect(getDayKind(plan, '2026-03-05')).toEqual({ type: 'memorize', index: 4 });
+  });
+
+  it("maps days with a memorize/rest cycle", () => {
+    const plan = makePlan({ startDate: '2026-03-01', memorizeDays: 2, restDays: 1 });
+    expect(getDayKind(plan, '2026-03-01')).toEqual({ type: 'memorize', index: 0 });
+    expect(getDayKind(plan, '2026-03-02')).toEqual({ type: 'memorize', index: 1 });
+    expect(getDayKind(plan, '2026-03-03')).toEqual({ type: 'rest' });
+    expect(getDayKind(plan, '2026-03-04')).toEqual({ type: 'memorize', index: 2 });
+    expect(getDayKind(plan, '2026-03-06')).toEqual({ type: 'rest' });
+  });
+
+  it("days before the plan start are off-plan", () => {
+    const plan = makePlan({ startDate: '2026-03-10' });
+    expect(getDayKind(plan, '2026-03-09')).toEqual({ type: 'off' });
+    expect(getDayKind(plan, '2026-03-10')).toEqual({ type: 'memorize', index: 0 });
+  });
+
+  it("task dates round-trip through getDayKind", () => {
+    const plan = makePlan({ startDate: '2026-03-01', memorizeDays: 2, restDays: 1 });
+    for (let i = 0; i < 12; i++) {
+      const dateKey = getTaskDate(plan, i);
+      expect(getDayKind(plan, dateKey)).toEqual({ type: 'memorize', index: i });
+    }
+  });
+
+  it("indices past the final task are still memorize days (plan finished)", () => {
+    const plan = makePlan({ unit: 'page' });
+    const total = getTotalTasks(plan, boundaries);
+    const lastDate = getTaskDate(plan, total - 1);
+    expect(getDayKind(plan, lastDate)).toEqual({ type: 'memorize', index: total - 1 });
+    expect(getTaskSegment(plan, boundaries, getDayKind(plan, addDaysToKey(lastDate, 1)).type === 'memorize'
+      ? (getDayKind(plan, addDaysToKey(lastDate, 1)) as { index: number }).index
+      : -1)).toBeNull();
+  });
+});
+
 describe("completion & stats", () => {
   it("toggles tasks keeping sorted order", () => {
     let plan = makePlan();
@@ -220,6 +544,18 @@ describe("completion & stats", () => {
     expect(plan.completedTasks).toEqual([1, 4]);
     plan = toggleTask(plan, 4);
     expect(plan.completedTasks).toEqual([1]);
+  });
+
+  it("toggles revisions independently of tasks", () => {
+    let plan = makePlan();
+    plan = toggleTask(plan, 1);
+    plan = toggleRevision(plan, 3);
+    plan = toggleRevision(plan, 1);
+    expect(plan.completedTasks).toEqual([1]);
+    expect(plan.completedRevisions).toEqual([1, 3]);
+    plan = toggleRevision(plan, 3);
+    expect(plan.completedRevisions).toEqual([1]);
+    expect(toggleRevision(plan, 1).completedRevisions).toEqual([]);
   });
 
   it("next-task index skips completed and clamps at the end", () => {
@@ -265,7 +601,7 @@ describe("segment description & storage", () => {
     expect(localStorage.getItem('quran-memorize-plan')).toBeNull();
   });
 
-  it("upgrades a v7 payload (no startSurah) to v8", () => {
+  it("upgrades a v7 payload (no startSurah) to v12 with defaults", () => {
     localStorage.setItem('quran-memorize-plan', JSON.stringify({
       version: 7,
       createdAt: Date.now(),
@@ -278,9 +614,102 @@ describe("segment description & storage", () => {
       completedTasks: [2],
     }));
     const loaded = loadMemorizePlan();
-    expect(loaded!.version).toBe(8);
+    expect(loaded!.version).toBe(12);
     expect(loaded!.startSurah).toBe(1);
     expect(loaded!.direction).toBe('backward');
+    expect(loaded!.revisionPages).toBe(20);
+    expect(loaded!.completedRevisions).toEqual([]);
+    expect(loaded!.juzRevisionFrequency).toBe('off');
+    expect(loaded!.completedJuz).toEqual([]);
+  });
+
+  it("upgrades a v8 payload (no revisionPages) to v12 keeping explicit revisionPages", () => {
+    localStorage.setItem('quran-memorize-plan', JSON.stringify({
+      version: 8,
+      createdAt: Date.now(),
+      startDate: todayKey(),
+      startSurah: 36,
+      unit: 'page',
+      ayahsPerDay: 0,
+      memorizeDays: 1,
+      restDays: 0,
+      direction: 'forward',
+      revisionPages: 40,
+      completedTasks: [],
+    }));
+    const loaded = loadMemorizePlan();
+    expect(loaded!.version).toBe(12);
+    expect(loaded!.startSurah).toBe(36);
+    expect(loaded!.revisionPages).toBe(40);
+    expect(loaded!.completedRevisions).toEqual([]);
+  });
+
+  it("upgrades a v9 payload (no completedRevisions) to v12", () => {
+    localStorage.setItem('quran-memorize-plan', JSON.stringify({
+      version: 9,
+      createdAt: Date.now(),
+      startDate: todayKey(),
+      startSurah: 78,
+      unit: 'page',
+      ayahsPerDay: 0,
+      memorizeDays: 1,
+      restDays: 0,
+      direction: 'backward',
+      revisionPages: 20,
+      completedTasks: [0, 1],
+    }));
+    const loaded = loadMemorizePlan();
+    expect(loaded!.version).toBe(12);
+    expect(loaded!.completedTasks).toEqual([0, 1]);
+    expect(loaded!.completedRevisions).toEqual([]);
+  });
+
+  it("upgrades a v10 payload (no juz fields) to v12 keeping them defaulted", () => {
+    localStorage.setItem('quran-memorize-plan', JSON.stringify({
+      version: 10,
+      createdAt: Date.now(),
+      startDate: todayKey(),
+      startSurah: 77,
+      unit: 'page',
+      ayahsPerDay: 0,
+      memorizeDays: 1,
+      restDays: 0,
+      direction: 'backward',
+      revisionPages: 20,
+      completedTasks: [0, 1],
+      completedRevisions: [0],
+    }));
+    const loaded = loadMemorizePlan();
+    expect(loaded!.version).toBe(12);
+    expect(loaded!.completedTasks).toEqual([0, 1]);
+    expect(loaded!.completedRevisions).toEqual([0]);
+    expect(loaded!.juzRevisionFrequency).toBe('off');
+    expect(loaded!.completedJuz).toEqual([]);
+  });
+
+  it("upgrades a v11 payload (manual memorizedJuz) to v12 deriving juz automatically", () => {
+    localStorage.setItem('quran-memorize-plan', JSON.stringify({
+      version: 11,
+      createdAt: Date.now(),
+      startDate: todayKey(),
+      startSurah: 77,
+      unit: 'page',
+      ayahsPerDay: 0,
+      memorizeDays: 1,
+      restDays: 0,
+      direction: 'backward',
+      revisionPages: 20,
+      completedTasks: [0, 1],
+      completedRevisions: [0],
+      juzRevisionFrequency: 'weekly',
+      memorizedJuz: 1,
+      completedJuz: ['2026-01-01'],
+    }));
+    const loaded = loadMemorizePlan();
+    expect(loaded!.version).toBe(12);
+    expect(loaded!.juzRevisionFrequency).toBe('weekly');
+    expect(loaded!.completedJuz).toEqual(['2026-01-01']);
+    expect('memorizedJuz' in loaded!).toBe(false); // derived automatically now
   });
 
   it("migrates a legacy revision-key plan into the new key", () => {
@@ -299,12 +728,14 @@ describe("segment description & storage", () => {
 
     const loaded = loadMemorizePlan();
     expect(loaded).not.toBeNull();
-    expect(loaded!.version).toBe(8);
+    expect(loaded!.version).toBe(12);
     expect(loaded!.startSurah).toBe(1);
     expect(loaded!.direction).toBe('backward');
     expect(loaded!.completedTasks).toEqual([3]);
+    expect(loaded!.revisionPages).toBe(20);
+    expect(loaded!.completedRevisions).toEqual([]);
 
-    expect(JSON.parse(localStorage.getItem('quran-memorize-plan')!).version).toBe(8);
+    expect(JSON.parse(localStorage.getItem('quran-memorize-plan')!).version).toBe(12);
     expect(localStorage.getItem('quran-revision-plan')).toBeNull();
   });
 
