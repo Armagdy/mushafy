@@ -30,7 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useBookmarks } from '@/hooks/useBookmarks';
 import { useQuranData } from '@/hooks/useQuranData';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
-import { getPageImageFilename, getPageSurahInfo, getPageJuzNumber, getJuzFirstPage, getSurahFirstPage, getAyahPage } from '@/lib/quran-mapping';
+import { getPageImageFilename, getPageSurahInfo, getPageJuzNumber, getJuzFirstPage, getSurahFirstPage, getAyahPage, getMushafPageAspectRatio } from '@/lib/quran-mapping';
 import { getChromeTextClass } from '@/lib/chrome-theme';
 import { prewarmEditorImage } from '@/lib/asset-cache';
 import { cn } from '@/lib/utils';
@@ -163,6 +163,15 @@ const Surah = () => {
   const [isMobile, setIsMobile] = useState(
     typeof window !== 'undefined' && window.innerWidth < 768
   );
+  // Viewport width (desktop chrome sizing recomputes on resize).
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 0
+  );
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [pagesToLoad, setPagesToLoad] = useState<number>(() => {
     const saved = localStorage.getItem('quran-pages-to-load');
     return saved ? parseInt(saved) : 1;
@@ -220,6 +229,25 @@ const Surah = () => {
     return () => observer.disconnect();
   }, []);
   
+  // Measured height of the page-display container (the band between the
+  // TopBar and the footer chrome, Audio progress bar included). Passed to
+  // SwiperPageDisplay so page sizing is derived from the REAL available
+  // space instead of fixed 100dvh-170px guesses that don't match the
+  // actual chrome (bars/text settings change the real band height).
+  // Measured via ResizeObserver — siblings determine this container's
+  // height, so observing it can never loop.
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageHeight, setStageHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const update = () => setStageHeight(el.clientHeight || 0);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   // Swiper mode is now the default page display
   const useSwiperMode = true;
   
@@ -748,6 +776,35 @@ const Surah = () => {
   // Minimum swipe distance (in px)
   const minSwipeDistance = 50;
 
+  // Reader chrome width (DESKTOP ONLY): the top/bottom bars span exactly
+  // the width taken by the displayed pages — a two-page spread at most —
+  // so they align with the mushaf content instead of the monitor edges.
+  // Computed analytically from the MEASURED stage height (page height →
+  // page width via the mushaf's page aspect ratio) and the swiper's
+  // slide-width caps (max-w-7xl container, slide side padding, double
+  // mode's 24px spaceBetween) — the same constraints the page images
+  // themselves obey, so bar and page widths agree. Phones get no cap:
+  // their bars stay full-width exactly as before.
+  const readerBarMaxWidth = (() => {
+    if (isMobile) return undefined;
+    const SWIPER_MAX_W = 1280; // swiper container max-w-7xl
+    const SLIDE_GUTTER = 48; // slide px-3 md:px-6 × 2
+    const stageH = stageHeight ?? Math.max(window.innerHeight - 170, 300);
+    const pageH = Math.max(stageH - 12, 300); // slide py + slack (matches page sizing)
+    const ratio = getMushafPageAspectRatio(mushafType);
+    const swiperW = Math.min(viewportWidth, SWIPER_MAX_W);
+    if (viewMode === 'double') {
+      const SPACE_BETWEEN = 24;
+      const slideAvailW = swiperW / 2 - SLIDE_GUTTER;
+      const pageW = Math.min(pageH * ratio, slideAvailW);
+      return Math.round(Math.max(pageW * 2 + SPACE_BETWEEN, 640));
+    }
+    const pageW = Math.min(pageH * ratio, swiperW - SLIDE_GUTTER);
+    // Small usability floor: keeps the footer controls usable on
+    // pathologically short windows.
+    return Math.round(Math.max(pageW, 640));
+  })();
+
   return (
     <div 
       className={cn("w-full h-screen max-h-screen flex flex-col overflow-hidden", isDarkMode ? "bg-black" : "bg-[#FBF9F4]")} 
@@ -782,6 +839,7 @@ const Surah = () => {
       >
       <TopBar
         theme={chromeTheme}
+        maxWidthPx={readerBarMaxWidth}
         currentSurah={currentSurah}
         currentPageNum={currentPageNum}
         currentJuz={currentJuz}
@@ -832,7 +890,10 @@ const Surah = () => {
             ? "opacity-100 translate-y-0"
             : "opacity-0 -translate-y-[30px] pointer-events-none"
         )}
-        style={{ paddingTop: 'calc(env(safe-area-inset-top) + 10px)' }}
+        // Flush with the top of the screen (same rule as the full TopBar):
+        // safe-area only — no extra spacing. Its measured height drives the
+        // fullscreen page's top padding, so pages shift up accordingly.
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         {/* Surah Name — themed chrome text (matches the fullscreen quick bar) */}
         <div className={cn(
@@ -861,6 +922,7 @@ const Surah = () => {
           feel heavy. The perceived motion comes from the header/footer chrome
           overlays, which only animate compositor-friendly transform/opacity. */}
       <div
+        ref={stageRef}
         className={cn(
           "flex-1 flex items-center justify-center overflow-hidden",
           isDarkMode ? "bg-black" : "bg-[#FBF9F4]",
@@ -965,6 +1027,9 @@ const Surah = () => {
             // fullscreen fill the entire space between them.
             fullscreenFooterHeight={quickBarHeight}
             fullscreenHeaderHeight={fullscreenHeaderHeight}
+            // Measured normal-mode stage height (band between header and
+            // footer) — replaces the fixed 100dvh-170px page-size guesses.
+            stageHeight={stageHeight}
             // Show/hide saved page drawings (Eye/EyeOff quick bar toggle)
             showAnnotations={showAnnotations}
           />
@@ -1329,7 +1394,7 @@ const Surah = () => {
       {!configOverlayType && (
       <div
         className={cn(
-          "z-[100] transition-[opacity,transform] duration-300 ease-out",
+          "z-[100] transition-[opacity,transform] duration-300 ease-out md:px-3",
           // Hidden when: fullscreen, nothing selected, or audio fully STOPPED
           // (stopAudio clears the element's src — a paused player keeps its
           // source loaded, so pausing keeps the bar visible while stopping
@@ -1339,6 +1404,12 @@ const Surah = () => {
             : "opacity-100 translate-y-0"
         )}
       >
+        {/* Aligned with the footer panel below (same measured width) so the
+            progress track reads as part of the same floating panel. */}
+        <div
+          className="w-full max-w-4xl mx-auto"
+          style={readerBarMaxWidth ? { maxWidth: `${readerBarMaxWidth}px` } : undefined}
+        >
         <AudioProgressBar
             theme={chromeTheme}
             currentTime={currentTime}
@@ -1415,26 +1486,35 @@ const Surah = () => {
           }}
         />
         </div>
+      </div>
       )}
 
       {/* Combined Audio & Navigation Bar - smooth slide transition.
-          CSS-class driven (NOT framer-motion) — see the TopBar note above. */}
+          CSS-class driven (NOT framer-motion) — see the TopBar note above.
+          Desktop: a centered floating panel sized to the displayed pages'
+          width (two-page spread at most); phones keep the classic
+          full-width band. */}
       <div
         className={cn(
-          "w-full z-50 transition-[opacity,transform] duration-300 ease-out",
-          chromeTheme === 'glass'
-            ? isDarkMode
-              ? "bg-black/40 backdrop-blur-xl border-t border-white/10"
-              : "bg-[#E7E6E2]/60 backdrop-blur-md border-t border-[#8A8578]/20 shadow-[0_-2px_12px_rgba(87,70,36,0.08)]"
-            : isDarkMode
-              ? "bg-emerald-950"
-              : "bg-gradient-to-t from-emerald-800 to-emerald-600",
+          "w-full z-50 transition-[opacity,transform] duration-300 ease-out md:px-3",
           isFullscreen
             ? "opacity-0 translate-y-full pointer-events-none"
             : "opacity-100 translate-y-0"
         )}
       >
-        <div className="w-full max-w-[1600px] mx-auto rounded-t-2xl">
+        <div
+          className={cn(
+            "w-full max-w-4xl mx-auto md:rounded-2xl md:mb-2 md:shadow-lg",
+            chromeTheme === 'glass'
+              ? isDarkMode
+                ? "bg-black/40 backdrop-blur-xl border-t border-white/10"
+                : "bg-[#E7E6E2]/60 backdrop-blur-md border-t border-[#8A8578]/20 md:shadow-[0_-2px_12px_rgba(87,70,36,0.08)]"
+              : isDarkMode
+                ? "bg-emerald-950"
+                : "bg-gradient-to-t from-emerald-800 to-emerald-600"
+          )}
+          style={readerBarMaxWidth ? { maxWidth: `${readerBarMaxWidth}px` } : undefined}
+        >
         {/* Audio Player Bottom Bar */}
         <PlayBar
           theme={chromeTheme}
@@ -1678,6 +1758,9 @@ const Surah = () => {
         {configOverlayType && (
           <ConfigOverlay
           type={configOverlayType}
+          // Reader chrome width (desktop): the settings sheet's bars and
+          // content column match the default page's measured width exactly.
+          chromeMaxWidthPx={readerBarMaxWidth}
           onClose={() => {
             setConfigOverlayType(null);
             setInitialBookmarkCategory(null);

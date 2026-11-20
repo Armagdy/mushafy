@@ -24,6 +24,12 @@ interface TopBarProps {
   onPageClick: () => void;
   onJuzClick: () => void;
   theme?: 'green' | 'glass';
+  /**
+   * Desktop chrome width cap (px) — the width actually occupied by the
+   * displayed pages (two-page spread at most), so the top bar aligns with
+   * the mushaf content and the bottom bar. Undefined on phones (full width).
+   */
+  maxWidthPx?: number;
 }
 
 export function TopBar({
@@ -37,6 +43,7 @@ export function TopBar({
   onPageClick,
   onJuzClick,
   theme = 'green',
+  maxWidthPx,
 }: TopBarProps) {
   const { t, isRTL, language } = useLanguage();
   const { isDarkMode } = useDarkMode();
@@ -46,17 +53,26 @@ export function TopBar({
   const mutedText = isGlassLight ? 'text-emerald-700/70' : 'text-[#F2E3BB]/70';
 
   return (
-    <div className={cn(
-      "w-full flex justify-center pt-8",
-      theme === 'glass'
-        ? isDarkMode
-          ? "bg-black/40 backdrop-blur-xl border-b border-white/10"
-          : "bg-[#E7E6E2]/60 backdrop-blur-md border-b border-[#8A8578]/20 shadow-[0_2px_12px_rgba(87,70,36,0.08)]"
-        : isDarkMode
-          ? "bg-emerald-950"
-          : "bg-gradient-to-b from-emerald-800 to-emerald-600"
-    )}>
-      <header className="w-full max-w-[1600px]">
+    // Transparent outer strip — ZERO top padding, flush with the top of the
+    // screen on every device. On wide screens the bar itself is a centered
+    // floating panel; on phones it renders like the old full-bleed band but
+    // with no gap above it.
+    <div className="w-full flex justify-center md:px-3">
+      <header
+        className={cn(
+          "w-full max-w-4xl md:rounded-b-2xl md:shadow-lg",
+          theme === 'glass'
+            ? isDarkMode
+              ? "bg-black/40 backdrop-blur-xl border-b border-white/10"
+              : "bg-[#E7E6E2]/60 backdrop-blur-md border-b border-[#8A8578]/20 md:shadow-[0_2px_12px_rgba(87,70,36,0.08)]"
+            : isDarkMode
+              ? "bg-emerald-950"
+              : "bg-gradient-to-b from-emerald-800 to-emerald-600"
+        )}
+        // Inline maxWidth (measured pages' width) overrides the max-w-4xl
+        // fallback class on desktop; absent on phones.
+        style={maxWidthPx ? { maxWidth: `${maxWidthPx}px` } : undefined}
+      >
         {/* Main Header */}
         <div className="relative">
           {/* Subtle background gradient - only in light green theme */}
@@ -65,7 +81,7 @@ export function TopBar({
           )}
           
           {/* Content */}
-          <div className="relative px-4 md:px-8 pt-2.5 pb-1.5 md:pt-3 md:pb-2 flex items-center justify-between gap-2" style={{ direction: 'ltr' }}>
+          <div className="relative px-4 md:px-6 pt-2.5 pb-1.5 md:pt-1.5 md:pb-1 flex items-center justify-between gap-2" style={{ direction: 'ltr' }}>
             {/* Left Cell - Page Number */}
             <button
               onClick={onPageClick}
@@ -78,7 +94,7 @@ export function TopBar({
                 {t('page')}
               </span>
               <span 
-                className={cn("text-xl md:text-2xl font-bold", primaryText, "leading-none mt-0.5")}
+                className={cn("text-xl font-bold", primaryText, "leading-none mt-0.5")}
                 style={{ fontFamily: "'Changa', sans-serif" }}
               >
                 {formatNumber(currentPageNum)}
@@ -86,7 +102,7 @@ export function TopBar({
             </button>
 
             {/* Separator */}
-            <div className="w-[1px] h-9 bg-gradient-to-b from-transparent via-emerald-400/50 to-transparent" />
+            <div className="w-[1px] h-9 md:h-7 bg-gradient-to-b from-transparent via-emerald-400/50 to-transparent" />
 
             {/* Center Cell - Surah Name */}
             <button
@@ -96,7 +112,7 @@ export function TopBar({
               <div className="flex items-center gap-2">
                 <span className={cn("text-base", mutedText, "leading-none")}>﴾</span>
                 <span
-                  className={cn("text-xl md:text-2xl font-bold", primaryText, "leading-none")}
+                  className={cn("text-xl font-bold", primaryText, "leading-none")}
                   style={{ fontFamily: "'Changa', sans-serif" }}
                 >
                   {isInfoLoaded
@@ -129,7 +145,7 @@ export function TopBar({
             </button>
 
             {/* Separator */}
-            <div className="w-[1px] h-9 bg-gradient-to-b from-transparent via-emerald-400/50 to-transparent" />
+            <div className="w-[1px] h-9 md:h-7 bg-gradient-to-b from-transparent via-emerald-400/50 to-transparent" />
 
             {/* Right Cell - Juz Number */}
             <button
@@ -143,7 +159,7 @@ export function TopBar({
                 {t('juz')}
               </span>
               <span 
-                className={cn("text-xl md:text-2xl font-bold", primaryText, "leading-none mt-0.5")}
+                className={cn("text-xl font-bold", primaryText, "leading-none mt-0.5")}
                 style={{ fontFamily: "'Changa', sans-serif" }}
               >
                 {formatNumber(currentJuz)}

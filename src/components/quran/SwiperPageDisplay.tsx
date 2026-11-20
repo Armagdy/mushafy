@@ -46,6 +46,13 @@ interface SwiperPageDisplayProps {
    */
   fullscreenHeaderHeight?: number;
   /**
+   * Measured height (px) of the reader container in NORMAL mode (the band
+   * between the TopBar and the footer chrome). Used instead of the fixed
+   * 100dvh-170px reserves so pages always render at the real available
+   * size, whatever the bars/text settings make the chrome height.
+   */
+  stageHeight?: number | null;
+  /**
    * Whether saved page drawings (annotation overlays) are visible in the
    * reader. Toggled from the quick bar (Eye/EyeOff button). Default: true.
    */
@@ -71,6 +78,7 @@ export function SwiperPageDisplay({
   onSwiperReady,
   fullscreenFooterHeight,
   fullscreenHeaderHeight,
+  stageHeight,
   showAnnotations = true,
 }: SwiperPageDisplayProps) {
   const { t, isRTL } = useLanguage();
@@ -425,13 +433,19 @@ export function SwiperPageDisplay({
     // fullscreen drop the fixed class cap and use the MEASURED band
     // (fullscreenImageStyle) so the image fills the whole space between
     // header and quick bar — same size/view as the annotation editor's
-    // stage. Text mushafs keep the classic cap (their fill comes from
-    // fillReserves inside TartelPage). Normal mode keeps the classic
-    // bars-visible cap.
+    // stage. In NORMAL mode the measured stage height (stageHeight prop,
+    // when available) replaces the old fixed calc(100dvh-170px) guess so
+    // the page renders at the real available size whatever the chrome
+    // heights are. Text mushafs keep the classic cap (their fill comes
+    // from fillReserves inside TartelPage).
     const measuredImageStyle =
       !isTextMushaf && fullscreenImageReservePx
         ? { maxHeight: `calc(100dvh - ${fullscreenImageReservePx}px)` }
-        : undefined;
+        : !isTextMushaf && !isFullscreen && stageHeight
+          ? // Normal mode with a measured stage: fit exactly into the band
+            // (slide py-1 = 8px total, +4px slack).
+            { maxHeight: `${Math.max(stageHeight - 12, 200)}px` }
+          : undefined;
     const imageMaxHeight = measuredImageStyle
       ? undefined // inline maxHeight (measured band) takes over
       : pageEnlarged
@@ -476,6 +490,10 @@ export function SwiperPageDisplay({
               isFullscreen={pageEnlarged}
               isFullscreenDarkMode={isFullscreenDarkMode}
               fillReserves={fillReserves}
+              // Measured stage height (normal mode only) — lets the text
+              // page's line-height/width math use the REAL available band
+              // instead of the classic 112/132px reserve guesses.
+              stageHeight={isFullscreen ? undefined : stageHeight ?? undefined}
               className={cn(
                 // NO transition-all: max-height/gutters change instantly on
                 // fullscreen toggle. Animating layout properties re-flows the
@@ -560,6 +578,7 @@ export function SwiperPageDisplay({
     showAnnotations,
     fillReserves,
     fullscreenImageReservePx,
+    stageHeight,
   ]);
   
   // Generate slides array
@@ -609,7 +628,7 @@ export function SwiperPageDisplay({
           isFullscreenDarkMode && 'swiper-fullscreen-dark'
         )}
         style={{
-          '--swiper-navigation-size': '28px',
+          '--swiper-navigation-size': '18px',
         } as React.CSSProperties}
       >
         {slides.map((pageNum) => (

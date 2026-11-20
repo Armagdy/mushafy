@@ -54,6 +54,14 @@ const viewVariants = {
 interface ConfigOverlayProps {
   type: ConfigType;
   onClose: () => void;
+  /**
+   * Desktop chrome width (px) — the SAME measured width the reader's
+   * top/bottom bars use (width occupied by the displayed pages, two-page
+   * spread at most). The overlay's header panel, content column, and
+   * bottom bar all use it so the settings sheet matches the default page
+   * exactly. Undefined on phones (full width, as before).
+   */
+  chromeMaxWidthPx?: number;
   currentPage: number;
   currentSurahId: number;
   currentPlayingAyah: { surah: number; ayah: number } | null;
@@ -127,6 +135,7 @@ interface ConfigOverlayProps {
 export default function ConfigOverlay({
   type,
   onClose,
+  chromeMaxWidthPx,
   currentPage,
   currentSurahId,
   currentPlayingAyah,
@@ -513,19 +522,31 @@ export default function ConfigOverlay({
       exit={{ y: '100%' }}
       transition={{ type: 'spring', stiffness: 320, damping: 34 }}
     >
-      {/* Header - Android-style top app bar: back arrow + start-aligned title */}
+      {/* Header - Android-style top app bar: back arrow + start-aligned title.
+          Desktop: a centered floating panel (same treatment as the reader's
+          TopBar) with the sheet background showing on either side; phones
+          keep the classic full-width band. */}
         <div 
           className={cn(
-            "sticky top-0 z-10 shadow-lg pt-6",
-            chromeTheme === 'glass'
-              ? isDarkMode
-                ? "bg-black/40 backdrop-blur-xl border-b border-white/10"
-                : "bg-[#E7E6E2]/60 backdrop-blur-md border-b border-[#8A8578]/20"
-              : isDarkMode
-                ? "bg-emerald-950"
-                : "bg-gradient-to-b from-emerald-800 to-emerald-600"
+            "sticky top-0 z-10 pt-[env(safe-area-inset-top)] md:px-3",
           )}
         >
+          <div
+            className={cn(
+              "max-w-4xl w-full mx-auto md:rounded-b-2xl md:shadow-lg",
+              chromeTheme === 'glass'
+                ? isDarkMode
+                  ? "bg-black/40 backdrop-blur-xl border-b border-white/10"
+                  : "bg-[#E7E6E2]/60 backdrop-blur-md border-b border-[#8A8578]/20 md:shadow-[0_2px_12px_rgba(87,70,36,0.08)]"
+                : isDarkMode
+                  ? "bg-emerald-950"
+                  : "bg-gradient-to-b from-emerald-800 to-emerald-600"
+            )}
+            // Same measured width as the reader's TopBar — the default page
+            // is the reference. Inline style overrides the max-w-4xl
+            // fallback class; absent on phones.
+            style={chromeMaxWidthPx ? { maxWidth: `${chromeMaxWidthPx}px` } : undefined}
+          >
           <div className="flex items-center gap-1 px-2 py-1">
             <button
               onClick={() => {
@@ -558,11 +579,14 @@ export default function ConfigOverlay({
               {getTitle()}
             </motion.h1>
           </div>
+          </div>
         </div>
-        
+
         {/* View content - slides horizontally when switching bottom-bar views.
-            Touch handlers allow swiping to the next/previous bar item. */}
-        <div className="flex-1 min-h-0 overflow-hidden" {...swipeHandlers}>
+            Touch handlers allow swiping to the next/previous bar item.
+            md:px-3 keeps the content column aligned with the floating
+            header/footer panels at 768-896px widths. */}
+        <div className="flex-1 min-h-0 overflow-hidden md:px-3" {...swipeHandlers}>
           <AnimatePresence initial={false} custom={slideDirection} mode="popLayout">
             <motion.div
               key={activeView}
@@ -573,9 +597,11 @@ export default function ConfigOverlay({
               exit="exit"
               transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
               className={cn(
-                "h-full flex flex-col",
+                "h-full flex flex-col max-w-4xl w-full mx-auto",
                 activeView === 'reciter' ? 'overflow-hidden min-h-0' : 'overflow-y-auto pb-20'
               )}
+              // Same measured width as the reader's chrome bars.
+              style={chromeMaxWidthPx ? { maxWidth: `${chromeMaxWidthPx}px` } : undefined}
             >
               <div className="flex-1 flex flex-col min-h-0">
                 {renderView()}
@@ -584,38 +610,46 @@ export default function ConfigOverlay({
           </AnimatePresence>
         </div>
 
-      {/* Bottom Navigation Bar - part of the sliding sheet */}
-      <div className={cn(
-        "pt-2",
-        chromeTheme === 'glass'
-          ? isDarkMode
-            ? "bg-black/40 backdrop-blur-xl border-t border-white/10"
-            : "bg-[#E7E6E2]/60 backdrop-blur-md border-t border-[#8A8578]/20"
-          : isDarkMode
-            ? "bg-emerald-950"
-            : "bg-gradient-to-t from-emerald-800 to-emerald-600"
-      )}>
-        <BottomBar
-          theme={chromeTheme}
-          showBottomBarText={showBottomBarText}
-          totalBookmarks={getTotalBookmarks()}
-          isMobile={isMobile}
-          viewMode={viewMode}
-          activeButton={
-            activeView === 'navigation' ? 'navigation'
-            : activeView === 'search' ? 'search'
-            : activeView === 'bookmarks' ? 'bookmarks'
-            : activeView === 'settings' ? 'settings'
-            : activeView === 'tafseer' ? 'tafseer'
-            : null
-          }
-          onGoToClick={closeIfActive('navigation')}
-          onSearchClick={closeIfActive('search')}
-          onBookmarkClick={closeIfActive('bookmarks')}
-          onSettingsClick={closeIfActive('settings')}
-          onTafseerClick={closeIfActive('tafseer')}
-          onViewModeToggle={onViewModeToggle}
-        />
+      {/* Bottom Navigation Bar - part of the sliding sheet.
+          Desktop: centered floating panel matching the header; phones keep
+          the classic full-width band. */}
+      <div className="pt-2 md:px-3">
+        <div
+          className={cn(
+            "max-w-4xl w-full mx-auto md:rounded-t-2xl md:mb-2 md:shadow-lg",
+            chromeTheme === 'glass'
+              ? isDarkMode
+                ? "bg-black/40 backdrop-blur-xl border-t border-white/10"
+                : "bg-[#E7E6E2]/60 backdrop-blur-md border-t border-[#8A8578]/20 md:shadow-[0_-2px_12px_rgba(87,70,36,0.08)]"
+              : isDarkMode
+                ? "bg-emerald-950"
+                : "bg-gradient-to-t from-emerald-800 to-emerald-600"
+          )}
+          // Same measured width as the reader's footer panel.
+          style={chromeMaxWidthPx ? { maxWidth: `${chromeMaxWidthPx}px` } : undefined}
+        >
+          <BottomBar
+            theme={chromeTheme}
+            showBottomBarText={showBottomBarText}
+            totalBookmarks={getTotalBookmarks()}
+            isMobile={isMobile}
+            viewMode={viewMode}
+            activeButton={
+              activeView === 'navigation' ? 'navigation'
+              : activeView === 'search' ? 'search'
+              : activeView === 'bookmarks' ? 'bookmarks'
+              : activeView === 'settings' ? 'settings'
+              : activeView === 'tafseer' ? 'tafseer'
+              : null
+            }
+            onGoToClick={closeIfActive('navigation')}
+            onSearchClick={closeIfActive('search')}
+            onBookmarkClick={closeIfActive('bookmarks')}
+            onSettingsClick={closeIfActive('settings')}
+            onTafseerClick={closeIfActive('tafseer')}
+            onViewModeToggle={onViewModeToggle}
+          />
+        </div>
       </div>
     </motion.div>
   );

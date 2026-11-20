@@ -49,6 +49,15 @@ interface TartelPageProps {
    * the defaults below reproduce the classic layout exactly.
    */
   fillReserves?: { header: number; footer: number };
+  /**
+   * MEASURED available height (px) of the reader's stage in normal mode
+   * (band between the TopBar and the footer). When provided, the
+   * line-height fill AND the width cap use this instead of the classic
+   * fixed reserves — the page sizes itself to the real band whatever the
+   * chrome heights are. Undefined in fullscreen (fillReserves covers it)
+   * and in the annotation editor (classic defaults).
+   */
+  stageHeight?: number;
 }
 
 // Cache for the complete Quran pages data (loaded once, used for all pages)
@@ -91,7 +100,7 @@ const loadQuranPagesData = async (): Promise<QuranData> => {
   return dataLoadingPromise;
 };
 
-const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel', isFullscreen = false, isFullscreenDarkMode = false, fillReserves }: TartelPageProps) => {
+const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, currentPlayingAyah, mushafType = 'tarteel', isFullscreen = false, isFullscreenDarkMode = false, fillReserves, stageHeight }: TartelPageProps) => {
   const { language, t, isRTL } = useLanguage();
   // Viewport space (px) reserved for the fullscreen overlay header/footer.
   // Defaults (112/132) reproduce the classic layout used by the annotation
@@ -291,6 +300,24 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
   // line-height back to the 1.75 fallback and was visible as shrink-then-grow
   // on every swipe. We keep the last value and overwrite it synchronously
   // (layout effect, before paint) once the new page is measurable.
+  // WIDTH CAP (desktop): Quran lines are justified (flex space-between)
+  // across their line box. On a wide monitor the box would stretch to the
+  // full viewport while the font stays capped — gigantic inter-word gaps.
+  // The page content is therefore capped to the printed mushaf's aspect
+  // ratio (width = available height × ~0.67, Madani page proportion), the
+  // same geometry the image mushafs follow. The existing width-fit scaler
+  // then shrinks the font so the longest line fits the capped box, so the
+  // text page looks like a correctly proportioned printed page. Phones are
+  // narrower than the cap, so nothing changes there.
+  const PAGE_WIDTH_RATIO = 0.67; // Madani mushaf page width/height
+  const [contentMaxWidth, setContentMaxWidth] = useState<number | null>(null);
+  // Ref mirror so the measure callback can read/clear the current cap
+  // without adding it to the effect deps (no re-run loops).
+  const contentMaxWidthRef = useRef<number | null>(null);
+  const applyContentMaxWidth = (value: number | null) => {
+    contentMaxWidthRef.current = value;
+    setContentMaxWidth(value);
+  };
   useLayoutEffect(() => {
     if (!isFullscreen || !pageData || !fontLoaded) {
       return;
@@ -300,14 +327,15 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       const container = containerRef.current;
       if (!container) return;
 
-      // Get available height, accounting for the fullscreen overlay
-      // header/footer. Either the classic fixed reserves (112/132) or, when
-      // the reader passes fillReserves, the actual header/quick-bar bands —
-      // so the text fills the ENTIRE space between them.
+      // Available height, accounting for the fullscreen overlay
+      // header/footer. Either the classic fixed reserves (112/132), when
+      // the reader passes fillReserves the actual header/quick-bar bands,
+      // or — in normal mode — the MEASURED stage height so the text fills
+      // the real band between the bars whatever their heights are.
       const headerHeight = fillHeaderReserve;
       const footerHeight = fillFooterReserve;
-      const availableHeight = window.innerHeight - headerHeight - footerHeight;
-      
+      const availableHeight = stageHeight ?? window.innerHeight - headerHeight - footerHeight;
+
       // Count total lines on this page
       const totalLines = pageData.lines.length;
       if (totalLines === 0) return;
@@ -366,6 +394,25 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       setDynamicLineHeight((prev) =>
         prev === null || Math.abs(prev - clampedLineHeight) > 0.01 ? clampedLineHeight : prev
       );
+
+      // Width cap — TABLET/DESKTOP ONLY (viewport ≥ 768px): cap the page
+      // column to the printed mushaf's proportion (width = available
+      // height × 0.67) so the justified lines don't stretch across a wide
+      // monitor with huge inter-word gaps. On phones (< 768px) the cap is
+      // NEVER applied — their container is narrower than classic fill
+      // anyway and capping would only shrink their text.
+      const isWideScreen = window.matchMedia('(min-width: 768px)').matches;
+      const containerWidth = container.clientWidth;
+      if (isWideScreen && containerWidth > 0) {
+        const cap = Math.round(availableHeight * PAGE_WIDTH_RATIO);
+        const target = Math.min(containerWidth, cap);
+        if (contentMaxWidthRef.current === null || Math.abs(contentMaxWidthRef.current - target) > 1) {
+          applyContentMaxWidth(target);
+        }
+      } else if (contentMaxWidthRef.current !== null) {
+        // Back on a phone-sized viewport: drop the cap.
+        applyContentMaxWidth(null);
+      }
     };
 
     // Measure synchronously before paint (no 50ms delay) so the incoming page
@@ -381,7 +428,7 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
       cancelAnimationFrame(rafId);
       window.removeEventListener('resize', calculateLineHeight);
     };
-  }, [isFullscreen, pageData, fontLoaded, fillHeaderReserve, fillFooterReserve]);
+  }, [isFullscreen, pageData, fontLoaded, fillHeaderReserve, fillFooterReserve, stageHeight]);
 
   // Stretch the surah header frame to fill the full element width.
   // The icon-font glyph has an intrinsic width, so flex centering alone
@@ -772,6 +819,9 @@ const TartelPage = memo(({ pageNumber, onClick, className = '', onAyahSelect, cu
         className={`tartel-content-wrapper w-full flex flex-col ${fillReserves ? 'px-1' : 'px-2 sm:px-4 md:px-6'}`}
         style={{
           maxHeight: 'none',
+          // Desktop width cap (mushaf aspect ratio) — undefined on phones.
+          // The parent is items-center, so the capped column centers.
+          maxWidth: contentMaxWidth ? `${contentMaxWidth}px` : undefined,
           position: 'relative',
           zIndex: 1,
           flex: isFullscreen ? '1' : 'none',

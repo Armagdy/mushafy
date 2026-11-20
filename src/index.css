@@ -285,15 +285,17 @@
 @import 'swiper/css/navigation';
 @import 'swiper/css/virtual';
 
-/* Custom Swiper Navigation Buttons - Match App Theme */
+/* Custom Swiper Navigation Buttons - Match App Theme.
+   Desktop-sized (hidden below 768px via the media query below): compact
+   circles that don't dominate the reader on wide screens. */
 .swiper-button-next,
 .swiper-button-prev {
-  width: 3.5rem !important;
-  height: 3.5rem !important;
+  width: 2.25rem !important;
+  height: 2.25rem !important;
   background: linear-gradient(to bottom right, #15803d, #047857) !important;
   color: #F2E3BB !important;
   border-radius: 50% !important;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 4px 6px -2px rgba(0, 0, 0, 0.15) !important;
   border: 1px solid rgba(5, 150, 105, 0.3) !important;
   transition: all 0.2s ease !important;
 }
@@ -301,7 +303,7 @@
 .swiper-button-next:hover,
 .swiper-button-prev:hover {
   background: linear-gradient(to bottom right, #166534, #065f46) !important;
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .swiper-button-next.swiper-button-disabled,
@@ -312,7 +314,7 @@
 
 .swiper-button-next::after,
 .swiper-button-prev::after {
-  font-size: 1.5rem !important;
+  font-size: 1rem !important;
   font-weight: bold !important;
 }
 

@@ -60,7 +60,7 @@ export function BottomBar({
     <div 
       className={cn(
         "px-2 md:px-6 flex items-stretch justify-between",
-        showBottomBarText ? "pt-1 md:pt-1.5 pb-0.5 md:pb-1" : "pt-1.5 md:pt-2 pb-2 md:pb-3"
+        showBottomBarText ? "pt-1 md:pt-1 pb-0.5 md:pb-0.5" : "pt-1.5 md:pt-1 pb-2 md:pb-1.5"
       )}
       style={{ paddingBottom: `calc(env(safe-area-inset-bottom) + 0.25rem)` }}
     >
@@ -80,12 +80,12 @@ export function BottomBar({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.92 }}
               onClick={onClick}
-              className="relative flex flex-col items-center gap-0.5 md:gap-1 transition-colors group w-full py-1.5 pt-2"
+              className="relative flex flex-col items-center gap-0.5 transition-colors group w-full py-1.5 pt-2 md:py-1 md:pt-1.5"
               title={title}
             >
               {key === 'bookmarks' ? (
                 <div className="relative">
-                  <Icon className={cn("w-7 h-7 md:w-8 md:h-8 transition-colors", isActive ? activeIconClass : inactiveIconClass)} />
+                  <Icon className={cn("w-7 h-7 transition-colors", isActive ? activeIconClass : inactiveIconClass)} />
                   {totalBookmarks > 0 && (
                     <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[8px] rounded-full min-w-[12px] h-3 px-1 flex items-center justify-center">
                       {totalBookmarks}
@@ -93,10 +93,10 @@ export function BottomBar({
                   )}
                 </div>
               ) : (
-                <Icon className={cn("w-7 h-7 md:w-8 md:h-8 transition-colors", isActive ? activeIconClass : inactiveIconClass)} />
+                <Icon className={cn("w-7 h-7 transition-colors", isActive ? activeIconClass : inactiveIconClass)} />
               )}
               {showBottomBarText && (
-                <span className={cn("text-base md:text-xl font-medium transition-colors", isActive ? activeIconClass : inactiveTextClass)}>
+                <span className={cn("text-base font-medium transition-colors", isActive ? activeIconClass : inactiveTextClass)}>
                   {label}
                 </span>
               )}
@@ -118,19 +118,19 @@ export function BottomBar({
             )}
             title={viewMode === 'single' ? (isRTL ? 'عرض صفحتين' : 'Two Pages') : (isRTL ? 'صفحة واحدة' : 'Single Page')}
           >
-            <div className={cn("relative w-8 h-8", viewToggleClass)}>
+            <div className={cn("relative w-7 h-7", viewToggleClass)}>
               {viewMode === 'single' ? (
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <rect x="7" y="4" width="10" height="16" rx="1" />
                 </svg>
               ) : (
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <rect x="4" y="4" width="7" height="16" rx="1" />
                   <rect x="13" y="4" width="7" height="16" rx="1" />
                 </svg>
               )}
             </div>
-            {showBottomBarText && <span className="text-base md:text-xl font-medium">
+            {showBottomBarText && <span className="text-base font-medium">
               {viewMode === 'single' ? (isRTL ? 'صفحتين' : '2 Pages') : (isRTL ? 'صفحة' : '1 Page')}
             </span>}
           </motion.button>

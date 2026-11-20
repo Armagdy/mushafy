@@ -69,6 +69,23 @@ export const getPageImageFilename = (pageNumber: number): string => {
   return `page_${paddedPageNumber}.webp`;
 };
 
+// Page width/height aspect ratio per mushaf, measured from page_0001.webp
+// of each image set. Text mushafs (tarteel/tajweed) follow the Madani page
+// proportion. Used to size the reader chrome (top/bottom bars) to the
+// width actually occupied by the displayed pages.
+export const getMushafPageAspectRatio = (mushafType: string): number => {
+  switch (mushafType) {
+    case 'mwdoa':
+      return 1112 / 1600; // ≈ 0.695
+    case 'tashel':
+      return 990 / 1600; // ≈ 0.619
+    case 'madinah':
+      return 1073 / 1600; // ≈ 0.671
+    default:
+      return 0.67; // tarteel/tajweed text mushafs
+  }
+};
+
 // Get surah info for a specific page
 export const getPageSurahInfo = async (pageNumber: number): Promise<{ surahId: number; ayah: number } | null> => {
   try {

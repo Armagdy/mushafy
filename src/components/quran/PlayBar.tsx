@@ -55,7 +55,7 @@ export function PlayBar({
   const isGlassDark = theme === 'glass' && isDarkMode;
 
   const chipClass = cn(
-    "flex items-center justify-center rounded-lg px-3 md:px-4 h-10 md:h-12 shadow-md transition-all",
+    "flex items-center justify-center rounded-lg px-3 md:px-3.5 h-10 md:h-10 shadow-md transition-all",
     isGlassLight
       ? "bg-[#E7E6E2]/50 hover:bg-[#E7E6E2]/75 border border-[#8A8578]/25"
       : isGlassDark
@@ -118,7 +118,7 @@ export function PlayBar({
   return (
     <div className="flex justify-center px-2 md:px-0 pt-0 pb-0">
       <div className="w-[98%] md:max-w-4xl lg:max-w-5xl rounded-full">
-        <div className="flex items-center py-2 px-2 md:py-3 md:px-7 gap-1 md:gap-0 md:justify-between w-full">
+        <div className="flex items-center py-2 px-2 md:py-1.5 md:px-6 gap-1 md:gap-0 md:justify-between w-full">
           {/* Ayah Selection - Left */}
           <div className="flex items-center gap-1.5 md:gap-3">
             <button
@@ -134,7 +134,7 @@ export function PlayBar({
               )}
               title={(audioSource === 'mp3quran' && !hasAyahTimings) ? t('ayahSelectionNotAvailable') : ''}
             >
-              <span className={cn(chipTextClass, "text-base md:text-xl font-bold")} style={{ fontFamily: "'Changa', sans-serif" }}>
+              <span className={cn(chipTextClass, "text-base font-bold")} style={{ fontFamily: "'Changa', sans-serif" }}>
                 {(audioSource === 'mp3quran' && !hasAyahTimings) 
                   ? '--' 
                   : currentPlayingAyah 
@@ -155,7 +155,7 @@ export function PlayBar({
               )}
               title="Repeat"
             >
-              <Repeat className={cn("w-5 h-5 md:w-6 md:h-6", chipTextClass, isRepeatActive && "text-amber-500")} />
+              <Repeat className={cn("w-5 h-5", chipTextClass, isRepeatActive && "text-amber-500")} />
             </button>
           </div>
           
@@ -164,7 +164,7 @@ export function PlayBar({
             onClick={onReciterClick}
             className={cn(chipClass, "flex-[2] md:flex-1 min-w-0 md:max-w-md lg:max-w-lg")}
           >
-            <span className={cn(chipTextClass, "text-base md:text-xl font-bold truncate")} style={{ fontFamily: "'Changa', sans-serif" }}>
+            <span className={cn(chipTextClass, "text-base font-bold truncate")} style={{ fontFamily: "'Changa', sans-serif" }}>
               {getReciterName()}
             </span>
           </button>
@@ -178,7 +178,7 @@ export function PlayBar({
               className={chipClass}
               title={t('stop')}
             >
-              <Square className={cn("w-5 h-5 md:w-6 md:h-6", chipTextClass)} />
+              <Square className={cn("w-5 h-5", chipTextClass)} />
             </motion.button>
             
             <motion.button
@@ -191,7 +191,7 @@ export function PlayBar({
             >
               {isPreloadingAyahs ? (
                 <div className="flex flex-col items-center justify-center gap-0.5">
-                  <Loader2 className={cn("w-5 h-5 md:w-6 md:h-6 animate-spin", chipTextClass)} />
+                  <Loader2 className={cn("w-5 h-5 animate-spin", chipTextClass)} />
                   {preloadProgress.total > 0 && (
                     <span className={cn(chipTextClass, "text-[8px] md:text-[10px] font-medium")}>
                       {preloadProgress.current}/{preloadProgress.total}
@@ -199,9 +199,9 @@ export function PlayBar({
                   )}
                 </div>
               ) : isPlaying ? (
-                <Pause className={cn("w-5 h-5 md:w-6 md:h-6", chipTextClass)} />
+                <Pause className={cn("w-5 h-5", chipTextClass)} />
               ) : (
-                <Play className={cn("w-5 h-5 md:w-6 md:h-6", chipTextClass)} />
+                <Play className={cn("w-5 h-5", chipTextClass)} />
               )}
             </motion.button>
           </div>
