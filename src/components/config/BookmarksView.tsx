@@ -385,7 +385,7 @@ export default function BookmarksView({
                     <div
                       key={`${group.key}-${page}`}
                       className={cn(
-                        "flex items-center gap-2 px-2",
+                        "flex items-center gap-2 px-3",
                         index > 0 && "border-t border-emerald-100/60 dark:border-emerald-900/60"
                       )}
                     >
@@ -395,7 +395,7 @@ export default function BookmarksView({
                           onNavigate(page, safeBookmarkPageSurahIds[page], safeBookmarkPageAyahs[page]);
                         }}
                         className={cn(
-                          "flex-1 min-w-0 flex items-center justify-between gap-3 py-3 px-2 active:bg-emerald-50 dark:active:bg-emerald-900/40 transition-colors",
+                          "flex-1 min-w-0 flex items-center justify-between gap-3 py-3.5 px-3 active:bg-emerald-50 dark:active:bg-emerald-900/40 transition-colors",
                           isRTL ? 'text-right' : 'text-left'
                         )}
                       >
@@ -414,10 +414,10 @@ export default function BookmarksView({
                       {/* Delete */}
                       <button
                         onClick={() => setDeleteConfirmation({ page, type: group.deleteType })}
-                        className="w-11 h-11 flex items-center justify-center rounded-xl text-gray-400 dark:text-gray-500 hover:text-red-500 active:bg-red-100 dark:active:bg-red-900/30 transition-colors shrink-0"
+                        className="w-12 h-12 flex items-center justify-center rounded-xl text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 active:bg-red-100 dark:active:bg-red-900/30 transition-colors shrink-0"
                         aria-label="Remove bookmark"
                       >
-                        <Trash2 className="w-5 h-5" />
+                        <Trash2 className="w-6 h-6" />
                       </button>
                     </div>
                   ))}

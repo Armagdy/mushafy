@@ -5,6 +5,7 @@ import { preloadQuranData } from "./lib/quran-data-service";
 import { loadStaticFonts } from "./lib/font-cache";
 import { getQuranBoundaries, loadMemorizePlan } from "./lib/memorize";
 import { syncMemorizeReminder } from "./lib/memorize-notifications";
+import { syncUserNotifications } from "./lib/user-notifications";
 
 // Preload static Quran data early for better performance
 preloadQuranData().catch(err => {
@@ -15,6 +16,9 @@ preloadQuranData().catch(err => {
 getQuranBoundaries()
   .then(b => syncMemorizeReminder(loadMemorizePlan(), b))
   .catch(() => {});
+
+// Keep the daily user notifications (reading/listening/revise/dhikr) scheduled
+syncUserNotifications().catch(() => {});
 
 // Load static fonts (KFGQPC HAFS, quran-icon, surah-name-v4) from the app
 // bundle — fully offline, no CDN needed
