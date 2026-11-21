@@ -944,21 +944,21 @@ const Surah = () => {
           position: isFullscreen ? 'absolute' : 'relative',
           inset: isFullscreen ? 0 : 'auto',
           zIndex: isFullscreen ? 60 : 'auto',
-          // Fullscreen: page starts right below the header (+4px padding
-          // +4px slide padding = the validated 8px gap) and ends right above
-          // the quick bar's measured height (+ small gap). Applies to every
-          // mushaf type.
+          // Fullscreen: page starts right below the header (+6px padding
+          // +2px slide padding = 8px gap) and ends right above the quick
+          // bar's measured height (+ small gap). Applies to every mushaf
+          // type.
           paddingTop:
-            isFullscreen ? `${fullscreenHeaderHeight + 4}px` : undefined,
+            isFullscreen ? `${fullscreenHeaderHeight + 6}px` : undefined,
           paddingBottom:
             isFullscreen
               ? isTextMushaf
                 ? // Text mushafs: reserve the FULL measured quick-bar height
-                  // so the text RESPECTS the floating bar (never runs beneath
-                  // it) with essentially no extra gap — only the slide's 2px
-                  // py-0.5 remains between text and bar.
-                  `${quickBarHeight}px`
-                : `${quickBarHeight + 8}px`
+                  // (+2px breathing room) so the text RESPECTS the floating
+                  // bar (never runs beneath it) — plus the slide's 2px py-0.5
+                  // between text and bar.
+                  `${quickBarHeight + 2}px`
+                : `${quickBarHeight + 10}px`
               : undefined,
         }}
       >

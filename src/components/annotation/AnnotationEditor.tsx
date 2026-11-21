@@ -222,8 +222,8 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onReady, rea
     return () => observer.disconnect();
   }, []);
   // Text mushafs: fill the stage the SAME way the reader's fullscreen does.
-  // The reader passes {header: fullscreenHeaderHeight + 6, footer: quickBar
-  // + 2} (see SwiperPageDisplay's fillReserves) — using the same MEASURED
+  // The reader passes {header: fullscreenHeaderHeight + 8, footer: quickBar
+  // + 4} (see SwiperPageDisplay's fillReserves) — using the same MEASURED
   // values here makes the text page render at the exact same size in both
   // views. Fallback (no measurements passed): keep the classic
   // expand-to-fit against the editor's own chrome.
@@ -231,8 +231,8 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onReady, rea
     if (!isTextMushaf) return undefined;
     if (readerHeaderHeight != null && readerFooterHeight != null) {
       return {
-        header: readerHeaderHeight + 6,
-        footer: readerFooterHeight + 2,
+        header: readerHeaderHeight + 8,
+        footer: readerFooterHeight + 4,
       };
     }
     if (!availableHeight || availableHeight <= 120) return undefined;
@@ -1307,13 +1307,13 @@ export function AnnotationEditor({ page, imageSrc, theme = 'green', onReady, rea
                 WebkitUserDrag: 'none',
                 // Match the READER's fullscreen page EXACTLY: same formula as
                 // SwiperPageDisplay's fullscreenImageReservePx (measured
-                // header + 4, footer + 8, slide padding 8, slack 12 = +32).
+                // header + 6, footer + 10, slide padding 8, slack 12 = +36).
                 // min() with the editor's own band (measured stage - 4)
                 // guarantees the page never overflows behind the editor
                 // chrome if it is ever taller than the reader's overlays.
                 maxHeight:
                   readerHeaderHeight != null && readerFooterHeight != null
-                    ? `min(calc(100dvh - ${Math.round(readerHeaderHeight + readerFooterHeight + 32)}px), ${(availableHeight && availableHeight > 120 ? availableHeight - 4 : 9999)}px)`
+                    ? `min(calc(100dvh - ${Math.round(readerHeaderHeight + readerFooterHeight + 36)}px), ${(availableHeight && availableHeight > 120 ? availableHeight - 4 : 9999)}px)`
                     : availableHeight && availableHeight > 120
                       ? availableHeight - 12
                       : 'calc(100dvh - 190px)',

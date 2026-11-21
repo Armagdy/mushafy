@@ -101,12 +101,12 @@ export function SwiperPageDisplay({
     () =>
       isFullscreen && isTextMushaf
         ? {
-            // Page top offset: container pt (header + 4) + slide py-0.5 (2).
-            header: (fullscreenHeaderHeight ?? 40) + 6,
-            // Page bottom offset: container pb (FULL bar, no extra gap, so
-            // the text respects the quick bar) + slide py-0.5 (2) — matches
-            // Surah.tsx's conditional paddingBottom.
-            footer: (fullscreenFooterHeight ?? 120) + 2,
+            // Page top offset: container pt (header + 6) + slide py-0.5 (2).
+            header: (fullscreenHeaderHeight ?? 40) + 8,
+            // Page bottom offset: container pb (FULL bar + 2px breathing
+            // room, so the text respects the quick bar) + slide py-0.5 (2)
+            // — matches Surah.tsx's conditional paddingBottom.
+            footer: (fullscreenFooterHeight ?? 120) + 4,
           }
         : undefined,
     [isFullscreen, isTextMushaf, fullscreenHeaderHeight, fullscreenFooterHeight]
@@ -123,8 +123,8 @@ export function SwiperPageDisplay({
   // JIT-compiled). Memoized: renderPage is a callback consuming this value.
   const fullscreenImageReservePx = useMemo(() => {
     if (!isFullscreen) return undefined;
-    const headerReserve = (fullscreenHeaderHeight ?? 40) + 4; // container pt
-    const footerReserve = (fullscreenFooterHeight ?? 56) + 8; // container pb
+    const headerReserve = (fullscreenHeaderHeight ?? 40) + 6; // container pt
+    const footerReserve = (fullscreenFooterHeight ?? 56) + 10; // container pb
     const slidePadding = 8; // slide py-1 (top + bottom)
     const editorSlack = 12; // same -12px slack as the editor's stage
     return Math.round(headerReserve + footerReserve + slidePadding + editorSlack);
