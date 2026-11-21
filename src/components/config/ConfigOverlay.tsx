@@ -528,7 +528,7 @@ export default function ConfigOverlay({
           keep the classic full-width band. */}
         <div 
           className={cn(
-            "sticky top-0 z-10 pt-[env(safe-area-inset-top)] md:px-3",
+            "sticky top-0 z-10 md:px-3",
           )}
         >
           <div
@@ -545,7 +545,14 @@ export default function ConfigOverlay({
             // Same measured width as the reader's TopBar — the default page
             // is the reference. Inline style overrides the max-w-4xl
             // fallback class; absent on phones.
-            style={chromeMaxWidthPx ? { maxWidth: `${chromeMaxWidthPx}px` } : undefined}
+            style={{
+              ...(chromeMaxWidthPx ? { maxWidth: `${chromeMaxWidthPx}px` } : undefined),
+              // Status-bar inset on the gradient panel itself (same rule as
+              // the reader's TopBar) so the themed background fills the
+              // status-bar strip; on the outer wrapper the padding would show
+              // the sheet background above the header instead.
+              paddingTop: 'env(safe-area-inset-top)',
+            }}
           >
           <div className="flex items-center gap-1 px-2 py-1">
             <button
