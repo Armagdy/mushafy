@@ -20,7 +20,7 @@ import { Language, translations } from '@/i18n/translations';
 import { surahs } from '@/data/surahs';
 import {
   MemorizePlan, QuranBoundaries, SegmentInfo, RevisionRange,
-  getDayKind, getTaskSegment, getRevisionRanges, getJuzRevision, describeSegment,
+  getDayKind, getTaskSegment, getRevisionRanges, getJuzRevisionPortion, describeSegment,
   todayKey, addDaysToKey,
 } from './memorize';
 
@@ -119,20 +119,27 @@ export function buildMemorizeReminder(plan: MemorizePlan, b: QuranBoundaries, da
   };
 }
 
-/** Notification text for the day's REVISION (pages and whole juz, or null). */
+/** Notification text for the day's REVISION (pages and the day's juz
+ *  portion, or null). */
 export function buildReviseReminder(plan: MemorizePlan, b: QuranBoundaries, dateKey: string): ReminderContent | null {
   const lang = currentLanguage();
   const t = translations[lang];
   const kind = getDayKind(plan, dateKey);
   // the juz cycle runs on its own rhythm and can land on rest days too
   const ranges = kind.type === 'memorize' ? getRevisionRanges(plan, b, kind.index) : [];
-  const juz = getJuzRevision(plan, b, dateKey);
+  const juz = getJuzRevisionPortion(plan, b, dateKey);
   if (ranges.length === 0 && juz === null) return null;
 
   const lines: string[] = ranges.map((r: RevisionRange) =>
     t.memorizeReminderRevise.replace('{portion}', portionLabel(describeSegment({ index: 0, ...r }, b), lang)));
   if (juz !== null) {
-    lines.push(t.memorizeReminderJuz.replace('{juz}', fmtNum(juz, lang)));
+    const info = describeSegment({ index: 0, startAbs: juz.startAbs, endAbs: juz.endAbs }, b);
+    const pages = info.pageFrom === info.pageTo
+      ? fmtNum(info.pageFrom, lang)
+      : `${fmtNum(info.pageFrom, lang)}–${fmtNum(info.pageTo, lang)}`;
+    lines.push(t.memorizeReminderJuz
+      .replace('{juz}', fmtNum(juz.juz, lang))
+      .replace('{pages}', pages));
   }
   return {
     title: t.memorizeReminderReviseTitle,

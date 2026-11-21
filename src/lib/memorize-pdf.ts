@@ -18,7 +18,7 @@ import { surahs } from '@/data/surahs';
 import {
   MemorizePlan, QuranBoundaries, SegmentInfo,
   getDayKind, getTaskSegment, getRevisionRanges, describeSegment,
-  getJuzRevision, getJuzSpan,
+  getJuzRevisionPortion,
   getTaskDate, getTotalTasks, daysBetween, addDaysToKey,
 } from './memorize';
 
@@ -120,11 +120,10 @@ function buildRows(plan: MemorizePlan, b: QuranBoundaries, lang: Language): Sche
       }
     }
 
-    const juz = getJuzRevision(schedulePlan, b, dateKey);
+    const juz = getJuzRevisionPortion(schedulePlan, b, dateKey);
     if (juz !== null) {
-      const span = getJuzSpan(b, juz);
-      const info = describeSegment({ index: 0, ...span }, b);
-      row.juz = { juz, pages: pagesText(info, lang) };
+      const info = describeSegment({ index: 0, startAbs: juz.startAbs, endAbs: juz.endAbs }, b);
+      row.juz = { juz: juz.juz, pages: pagesText(info, lang) };
     }
     void t;
     rows.push(row);

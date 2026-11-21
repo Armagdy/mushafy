@@ -39,11 +39,12 @@ export interface MemorizePlan {
   revisionPages: number;
   completedTasks: number[]; // indices of new portions marked done
   completedRevisions: number[]; // indices of revision portions marked done
-  /** Cycling of whole memorized juz (independent of the page revision).
-   *  The memorized-juz pool itself is derived automatically from the plan's
-   *  start point and direction. */
+  /** Cycling of memorized juz (independent of the page revision). Each
+   *  cycle (a week, half a week, a month...) takes the next juz of the pool
+   *  in rotation and spreads it over the cycle's days; the pool itself is
+   *  derived automatically from the plan's start point and direction. */
   juzRevisionFrequency: JuzRevisionFrequency;
-  /** Date keys of completed juz revisions. */
+  /** Date keys of completed juz-revision days (one day's portion each). */
   completedJuz: string[];
 }
 
@@ -606,10 +607,13 @@ export function getRevisionRanges(plan: MemorizePlan, b: QuranBoundaries, index:
 }
 
 // ---------------------------------------------------------------------------
-// Juz revision (مراجعة الأجزاء) — cycling of whole memorized juz
+// Juz revision (مراجعة الأجزاء) — one memorized juz per cycle, spread over
+// the cycle's days so the cards carry a small portion every day
 // ---------------------------------------------------------------------------
 
-/** How many days between juz-revision slots for each frequency. */
+/** How many days each frequency's cycle spans and where its slots open.
+ *  A slot opens a revision window: from its offset to the next offset (or
+ *  the period's end). The window's juz is split across the window's days. */
 const JUZ_FREQUENCY_SLOTS: Record<Exclude<JuzRevisionFrequency, 'off'>, { period: number; offsets: number[] }> = {
   'weekly': { period: 7, offsets: [0] },
   'twice-weekly': { period: 7, offsets: [0, 3] },
@@ -696,26 +700,80 @@ export function getJuzPool(plan: MemorizePlan, b: QuranBoundaries, dateKey: stri
   return [...pool].sort((a, z) => (plan.direction === 'backward' ? a - z : z - a));
 }
 
+/** One day's slice of the juz-revision cycle. */
+export interface JuzRevisionPortion {
+  juz: number;
+  /** 1-based day number inside the revision window (e.g. day 3 of 7). */
+  dayInSlot: number;
+  /** How many days the window spreads the juz over. */
+  slotDays: number;
+  startAbs: number; // inclusive
+  endAbs: number; // inclusive
+}
+
 /**
- * The whole juz to revise on a given day (or null): slot days fall on the
- * frequency's rhythm counted from the plan's start; each slot takes the
- * next juz of the pool in rotation, newest first — e.g. with juz 29 and 30
- * memorized at once a week: week 1 → 29, week 2 → 30, week 3 → 29, ...
+ * The day's juz-revision portion (or null): each frequency opens revision
+ * windows on its rhythm — weekly → one 7-day window per week, twice-weekly →
+ * windows of 3 then 4 days, monthly → one 30-day window, twice-monthly →
+ * two 15-day windows — and each window takes the next juz of the pool in
+ * rotation, newest first (e.g. with juz 29 and 30 memorized, weekly: week 1
+ * → juz 29, week 2 → juz 30, week 3 → juz 29, ...). The window's juz is then
+ * SPLIT EVENLY across the window's days (20 pages over 7 days → 3,3,3,3,3,
+ * 3,2) so the daily cards guide the user through the juz over the whole
+ * window instead of cramming it into a single day. The juz is frozen at the
+ * window's first day, so the whole window revises the same juz even if the
+ * pool grows mid-window. Days past the juz's last page carry nothing.
  */
-export function getJuzRevision(plan: MemorizePlan, b: QuranBoundaries, dateKey: string): number | null {
+export function getJuzRevisionPortion(plan: MemorizePlan, b: QuranBoundaries, dateKey: string): JuzRevisionPortion | null {
   const f = plan.juzRevisionFrequency;
   if (!f || f === 'off') return null;
   const offset = daysBetween(plan.startDate, dateKey);
   if (offset < 0) return null;
+  if (b.pageStarts.length === 0) return null;
 
   const { period, offsets } = JUZ_FREQUENCY_SLOTS[f];
-  const oi = offsets.indexOf(offset % period);
+  const pos = offset % period;
+  // the window this day belongs to: from its slot start to the next slot
+  let oi = -1;
+  for (let i = offsets.length - 1; i >= 0; i--) {
+    if (pos >= offsets[i]) { oi = i; break; }
+  }
   if (oi < 0) return null;
 
+  const slotStart = offsets[oi];
+  const slotEnd = (oi + 1 < offsets.length ? offsets[oi + 1] : period) - 1;
+  const slotDays = slotEnd - slotStart + 1;
+  const dayInSlot = pos - slotStart; // 0-based within the window
+
+  // window number in the pool rotation (same numbering the old whole-juz
+  // slots used, evaluated on the window's first day)
   const slot = Math.floor(offset / period) * offsets.length + oi;
-  const pool = getJuzPool(plan, b, dateKey);
+  const windowStart = addDaysToKey(plan.startDate, Math.floor(offset / period) * period + slotStart);
+  const pool = getJuzPool(plan, b, windowStart);
   if (pool.length === 0) return null;
-  return pool[slot % pool.length];
+  const juz = pool[slot % pool.length];
+
+  // split the juz's pages across the window's days, in reading order
+  const span = getJuzSpan(b, juz);
+  const pageOf = (abs: number) => indexOfAtOrBefore(b.pageStarts, abs);
+  const firstPage = pageOf(span.startAbs);
+  const pages = pageOf(span.endAbs) - firstPage + 1;
+
+  // even split: the first `pages % slotDays` days take one extra page
+  const base = Math.floor(pages / slotDays);
+  const extra = pages % slotDays;
+  const size = base + (dayInSlot < extra ? 1 : 0);
+  if (size <= 0) return null; // the juz ends before the window does
+
+  const fromPage = firstPage + dayInSlot * base + Math.min(dayInSlot, extra);
+  const toPage = fromPage + size - 1;
+  return {
+    juz,
+    dayInSlot: dayInSlot + 1,
+    slotDays,
+    startAbs: b.pageStarts[fromPage],
+    endAbs: toPage + 1 < b.pageStarts.length ? b.pageStarts[toPage + 1] - 1 : TOTAL_AYAHS - 1,
+  };
 }
 
 /** Toggle a day's juz revision done/undone (keyed by date). */

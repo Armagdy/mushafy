@@ -8,7 +8,7 @@ import {
   loadMemorizePlan, saveMemorizePlan, clearMemorizePlan,
   getTaskSegment, getTotalTasks, getStats, getNextTaskIndex, toggleTask,
   getTaskDate, describeSegment, resolveAbsIndex, getSurahFirstPage,
-  getRevisionRanges, getJuzPool, getJuzRevision, getJuzSpan, getDayKind,
+  getRevisionRanges, getJuzPool, getJuzRevisionPortion, getJuzSpan, getDayKind,
   toggleRevision, toggleJuzRevision,
   toDateKey, todayKey, addDaysToKey, daysBetween,
   QuranBoundaries,
@@ -354,7 +354,7 @@ describe("revision ranges (Z memorized + N − Z previous, cut when a surah is m
   });
 });
 
-describe("juz revision (cycling of whole memorized juz)", () => {
+describe("juz revision (one juz spread over each cycle's days)", () => {
   it("getJuzSpan covers each juz exactly (juz 29 ends where juz 30 starts)", () => {
     expect(getJuzSpan(boundaries, 29)).toEqual({ startAbs: absIndex(67, 1), endAbs: absIndex(78, 1) - 1 });
     expect(getJuzSpan(boundaries, 30)).toEqual({ startAbs: absIndex(78, 1), endAbs: 6235 });
@@ -363,11 +363,11 @@ describe("juz revision (cycling of whole memorized juz)", () => {
 
   it("no juz revision when the frequency is off or the pool is empty", () => {
     const off = makePlan({ startSurah: 77, direction: 'backward', juzRevisionFrequency: 'off' });
-    expect(getJuzRevision(off, boundaries, '2026-01-01')).toBeNull();
+    expect(getJuzRevisionPortion(off, boundaries, '2026-01-01')).toBeNull();
 
     // backward starting AT An-Nas: nothing memorized before it yet
     const empty = makePlan({ startSurah: 114, direction: 'backward', juzRevisionFrequency: 'weekly' });
-    expect(getJuzRevision(empty, boundaries, '2026-01-01')).toBeNull();
+    expect(getJuzRevisionPortion(empty, boundaries, '2026-01-01')).toBeNull();
   });
 
   it("backward: previously-memorized juz derive automatically from the start point (user's example)", () => {
@@ -381,23 +381,42 @@ describe("juz revision (cycling of whole memorized juz)", () => {
 
     // day 0: only juz 30 lies wholly after the start surah
     expect(getJuzPool(plan, boundaries, '2026-01-01')).toEqual([30]);
-    // non-slot days carry nothing
-    expect(getJuzRevision(plan, boundaries, '2026-01-02')).toBeNull();
-    // weekly slot while juz 29 is still being memorized
-    expect(getJuzRevision(plan, boundaries, '2026-01-08')).toBe(30);
+    // the whole week carries juz 30, one slice per day
+    for (let i = 0; i < 7; i++) {
+      const p = getJuzRevisionPortion(plan, boundaries, addDaysToKey('2026-01-01', i))!;
+      expect(p.juz).toBe(30);
+      expect(p.dayInSlot).toBe(i + 1);
+      expect(p.slotDays).toBe(7);
+    }
+    // the 7 slices tile the juz exactly, in reading order, and split evenly
+    const whole = describeSegment({ index: 0, ...getJuzSpan(boundaries, 30) }, boundaries);
+    const slices = Array.from({ length: 7 }, (_, i) =>
+      describeSegment(
+        { index: 0, ...getJuzRevisionPortion(plan, boundaries, addDaysToKey('2026-01-01', i))! },
+        boundaries
+      )
+    );
+    expect(slices[0].pageFrom).toBe(whole.pageFrom);
+    expect(slices[6].pageTo).toBe(whole.pageTo);
+    for (let i = 1; i < 7; i++) {
+      expect(slices[i].pageFrom).toBe(slices[i - 1].pageTo + 1);
+    }
+    const sizes = slices.map(s => s.pageTo - s.pageFrom + 1);
+    expect(sizes.reduce((a, z) => a + z, 0)).toBe(whole.pageTo - whole.pageFrom + 1);
+    expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThanOrEqual(1);
 
     // juz 29 completes once the frontier leaves surah 67
     let p0 = 0;
     while (resolveAbsIndex(getTaskSegment(plan, boundaries, p0)!.startAbs).surah > 66) p0++;
     const completionOffset = p0 + 1;
-    // first weekly slot at/after the completion
+    // first weekly window at/after the completion
     const s0 = Math.ceil(completionOffset / 7);
     const at = (slot: number) => addDaysToKey('2026-01-01', slot * 7);
 
-    // consecutive slots alternate 29 / 30 / 29 (or 30 / 29 / 30)
-    const a = getJuzRevision(plan, boundaries, at(s0))!;
-    const b = getJuzRevision(plan, boundaries, at(s0 + 1))!;
-    const c = getJuzRevision(plan, boundaries, at(s0 + 2))!;
+    // consecutive weeks alternate 29 / 30 / 29 (or 30 / 29 / 30)
+    const a = getJuzRevisionPortion(plan, boundaries, at(s0))!.juz;
+    const b = getJuzRevisionPortion(plan, boundaries, at(s0 + 1))!.juz;
+    const c = getJuzRevisionPortion(plan, boundaries, at(s0 + 2))!.juz;
     expect(a).not.toBe(b);
     expect(b).not.toBe(c);
     expect(a).toBe(c);
@@ -422,29 +441,52 @@ describe("juz revision (cycling of whole memorized juz)", () => {
     expect(getJuzPool(plan, boundaries, addDaysToKey('2026-01-01', p + 1))).toContain(30);
   });
 
-  it("twice-weekly: two slots per week (days 0 and 3 of each week)", () => {
+  it("twice-weekly: two windows per week (3 days then 4 days)", () => {
     const plan = makePlan({
       startDate: '2026-01-01',
       startSurah: 77, direction: 'backward', unit: 'page',
       juzRevisionFrequency: 'twice-weekly',
     });
-    expect(getJuzRevision(plan, boundaries, '2026-01-01')).toBe(30);
-    expect(getJuzRevision(plan, boundaries, '2026-01-02')).toBeNull();
-    expect(getJuzRevision(plan, boundaries, '2026-01-03')).toBeNull();
-    expect(getJuzRevision(plan, boundaries, '2026-01-04')).toBe(30);
-    expect(getJuzRevision(plan, boundaries, '2026-01-08')).toBe(30);
-    expect(getJuzRevision(plan, boundaries, '2026-01-11')).toBe(30);
+    const at = (offset: number) => getJuzRevisionPortion(plan, boundaries, addDaysToKey('2026-01-01', offset));
+    // window 1: days 0–2 (3 days) — juz 30 split over 3 days
+    expect(at(0)!.juz).toBe(30);
+    expect(at(0)!.dayInSlot).toBe(1);
+    expect(at(0)!.slotDays).toBe(3);
+    expect(at(1)!.juz).toBe(30);
+    expect(at(2)!.juz).toBe(30);
+    // window 2: days 3–6 (4 days) — still juz 30 (one-juz pool)
+    expect(at(3)!.juz).toBe(30);
+    expect(at(3)!.dayInSlot).toBe(1);
+    expect(at(3)!.slotDays).toBe(4);
+    expect(at(6)!.juz).toBe(30);
+    expect(at(6)!.dayInSlot).toBe(4);
+    // the following week repeats the rhythm
+    expect(at(7)!.juz).toBe(30);
+    expect(at(7)!.slotDays).toBe(3);
+    expect(at(10)!.juz).toBe(30);
+    expect(at(10)!.slotDays).toBe(4);
   });
 
-  it("monthly: one slot per 30 days", () => {
+  it("monthly: one 30-day window — a page a day until the juz runs out", () => {
     const plan = makePlan({
       startDate: '2026-01-01',
       startSurah: 77, direction: 'backward', unit: 'page',
       juzRevisionFrequency: 'monthly',
     });
-    expect(getJuzRevision(plan, boundaries, '2026-01-29')).toBeNull();
-    expect(getJuzRevision(plan, boundaries, '2026-01-31')).toBe(30);
-    expect(getJuzRevision(plan, boundaries, '2026-03-02')).toBe(30);
+    const at = (offset: number) => getJuzRevisionPortion(plan, boundaries, addDaysToKey('2026-01-01', offset));
+    // juz 30 holds 23 pages in this mushaf: 23 days of one page each
+    expect(at(0)!.juz).toBe(30);
+    expect(at(0)!.slotDays).toBe(30);
+    expect(at(0)!.dayInSlot).toBe(1);
+    expect(at(22)!.juz).toBe(30);
+    expect(at(22)!.dayInSlot).toBe(23);
+    // the juz is exhausted before the window ends: nothing left to carry
+    expect(at(23)).toBeNull();
+    expect(at(29)).toBeNull();
+    // the next month's window starts fresh
+    expect(at(30)!.juz).toBe(30);
+    expect(at(30)!.dayInSlot).toBe(1);
+    expect(at(60)!.juz).toBe(30);
   });
 
   it("forward: previously-memorized juz derive from the start point, newest-first", () => {
@@ -458,10 +500,14 @@ describe("juz revision (cycling of whole memorized juz)", () => {
     expect(pool.length).toBe(28);
     expect(pool[0]).toBe(28); // newest = highest
     expect(pool[27]).toBe(1);
-    // weekly slots walk the pool one juz at a time: 28, 27, 26, ...
-    expect(getJuzRevision(plan, boundaries, '2026-01-01')).toBe(28);
-    expect(getJuzRevision(plan, boundaries, '2026-01-08')).toBe(27);
-    expect(getJuzRevision(plan, boundaries, '2026-01-15')).toBe(26);
+    // weekly windows walk the pool one juz at a time: 28, 27, 26, ...
+    expect(getJuzRevisionPortion(plan, boundaries, '2026-01-01')!.juz).toBe(28);
+    // mid-window days keep the same juz and take its next slice
+    const mid = getJuzRevisionPortion(plan, boundaries, '2026-01-04')!;
+    expect(mid.juz).toBe(28);
+    expect(mid.dayInSlot).toBe(4);
+    expect(getJuzRevisionPortion(plan, boundaries, '2026-01-08')!.juz).toBe(27);
+    expect(getJuzRevisionPortion(plan, boundaries, '2026-01-15')!.juz).toBe(26);
   });
 
   it("forward: juz completed inside the plan join the pool", () => {
@@ -472,8 +518,12 @@ describe("juz revision (cycling of whole memorized juz)", () => {
     });
     // after ~30 pages the first juz is fully covered
     expect(getJuzPool(plan, boundaries, addDaysToKey('2026-01-01', 30))).toEqual([1]);
-    // and a week later it still rotates over just that juz
-    expect(getJuzRevision(plan, boundaries, addDaysToKey('2026-01-01', 35))).toBe(1);
+    // and a week later the window still rotates over just that juz
+    expect(getJuzRevisionPortion(plan, boundaries, addDaysToKey('2026-01-01', 35))!.juz).toBe(1);
+    // mid-window days carry slices of the same juz
+    const mid = getJuzRevisionPortion(plan, boundaries, addDaysToKey('2026-01-01', 37))!;
+    expect(mid.juz).toBe(1);
+    expect(mid.dayInSlot).toBe(3);
   });
 
   it("nothing before the plan's start date", () => {
@@ -482,7 +532,7 @@ describe("juz revision (cycling of whole memorized juz)", () => {
       startSurah: 77, direction: 'backward', unit: 'page',
       juzRevisionFrequency: 'weekly',
     });
-    expect(getJuzRevision(plan, boundaries, '2026-01-03')).toBeNull();
+    expect(getJuzRevisionPortion(plan, boundaries, '2026-01-03')).toBeNull();
   });
 
   it("toggles juz revisions by date keeping sorted order", () => {

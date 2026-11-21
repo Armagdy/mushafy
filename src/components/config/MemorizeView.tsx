@@ -14,7 +14,7 @@ import {
   loadMemorizePlan, saveMemorizePlan, clearMemorizePlan,
   getQuranBoundaries, getTaskSegment, getStats, getSurahFirstPage,
   getTaskDate, getNextTaskIndex, describeSegment, toggleTask, toggleRevision,
-  toggleJuzRevision, getRevisionRanges, getJuzRevision, getJuzSpan, getDayKind,
+  toggleJuzRevision, getRevisionRanges, getJuzRevisionPortion, getDayKind,
   resolveAbsIndex, todayKey, daysBetween,
 } from "@/lib/memorize";
 import {
@@ -498,6 +498,11 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
             </button>
           ))}
         </div>
+        {formJuzFrequency !== 'off' && (
+          <p className={cn("text-center text-emerald-600 dark:text-emerald-400", textSizeClasses.text)}>
+            {t('memorizeJuzSplitStatement')}
+          </p>
+        )}
       </div>
 
       <label className="flex flex-col gap-1">
@@ -610,6 +615,10 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
     juz: number;
     info: SegmentInfo;
     done: boolean;
+    /** 1-based day number inside the revision window */
+    dayInSlot: number;
+    /** days the window spreads the juz over */
+    slotDays: number;
   }
 
   interface DayContent {
@@ -635,12 +644,17 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
     if (!plan || !boundaries) return base;
 
     // juz revision runs on its own calendar rhythm — any day kind can carry it
-    const juz = getJuzRevision(plan, boundaries, dateKey);
-    const juzInfo: JuzInfo | null = juz !== null
+    const juzPortion = getJuzRevisionPortion(plan, boundaries, dateKey);
+    const juzInfo: JuzInfo | null = juzPortion
       ? {
-          juz,
-          info: describeSegment({ index: 0, ...getJuzSpan(boundaries, juz) }, boundaries),
+          juz: juzPortion.juz,
+          info: describeSegment(
+            { index: 0, startAbs: juzPortion.startAbs, endAbs: juzPortion.endAbs },
+            boundaries
+          ),
           done: plan.completedJuz.includes(dateKey),
+          dayInSlot: juzPortion.dayInSlot,
+          slotDays: juzPortion.slotDays,
         }
       : null;
 
@@ -823,7 +837,7 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
     if (!plan || !boundaries) return null;
     const content = getDayContent(dateKey);
 
-    // whole-juz revision row (its own calendar rhythm — any day kind)
+    // juz-revision row: the day's slice of the cycle's juz (any day kind)
     const juzRow = content.juzInfo && (() => {
       const j = content.juzInfo!;
       return (
@@ -847,14 +861,26 @@ export default function MemorizeView({ currentPage = 1, onNavigateToPage }: Memo
             <span className="text-xs font-semibold text-violet-700 dark:text-violet-400">
               {t('memorizeJuzRevision')}
             </span>
-            <p className={cn(
-              "font-medium break-words",
-              j.done
-                ? "line-through text-violet-700/80 dark:text-violet-500/80"
-                : "text-emerald-900 dark:text-emerald-100"
-            )}>
-              {t('memorizeJuzFull').replace('{juz}', fmt(j.juz))}
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className={cn(
+                "font-medium break-words",
+                j.done
+                  ? "line-through text-violet-700/80 dark:text-violet-500/80"
+                  : "text-emerald-900 dark:text-emerald-100"
+              )}>
+                {t('memorizeJuzPortion').replace('{juz}', fmt(j.juz))}
+              </p>
+              <span className={cn(
+                "text-xs px-2 rounded-full font-medium",
+                j.done
+                  ? "bg-violet-200/60 dark:bg-violet-900/40 text-violet-700/80 dark:text-violet-400/80"
+                  : "bg-violet-100 dark:bg-violet-900/60 text-violet-700 dark:text-violet-300"
+              )}>
+                {t('memorizeJuzDay')
+                  .replace('{day}', fmt(j.dayInSlot))
+                  .replace('{days}', fmt(j.slotDays))}
+              </span>
+            </div>
             <p className="text-xs text-emerald-700 dark:text-emerald-400">
               {pagesText(j.info)}
             </p>
